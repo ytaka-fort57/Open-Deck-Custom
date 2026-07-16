@@ -3,8 +3,21 @@
 window.opd_custom_column_state = (function(){
     const STATE_KEY = "opd_custom_column_state";
 
+    //拡張機能の更新後、ページに残った古いスクリプトはstorageを触れない
+    //その状態で操作を続けても例外になるだけなので、静かに諦める
+    function is_extension_alive(){
+        try{
+            return chrome.runtime != undefined && chrome.runtime.id != undefined;
+        }catch(error){
+            return false;
+        }
+    }
+
     //本家の内部変数へ依存しないよう、現在のプロファイル番号は設定から読む
     function get_profile_index(callback){
+        if(!is_extension_alive()){
+            return;
+        }
         chrome.storage.local.get("opd_settings", function(value){
             if(value.opd_settings == null){
                 callback(0);
@@ -20,6 +33,9 @@ window.opd_custom_column_state = (function(){
     }
 
     function load_state(callback){
+        if(!is_extension_alive()){
+            return;
+        }
         chrome.storage.local.get(STATE_KEY, function(value){
             if(value[STATE_KEY] == null){
                 callback({});
