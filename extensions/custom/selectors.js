@@ -24,6 +24,17 @@ window.opd_custom_selectors = (function(){
         return tab.getAttribute("aria-selected") === "true";
     }
 
+    //Xの実処理はrole="tab"より内側の要素に付いている場合があるため、
+    //最も内側のラベル要素を押してイベントを外へ伝播させる
+    function click_tab(tab){
+        const label_node = tab.querySelector("span");
+        if(label_node != null){
+            label_node.click();
+        }else{
+            tab.click();
+        }
+    }
+
     function find_tab_by_label(doc, label){
         return get_tabs(doc).find(function(tab){
             return tab_label(tab) === label;
@@ -52,6 +63,7 @@ window.opd_custom_selectors = (function(){
         get_tabs: get_tabs,
         tab_label: tab_label,
         is_selected: is_selected,
+        click_tab: click_tab,
         find_tab_by_label: find_tab_by_label,
         wait_for_tabs: wait_for_tabs
     };

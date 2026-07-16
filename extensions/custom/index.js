@@ -53,17 +53,31 @@
 
     //保存済みのタブを選び直す
     //Xはタブ選択をアカウント単位で共有するため、カラムごとに読み込み後の再選択が必要
+    //描画直後はクリックが効かず、こちらの選択がX側の状態で戻される場合もあるため、
+    //選択されたか確かめて必要なら押し直す
     function apply_saved_tab(doc, profile_index, column_index){
+        const RETRY_LIMIT = 4;
+        const RETRY_INTERVAL_MS = 700;
         column_state.get_tab(profile_index, column_index, function(saved_label){
             if(saved_label == undefined){
                 return;
             }
             selectors.wait_for_tabs(doc, 15000, function(){
-                const target = selectors.find_tab_by_label(doc, saved_label);
-                if(target == null || selectors.is_selected(target)){
-                    return;
+                let tried_count = 0;
+                function select_tab(){
+                    const target = selectors.find_tab_by_label(doc, saved_label);
+                    //タブ自体が無くなった場合(リスト削除など)は諦める
+                    if(target == null || selectors.is_selected(target)){
+                        return;
+                    }
+                    if(tried_count >= RETRY_LIMIT){
+                        return;
+                    }
+                    tried_count += 1;
+                    selectors.click_tab(target);
+                    setTimeout(select_tab, RETRY_INTERVAL_MS);
                 }
-                target.click();
+                select_tab();
             });
         });
     }
