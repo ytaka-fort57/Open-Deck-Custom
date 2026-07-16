@@ -18,7 +18,7 @@
   "content_scripts": [
   {
     "matches": ["https://*.twitter.com/*", "https://*.x.com/*"],
-    "js": ["content.js", "extensions/utils.js", "extensions/text_review.js", "extensions/auto_reload.js", "extensions/media_viewer_block.js", "extensions/media_viewer/media_viewer.js"]
+    "js": ["content.js", "extensions/utils.js", "extensions/text_review.js", "extensions/auto_reload.js", "extensions/media_viewer_block.js", "extensions/media_viewer/media_viewer.js", "extensions/custom/index.js"]
   }],
   "web_accessible_resources" : [{
     "matches" : ["https://*.twitter.com/*", "https://*.x.com/*"],
@@ -31,6 +31,7 @@
     "icon.png", 
     "icon/logo_icon.svg",
     "profile_debug.html",
+    "extensions/custom/settings_import.html",
     "about_opd.html",
     "icon/settings.svg",
     "icon/banner_hide.svg", 

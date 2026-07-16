@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8" >
+    <title>Open-Deck Custom Settings Import</title>
+    <script src="settings_import.js" charset="UTF-8"></script>
+</head>
+<body>
+    <h1>設定インポート</h1>
+    <p>本家Open-Deckで書き出した設定を、このカスタム版へ取り込みます。
+        <br>
+        カスタム版は本家とは別の拡張機能として登録されるため、設定は共有されません。取り込みはこの画面から行ってください。
+    </p>
+    <section>
+        <h2>本家からの書き出し手順</h2>
+        <ol>
+            <li>本家Open-Deckをインストールしたブラウザーでデッキを開きます。</li>
+            <li>サイドバーの「Debug」メニューから「プロファイル読み込み」を開きます。</li>
+            <li>「プロファイル書き出し」を押し、出力されたJSONをすべてコピーします。</li>
+            <li>コピーしたJSONを下のテキストエリアへ貼り付け、「インポート」を押します。</li>
+        </ol>
+        <p>本家の書き出しにはカラム構成（プロファイル）のみが含まれます。
+            <br>
+            表示設定などを含めて移したい場合は、このカスタム版の「書き出し」で作ったJSONを使ってください。
+        </p>
+    </section>
+    <hr>
+    <section>
+        <h2>インポート</h2>
+        <h3>JSONを貼り付け</h3>
+        <div><textarea id="import_input_area" style="width: 40rem;height: 12rem;"></textarea></div>
+        <div style="margin-top: 0.5rem;">ファイルから読み込む<span><input type="file" id="import_file" accept=".json,application/json"></span></div>
+        <div style="margin-top: 1rem;"><input id="import_btn" type="button" value="インポート"/></div>
+        <div id="import_status" style="margin-top: 0.5rem;"></div>
+    </section>
+    <hr>
+    <section>
+        <h2>書き出し</h2>
+        <p>このカスタム版の設定とカラム構成をまとめて書き出します。バックアップや別環境への移動に使ってください。</p>
+        <div><input id="export_btn" type="button" value="書き出し"/></div>
+        <div style="margin-top: 0.5rem;"><textarea id="export_output_area" style="width: 40rem;height: 12rem;"></textarea></div>
+    </section>
+</body>
+</html>
