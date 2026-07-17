@@ -14,6 +14,7 @@
     const column_state = window.opd_custom_column_state;
     const keyboard = window.opd_custom_keyboard;
     const column_history = window.opd_custom_column_history;
+    const column_reorder = window.opd_custom_column_reorder;
 
     function open_settings_import(){
         window.open(chrome.runtime.getURL("extensions/custom/settings_import.html"), "OPD-Custom-Settings-Import", 'width=760, height=680');
@@ -166,6 +167,7 @@
         add_menu_button();
         setup_timeline_columns();
         setup_column_keys();
+        column_reorder.setup(document);
     });
     observer.observe(document.documentElement, {childList: true, subtree: true});
     add_menu_button();
