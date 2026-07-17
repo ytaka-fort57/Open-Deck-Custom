@@ -24,11 +24,14 @@ chrome.runtime.onMessage.addListener(
         if(request.message == "text_review"){
             const api_url = "https://opd.kwdev-sys.com/api/opd/text_review/review";
             (async () => {
+                const controller = new AbortController();
+                const timeout_id = setTimeout(() => controller.abort(), 15000);
                 try{
                     const res = await fetch(api_url, {
                         method: "POST",
                         headers: {"Content-Type": "application/json"},
                         body: JSON.stringify({"text":request.review_text}),
+                        signal: controller.signal,
                     });
 
                     if(!res.ok){
@@ -40,7 +43,8 @@ chrome.runtime.onMessage.addListener(
                 }catch(error){
                     console.error("Fetch failed:", error);
                     sendResponse(false);
-                    return;
+                }finally{
+                    clearTimeout(timeout_id);
                 }
             })();
         }

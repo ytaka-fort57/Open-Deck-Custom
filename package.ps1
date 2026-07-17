@@ -27,54 +27,51 @@ Write-Host "version: $Version"
 $ZipFirefox = "Open-Deck_Firefox_${Version}.zip"
 $ZipChrome  = "Open-Deck_Chromium_${Version}.zip"
 
+# 配布に必要な項目だけを列挙する。開発用ファイルは追加されてもZIPへ入らない。
+$PackageEntries = @(
+    "_locales",
+    "extensions",
+    "icon",
+    "about_opd.html",
+    "about_opd.js",
+    "background.js",
+    "content.js",
+    "icon.png",
+    "LICENSE",
+    "manifest.json",
+    "manifest_firefox.json",
+    "popup.html",
+    "popup.js",
+    "profile_debug.html",
+    "profile_debug.js",
+    "text_review_privacy_policy.md"
+)
+
 # 初期化
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 Remove-Item -Recurse -Force -ErrorAction Ignore $TmpDir
 New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
 
-# ディレクトリ除外
-$ExcludeDirs = @(
-    ".git",
-    ".github",
-    "package_tmp",
-    "package"
-)
-
-# ファイル除外
-$ExcludeFiles = @(
-    ".gitignore",
-    "README.md",
-    ".DS_Store",
-    "*.sh",
-    "*.ps1"
-)
-
-function Invoke-RoboCopy {
+function Copy-PackageEntries {
     param(
-        [Parameter(Mandatory=$true)][string]$Source,
         [Parameter(Mandatory=$true)][string]$Dest,
-        [string[]]$XD,
-        [string[]]$XF
+        [Parameter(Mandatory=$true)][bool]$IncludeFirefoxManifest
     )
 
-    $args = @(
-        $Source, $Dest,
-        "/E", "/R:0", "/W:0",
-        "/NFL", "/NDL", "/NJH", "/NJS"
-    )
-
-    if ($XD -and $XD.Count -gt 0) { $args += "/XD"; $args += $XD }
-    if ($XF -and $XF.Count -gt 0) { $args += "/XF"; $args += $XF }
-
-    $null = & robocopy @args
-
-    if ($LASTEXITCODE -ge 8) {
-        throw "robocopy に失敗しました $LASTEXITCODE"
+    foreach ($Entry in $PackageEntries) {
+        if (-not $IncludeFirefoxManifest -and $Entry -eq "manifest_firefox.json") {
+            continue
+        }
+        $SourcePath = Join-Path $TargetDir $Entry
+        if (-not (Test-Path -LiteralPath $SourcePath)) {
+            throw "配布対象が見つかりません: $SourcePath"
+        }
+        Copy-Item -LiteralPath $SourcePath -Destination $Dest -Recurse -Force
     }
 }
 
 # Firefox 用 ZIP 作成
-Invoke-RoboCopy -Source $TargetDir -Dest $TmpDir -XD $ExcludeDirs -XF $ExcludeFiles
+Copy-PackageEntries -Dest $TmpDir -IncludeFirefoxManifest $true
 
 $ffManifest = Join-Path $TmpDir "manifest_firefox.json"
 $mainManifest = Join-Path $TmpDir "manifest.json"
@@ -90,7 +87,7 @@ Remove-Item -Recurse -Force $TmpDir
 New-Item -ItemType Directory -Force -Path $TmpDir | Out-Null
 
 # Chrome 用 ZIP 作成
-Invoke-RoboCopy -Source $TargetDir -Dest $TmpDir -XD $ExcludeDirs -XF ($ExcludeFiles + @("manifest_firefox.json"))
+Copy-PackageEntries -Dest $TmpDir -IncludeFirefoxManifest $false
 
 $chZipPath = Join-Path $OutputDir $ZipChrome
 if (Test-Path $chZipPath) { Remove-Item -Force $chZipPath }

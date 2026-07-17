@@ -11,16 +11,38 @@ if(is_prototype){
 const url_path = new URL(location.href);
 let is_added_system_color_mode = false;
 let apply_ui_color = null;
+let system_color_scheme = null;
+let is_page_observer_initialized = false;
+let is_title_favicon_initialized = false;
+let is_page_event_listener_initialized = false;
 const i18n_message = chrome.i18n.getMessage;
 let is_shift_pressed = false;
 let profile_store;
 let last_load_profile = 0;
 let is_removed_default_style = false;
-let media_viewer_token = [];
+const media_viewer_tokens_by_frame = new WeakMap();
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
     media_viewer: {active: false},
 };
+const auto_reload_disposers = new Set();
+
+function dispose_all_auto_reload(){
+    Array.from(auto_reload_disposers).forEach(function(dispose){
+        dispose();
+    });
+}
+
+function dispose_auto_reload_in(root){
+    if(root == null){
+        return;
+    }
+    root.querySelectorAll("iframe").forEach(function(iframe){
+        if(typeof iframe.opd_dispose_auto_reload === "function"){
+            iframe.opd_dispose_auto_reload();
+        }
+    });
+}
 const ui_icon_define = {
     banner_hide:"icon/banner_hide.svg",
     top_bar_hide:"icon/top_hide.svg",
@@ -198,6 +220,8 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
     }
 }
 function run(settings){
+    //再構築前のカラムが保持していた自動更新を確実に停止する
+    dispose_all_auto_reload();
     //console.log(settings)
     let profile_list_html;
     let profile_list_btn_html = "";
@@ -207,35 +231,37 @@ function run(settings){
     }
     profile_list_html = `<div class="profile_val_now" title="${i18n_message("ui_profile_current_title")}">${last_load_profile}</div><div class="dsp_profile_list"><div id="profile_btn_list">${profile_list_btn_html}</div>`;
     //console.log(profile_list_btn_html)
-    //カラム全体のテキストフォーカスの状態で自動更新を制御できるようにする
-    window.addEventListener('opd_post_focus', (e) => {
-        const detail = JSON.parse(e.detail);
-        if(detail){
-            column_auto_update_state.text_focus.date = Date.now();
-            column_auto_update_state.text_focus.active = true;
-        }else{
-            column_auto_update_state.text_focus.date = 0;
-            column_auto_update_state.text_focus.active = false;
-        }
-    });
-    //画像表示パネル
-    const media_viewer = new OpdExtMediaViewer();
-    document.addEventListener('opd_send_media_info', (e) => {
-        const detail = JSON.parse(e.detail);
-        for (let index = 0; index < media_viewer_token.length; index++) {
-            const token = media_viewer_token[index];
-            if(detail.token === token){
+    if(!is_page_event_listener_initialized){
+        is_page_event_listener_initialized = true;
+        //カラム全体のテキストフォーカスの状態で自動更新を制御できるようにする
+        window.addEventListener('opd_post_focus', (e) => {
+            const detail = JSON.parse(e.detail);
+            if(detail){
+                column_auto_update_state.text_focus.date = Date.now();
+                column_auto_update_state.text_focus.active = true;
+            }else{
+                column_auto_update_state.text_focus.date = 0;
+                column_auto_update_state.text_focus.active = false;
+            }
+        });
+        //画像表示パネルとページ全体の受信listenerも、プロファイル切り替え後に重複させない
+        const media_viewer = new OpdExtMediaViewer();
+        document.addEventListener('opd_send_media_info', (e) => {
+            const detail = JSON.parse(e.detail);
+            const is_current_frame = Array.from(document.querySelectorAll('#main_rack_element iframe')).some((frame) => {
+                return media_viewer_tokens_by_frame.get(frame) === detail.token;
+            });
+            if(is_current_frame){
                 //ビューワーを閉じた際のコールバック関数
                 function viewer_close(){
                     column_auto_update_state.media_viewer.active = false;
                 }
-                
+
                 column_auto_update_state.media_viewer.active = true;
                 media_viewer.Preview(detail.media_info, detail.selected_index, viewer_close);
-                break;
             }
-        }
-    });
+        });
+    }
     //CSSタグ追加
     document.querySelector("head").insertAdjacentHTML("afterbegin", `<style second_column_css></style>
     <style opd_default_css>
@@ -869,24 +895,29 @@ function run(settings){
     //HTML挿入
     document.body.insertAdjacentElement("afterbegin", ins_html);
 
-    //favicon・タイトルを設定
+    //favicon・タイトルとページ全体の監視は、プロファイル切り替え後も同じdocumentを使うため1度だけ登録する
     set_title_favicon()
+    if(!is_page_observer_initialized){
+        is_page_observer_initialized = true;
+        //react-rootを監視しマスク処理をする
+        observe_when_ready(
+            () => document.getElementById("react-root"),
+            document.body,
+            main_dsp,
+            { childList: true, characterData: true, subtree: false }
+        );
 
-    //react-rootを監視しマスク処理をする
-    observe_when_ready(
-        () => document.getElementById("react-root"),
-        document.body,
-        main_dsp,
-        { childList: true, characterData: true, subtree: false }
-    );
-
-    //headを監視しカラーモード機能やCSSを設定・変更する
-    observe_when_ready(
-        () => document.querySelector("head"),
-        document.documentElement,
-        head_observer_callback,
-        { childList: true, subtree: false }
-    );
+        //headを監視しカラーモード機能やCSSを設定・変更する
+        observe_when_ready(
+            () => document.querySelector("head"),
+            document.documentElement,
+            head_observer_callback,
+            { childList: true, subtree: false }
+        );
+    }else{
+        main_dsp(document.getElementById("react-root"));
+        head_observer_callback(document.head);
+    }
     //APIリミット表示用
     document.querySelector("#api_limit_status").addEventListener("click", function(){
         if(api_limit_obj != null){
@@ -977,6 +1008,7 @@ function run(settings){
                 }
                 //console.log(preload_desc_array)
                 if(confirm(`${i18n_message("msg_profile_load_confirm", [index, preload_desc_array.join("\r\n")])}`)){
+                    dispose_all_auto_reload();
                     document.querySelector("#opd_main_element").remove();
                     last_load_profile = index;
                     chrome.storage.local.get("opd_settings", function(value){
@@ -1083,7 +1115,11 @@ function run(settings){
                 }
             })
             //各カラム読み込み後の動作(init)
-            column_object[index].addEventListener("load", function(){
+            //append_object_css() は別カラム削除時にも既存iframeを再走査するため、
+            //初期化用loadハンドラーはiframeごとに一度だけ登録する
+            if(column_object[index].opd_column_ui_loader_added !== true){
+                column_object[index].opd_column_ui_loader_added = true;
+                column_object[index].addEventListener("load", function(){
                 //console.log(this)
                 let opd_column_div = this.closest("div[opd_column_type]");
                 let opd_column_width_btn = opd_column_div.querySelector(".column_width_btn");
@@ -1255,9 +1291,49 @@ function run(settings){
                             break;
                     }
                     //自動更新初期適用
-                    let reload_test = 0;
                     let auto_reload_int = null;//チェックボックスイベントにも再利用
                     if(opd_column_auto_reload_checkbox != null){
+                        const auto_reload_target_elem = this;
+                        const stop_auto_reload = function(){
+                            if(auto_reload_int != null){
+                                clearInterval(auto_reload_int);
+                                auto_reload_int = null;
+                            }
+                        };
+                        const dispose_auto_reload = function(){
+                            stop_auto_reload();
+                            auto_reload_disposers.delete(dispose_auto_reload);
+                            if(auto_reload_target_elem.opd_dispose_auto_reload === dispose_auto_reload){
+                                delete auto_reload_target_elem.opd_dispose_auto_reload;
+                            }
+                        };
+                        const start_auto_reload = function(interval_ms){
+                            stop_auto_reload();
+                            if(!Number.isFinite(interval_ms) || interval_ms < 1000){
+                                return;
+                            }
+                            auto_reload_int = setInterval(function(){
+                                if(!auto_reload_target_elem.isConnected){
+                                    dispose_auto_reload();
+                                    return;
+                                }
+                                const path_name = auto_reload_target_elem.contentWindow.location.pathname;
+                                if(['/home', '/search'].includes(path_name) || path_name.startsWith('/i/lists')){
+                                    if(auto_reload_target_elem.getAttribute("auto_reload_mouse_hover") == "false"){
+                                        if (auto_reload_target_elem.opd_auto_reload && is_auto_update()){
+                                            auto_reload_target_elem.opd_auto_reload.Reload(auto_reload_target_elem.contentWindow);
+                                            setTimeout(() => {
+                                                if(auto_reload_target_elem.isConnected){
+                                                    auto_reload_target_elem.contentWindow.scrollTo({ top: 0, behavior: 'auto' });
+                                                }
+                                            }, 100);
+                                        }
+                                    }
+                                }
+                            }, interval_ms);
+                        };
+                        auto_reload_target_elem.opd_dispose_auto_reload = dispose_auto_reload;
+                        auto_reload_disposers.add(dispose_auto_reload);
                         //Home, Exproleカラムホバー中 自動更新上部遷移停止
                         opd_column_div.querySelector("iframe").addEventListener("mouseover", function(){
                             this.setAttribute("auto_reload_mouse_hover", "true");
@@ -1265,7 +1341,6 @@ function run(settings){
                         opd_column_div.querySelector("iframe").addEventListener("mouseleave", function(){
                             this.setAttribute("auto_reload_mouse_hover", "false");
                         });
-                        const auto_reload_target_elem = this;
                         //console.log(opd_column_auto_reload_checkbox)
                         if(mode != "session_set"){
                             opd_column_auto_reload_time_reload.addEventListener("change", function(){
@@ -1286,22 +1361,7 @@ function run(settings){
                             const auto_reload_time_input = auto_reload_target_elem.closest('div[opd_column_type]').querySelector(".opd_a_reload_time_setting");
                             const auto_reload_load_time = Number(auto_reload_time_input.value) * 1000;
                             auto_reload_time_input.disabled = true;
-                            auto_reload_int = setInterval(function(){
-                                //console.log("update!")
-                                //console.log(auto_reload_target_elem.contentWindow)
-                                const path_name = auto_reload_target_elem.contentWindow.location.pathname;
-                                if(['/home', '/search'].includes(path_name) || path_name.startsWith('/i/lists')){
-                                    if(auto_reload_target_elem.getAttribute("auto_reload_mouse_hover") == "false"){
-                                        //カラムの自動更新が全体的に許可されていない場合は自動更新を無効化する
-                                        if (auto_reload_target_elem.opd_auto_reload && is_auto_update()){
-                                            auto_reload_target_elem.opd_auto_reload.Reload(auto_reload_target_elem.contentWindow);
-                                            setTimeout(() => {
-                                                auto_reload_target_elem.contentWindow.scrollTo({ top: 0, behavior: 'auto' });
-                                            }, 100);
-                                        }
-                                    }
-                                };
-                            }, auto_reload_load_time);
+                            start_auto_reload(auto_reload_load_time);
                         }
                     }
 
@@ -1381,33 +1441,17 @@ function run(settings){
                     if(opd_column_auto_reload_checkbox != null){
                         if(mode != "session_set"){
                             opd_column_auto_reload_checkbox.addEventListener("click", function(){
-                                let auto_reload_target_object = this.closest("div[opd_column_type]").querySelector("iframe");
                                 const auto_reload_time_input = this.closest("div[opd_column_type]").querySelector(".opd_a_reload_time_setting");
                                 const auto_reload_time = Number(auto_reload_time_input.value) * 1000;
                                 if(this.checked){
                                     auto_reload_time_input.disabled = true;
-                                    auto_reload_int = setInterval(function(){
-                                        //console.log("update!")
-                                        //console.log(auto_reload_target_object.contentWindow)
-                                        const path_name = auto_reload_target_object.contentWindow.location.pathname;
-                                        if(['/home', '/search'].includes(path_name) || path_name.startsWith('/i/lists')){
-                                            if(auto_reload_target_object.getAttribute("auto_reload_mouse_hover") == "false"){
-                                                //カラムの自動更新が全体的に許可されていない場合は自動更新を無効化する
-                                                if (auto_reload_target_object.opd_auto_reload && is_auto_update()){
-                                                    auto_reload_target_object.opd_auto_reload.Reload(auto_reload_target_object.contentWindow);
-                                                    setTimeout(() => {
-                                                        auto_reload_target_object.contentWindow.scrollTo({ top: 0, behavior: 'auto' });
-                                                    }, 500);
-                                                }
-                                            }
-                                        };
-                                    }, auto_reload_time);
+                                    start_auto_reload(auto_reload_time);
                                     //console.log(auto_reload_time)
                                     column_settings_save("", last_load_profile);
                                 }else{
                                     auto_reload_time_input.disabled = false;
                                     //console.log("update stop!")
-                                    clearInterval(auto_reload_int);
+                                    stop_auto_reload();
                                     column_settings_save("", last_load_profile);
                                 }
                             });
@@ -1447,7 +1491,8 @@ function run(settings){
                 //カラムバー空白領域クリックでトップにスクロール
                 opd_column_scroll_to_top.addEventListener("click", (e) => { this.contentWindow.scrollTo({ top: 0, behavior: "auto" }); });
 
-            }, {once: true})
+                }, {once: true})
+            }
             //exploreURL検出処理
             const opd_column_mutate = column_object[index].closest("div[opd_column_type]");
             if(opd_column_mutate.getAttribute("opd_column_type") == 'explore'){
@@ -1509,7 +1554,10 @@ function run(settings){
             document.querySelector(".dsp_btn_second_rack_img").style.backgroundImage = `url(${chrome.runtime.getURL(ui_icon_define.column_single_rack)})`;
         }else{
             if(confirm(i18n_message("msg_second_rack_to_single_confirm"))){
+                const timeline_before = snapshot_timeline_state();
+                dispose_auto_reload_in(document.querySelector("#second_rack_element"));
                 document.querySelector("#second_rack_element").textContent = "";
+                remap_timeline_state(timeline_before);
                 document.querySelector("style[second_column_css]").textContent = ``;
                 document.querySelector("#first_rack_element").style.height = "100vh";
                 document.querySelector("#second_rack_element").style.height = "0";
@@ -1564,9 +1612,11 @@ function run(settings){
         const empty_column = document.querySelector(".dsp_column_emptycolumn");
         const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
         const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
+        const timeline_before = snapshot_timeline_state();
         
-        const new_column = default_element["home"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10000");
+        const new_column = default_element["home"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
         add_target_column.insertAdjacentHTML("beforebegin", new_column);
+        remap_timeline_state(timeline_before);
         add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
@@ -1595,7 +1645,7 @@ function run(settings){
         const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
         const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
         
-        const new_column = default_element["explore"]["html"].replaceAll("%column_save_path%", "/explore").replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_pinned_save_path%", "").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10000");
+        const new_column = default_element["explore"]["html"].replaceAll("%column_save_path%", "/explore").replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_pinned_save_path%", "").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
         add_target_column.insertAdjacentHTML("beforebegin", new_column);
         add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
@@ -1611,8 +1661,10 @@ function run(settings){
             const save_object = {name:"user_profile", profile:profile.column_settings};
             //console.log(profile)
             profile_store.push(save_object);
+            const new_profile_index = profile_store.length - 1;
             //console.log(profile_store)
             chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile_store)}, function () {
+                copy_profile_tab_state(last_load_profile, new_profile_index);
                 let profile_list_btn_html = "";
                 //プロファイルリスト初期化
                 for (let index = 0; index < profile_store.length; index++) {
@@ -1625,13 +1677,27 @@ function run(settings){
     });
     //プロファイル削除ボタン
     document.getElementById("profile_delete").addEventListener("click", function(){
-        const delete_num = Number(prompt(i18n_message("msg_profile_delete_number_prompt")));
+        const delete_input = prompt(i18n_message("msg_profile_delete_number_prompt"));
+        if(delete_input == null){
+            return;
+        }
+        const normalized_delete_input = delete_input.trim();
+        if(!/^\d+$/.test(normalized_delete_input)){
+            alert(i18n_message("msg_invalid_value_alert"));
+            return;
+        }
+        const delete_num = Number(normalized_delete_input);
+        if(!Number.isSafeInteger(delete_num) || delete_num < 0 || delete_num >= profile_store.length){
+            alert(i18n_message("msg_invalid_value_alert"));
+            return;
+        }
         if(last_load_profile != delete_num){
             if(confirm(i18n_message("msg_profile_delete_confirm", [delete_num]))){
                 let after_profile_num = null;
                 profile_store.splice(delete_num, 1);
                 //console.log(profile_store)
                 chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile_store)}, function () {
+                    delete_profile_tab_state(delete_num);
                     //
                     chrome.storage.local.get("opd_settings", function(load_value){
                         //console.log(last_load_profile)
@@ -1689,7 +1755,8 @@ function run(settings){
 
                 const blocker = new OpdMediaViewerBlocker();
                 blocker.Init(column_frame);
-                media_viewer_token.push(blocker.opd_send_media_info_token);
+                //同じiframeの再読込では最新tokenへ置き換え、削除済みiframeはWeakMapに保持させない
+                media_viewer_tokens_by_frame.set(column_frame, blocker.opd_send_media_info_token);
             }
         };
 
@@ -1699,6 +1766,36 @@ function run(settings){
 
         //拡張を追加する
         column_frame.addEventListener("load", ext_load);
+    }
+
+    function snapshot_timeline_state(){
+        const reorder_api = window.opd_custom_column_reorder;
+        if(reorder_api == undefined || reorder_api.snapshot_timeline_sections == undefined){
+            return null;
+        }
+        return reorder_api.snapshot_timeline_sections(document);
+    }
+
+    function remap_timeline_state(before_sections){
+        const reorder_api = window.opd_custom_column_reorder;
+        if(before_sections == null || reorder_api == undefined || reorder_api.remap_after_dom_change == undefined){
+            return;
+        }
+        reorder_api.remap_after_dom_change(before_sections, document);
+    }
+
+    function copy_profile_tab_state(source_profile_index, target_profile_index){
+        const state_api = window.opd_custom_column_state;
+        if(state_api != undefined && state_api.copy_profile != undefined){
+            state_api.copy_profile(source_profile_index, target_profile_index);
+        }
+    }
+
+    function delete_profile_tab_state(deleted_profile_index){
+        const state_api = window.opd_custom_column_state;
+        if(state_api != undefined && state_api.delete_profile != undefined){
+            state_api.delete_profile(deleted_profile_index);
+        }
     }
 
     //カラム移動
@@ -1727,6 +1824,7 @@ function run(settings){
                 const dt_id = ev.dataTransfer.getData('text/plain');
                 const dr_elem = document.getElementById(dt_id);
                 if(dr_elem != null){
+                    const timeline_before = ev.opd_custom_tab_remap === true ? null : snapshot_timeline_state();
                     if(dr_elem?.querySelector("div")?.getAttribute("opd_column_type") == 'explore'){
                         if(dr_elem.querySelector("div").getAttribute("opd_pinned_path") != ""){
                             dr_elem.querySelector("div").querySelector("iframe").src = `https://x.com${dr_elem.querySelector("div").getAttribute("opd_pinned_path")}`;
@@ -1735,6 +1833,7 @@ function run(settings){
                         }
                     }
                     this.parentNode.insertBefore(dr_elem, this);
+                    remap_timeline_state(timeline_before);
                     this.style.borderLeft = '';
                     column_settings_save("", last_load_profile);
                 }else{
@@ -1753,12 +1852,20 @@ function run(settings){
                 close_btns[index].addEventListener("click", function(){
                 const pin_checkbox = this.closest(".dsp_column").querySelector(".opd_pinned_btn")?.checked;
                 if(pin_checkbox == false || pin_checkbox == undefined){
-                    this.closest(".dsp_column").remove();
+                    const timeline_before = snapshot_timeline_state();
+                    const column = this.closest(".dsp_column");
+                    dispose_auto_reload_in(column);
+                    column.remove();
+                    remap_timeline_state(timeline_before);
                     append_object_css();
                     column_settings_save("", last_load_profile);
                 }else{
                     if(confirm(i18n_message("msg_pinned_column_close_confirm"))){
-                        this.closest(".dsp_column").remove();
+                        const timeline_before = snapshot_timeline_state();
+                        const column = this.closest(".dsp_column");
+                        dispose_auto_reload_in(column);
+                        column.remove();
+                        remap_timeline_state(timeline_before);
                         append_object_css();
                         column_settings_save("", last_load_profile);
                     }
@@ -1922,28 +2029,33 @@ function head_observer_callback(head_elem){
     const color_mode = get_cookie_color_mode();
     switch (color_mode){
         case "system": {
-            apply_ui_color = () => {
-                const currentScheme = color_scheme.matches ? "dark" : "light";
-                main_element.setAttribute("opd-dsp-theme", currentScheme);
-            };
-            apply_ui_color();
             if(!is_added_system_color_mode){
-                color_scheme.addEventListener("change", apply_ui_color);
+                system_color_scheme = color_scheme;
+                apply_ui_color = () => {
+                    const current_main_element = document.getElementById("opd_main_element");
+                    if(current_main_element == null || system_color_scheme == null) return;
+                    const current_scheme = system_color_scheme.matches ? "dark" : "light";
+                    current_main_element.setAttribute("opd-dsp-theme", current_scheme);
+                };
+                system_color_scheme.addEventListener("change", apply_ui_color);
                 is_added_system_color_mode = true;
             }
+            apply_ui_color();
             break;
         }
         case "light":
-            if(is_added_system_color_mode && apply_ui_color){
-                color_scheme.removeEventListener("change", apply_ui_color);
+            if(is_added_system_color_mode && apply_ui_color && system_color_scheme){
+                system_color_scheme.removeEventListener("change", apply_ui_color);
                 is_added_system_color_mode = false;
+                system_color_scheme = null;
             }
             main_element.setAttribute("opd-dsp-theme", "light");
             break;
         case "dark":
-            if(is_added_system_color_mode && apply_ui_color){
-                color_scheme.removeEventListener("change", apply_ui_color);
+            if(is_added_system_color_mode && apply_ui_color && system_color_scheme){
+                system_color_scheme.removeEventListener("change", apply_ui_color);
                 is_added_system_color_mode = false;
+                system_color_scheme = null;
             }
             main_element.setAttribute("opd-dsp-theme", "dark");
             break;
@@ -1961,6 +2073,8 @@ function main_dsp(react_root){
 
 //タイトルやfaviconを設定する
 function set_title_favicon(){
+    if(is_title_favicon_initialized) return;
+    is_title_favicon_initialized = true;
     const OPD_TITLE = "Open-Deck";
     const OPD_FAVICON_URL = chrome.runtime.getURL("icon.png");
 

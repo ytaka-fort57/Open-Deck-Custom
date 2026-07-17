@@ -89,11 +89,14 @@ window.opd_custom_column_reorder = (function(){
         try{
             const transfer = new DataTransfer();
             transfer.setData("text/plain", section.id);
-            drop_target.dispatchEvent(new DragEvent("drop", {
+            const drop_event = new DragEvent("drop", {
                 dataTransfer: transfer,
                 bubbles: true,
                 cancelable: true
-            }));
+            });
+            //独自操作は move_to() 側で状態を付け替えるため、本家側の追加処理と二重にしない
+            drop_event.opd_custom_tab_remap = true;
+            drop_target.dispatchEvent(drop_event);
         }finally{
             //差し替えは本家のdrop処理の間だけに留める
             Node.prototype.insertBefore = original_insert_before;
@@ -119,7 +122,7 @@ window.opd_custom_column_reorder = (function(){
             return;
         }
         state_api.get_profile_index(function(profile_index){
-            state_api.load_all(function(state){
+            state_api.update_all(function(state){
                 const prefix = profile_index + ":";
                 const next_state = {};
                 //他のプロファイルの保存はそのまま残す
@@ -138,9 +141,21 @@ window.opd_custom_column_reorder = (function(){
                         next_state[prefix + new_index] = label;
                     }
                 });
-                state_api.save_all(next_state);
+                return next_state;
             });
         });
+    }
+
+    //本家側のドラッグ、追加、削除からも同じ再配置処理を利用する
+    function snapshot_timeline_sections(doc){
+        return get_timeline_sections(doc);
+    }
+
+    function remap_after_dom_change(before_sections, doc){
+        if(before_sections == null){
+            return;
+        }
+        remap_tab_state(before_sections, get_timeline_sections(doc));
     }
 
     function move_to(section, target_index){
@@ -245,6 +260,8 @@ window.opd_custom_column_reorder = (function(){
 
     return {
         setup: setup,
-        move_to: move_to
+        move_to: move_to,
+        snapshot_timeline_sections: snapshot_timeline_sections,
+        remap_after_dom_change: remap_after_dom_change
     };
 })();

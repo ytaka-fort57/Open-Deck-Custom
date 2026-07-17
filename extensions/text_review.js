@@ -9,7 +9,8 @@ class OpdExtTextReview {
             let editable_elem = null;
             let is_textarea_empty = true;
             let review_state = false;
-            this.opd_use_lang = ui_lang.split("-")[0];
+            const requested_lang = String(ui_lang || "").split("-")[0];
+            this.opd_use_lang = this.UITexts[requested_lang] != undefined ? requested_lang : "en";
             column_window.document.head.insertAdjacentHTML("beforeend", `<style opd_post_textreview_css>
                 /* Premium 勧誘要素非表示 */
                 div[aria-live="polite"][role="status"]:has(a[dir="ltr"]){
@@ -193,8 +194,14 @@ class OpdExtTextReview {
                             const review_panel = column_window.document.querySelector('div.opd_text_review_panel');
                             review_panel.textContent = "";
                             review_panel.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div><div class="opd_text_review_loader"></div>${this.UITexts[this.opd_use_lang].textReview_inProgress.message}</div>`);
-                            await this.Review(editable_elem.innerText.trim(), review_panel, column_window);
-                            review_state = false;
+                            try{
+                                await this.Review(editable_elem.innerText.trim(), review_panel, column_window);
+                            }catch(error){
+                                review_panel.textContent = "";
+                                review_panel.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_failed.message}</div>`);
+                            }finally{
+                                review_state = false;
+                            }
                         }
                     });
 
@@ -230,52 +237,53 @@ class OpdExtTextReview {
             const review_request = await this.ReviewRquest(text);
             
             //校正に失敗したら終了
-            if(!review_request){
+            if(!review_request || !Array.isArray(review_request.indications)){
                 panel_elem.textContent = "";
                 panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_failed.message}</div>`);
                 return;
             }
+            const indication_items = this.NormalizeIndications(text, review_request.indications).map((indication) => ({
+                indication: indication,
+                id: this.CreateRandomID(),
+                enabled: false
+            }));
             //校正パネルを空にする
             panel_elem.textContent = "";
 
             //指摘箇所がなければ終了
-            if(review_request.indications.length === 0){
+            if(indication_items.length === 0){
                 panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_noIssues.message}</div>`);
                 return;
             }
             //校正結果がある場合
             let result = [];
-            let indication_id = [];
-            const indications_fix_enabled = [];
             let indication_fix_str = text;
             
             //indicationsの分だけ校正パネルへ指摘リストを表示
-            review_request.indications.forEach((review) => {
-                const id = this.CreateRandomID();
+            indication_items.forEach((item) => {
+                const review = item.indication;
                 let suggest_elem = "";
                 if(review.params?.suggests != null){
                     suggest_elem = `<span style="background:#14ff0063;">${this.EscapeHTML(review.params?.suggests?.at(-1))}</span>`;
                 }
-                result.push(`<div class="opd_text_review_indication_switch"><input id="opd_text_review_iid_${id}" type="checkbox" opd_indication_id="${id}"><div><span style="font-size: 0.8em;">(${this.EscapeHTML(review.message)})</span><div><span style="text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(review.relevant_part.problem)}</span>${suggest_elem}${this.EscapeHTML(review.relevant_part.after)}</div></div></div>`);
-                indication_id.push(id);
-                indications_fix_enabled.push(false);
+                result.push(`<div class="opd_text_review_indication_switch"><input id="opd_text_review_iid_${item.id}" type="checkbox" opd_indication_id="${item.id}"><div><span style="font-size: 0.8em;">(${this.EscapeHTML(review.message)})</span><div><span style="text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(review.relevant_part?.problem)}</span>${suggest_elem}${this.EscapeHTML(review.relevant_part?.after)}</div></div></div>`);
             });
             //校正パネルへ全文指摘を表示
-            const review_view = this.IndicationTexts(text, review_request.indications, indication_id);
+            const review_view = this.IndicationTexts(text, indication_items);
             panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div class="opd_text_review_result"><div class="opd_text_review_result_preview">${review_view}</div><div class="opd_text_review_indication_switcher">${result.join("")}</div><div class="opd_text_review_indication_apply_panel"><button id="opd_text_review_apply_selected">${this.UITexts[this.opd_use_lang].textReview_applySelected.message}</button><button id="opd_text_review_apply_all">${this.UITexts[this.opd_use_lang].textReview_applyAll.message}</button></div></div>`);
 
-            indication_id.forEach((id, i)=>{
-                panel_elem.querySelector(`#opd_text_review_iid_${id}`).addEventListener("change", (ev)=>{
-                    const indcation_target = panel_elem.querySelector(`#opd_text_review_problem_id_${id}`)
-                    indcation_target.scrollIntoView({behavior: "smooth",inline: "end"});
+            indication_items.forEach((item)=>{
+                panel_elem.querySelector(`#opd_text_review_iid_${item.id}`).addEventListener("change", (ev)=>{
+                    const indcation_target = panel_elem.querySelector(`#opd_text_review_problem_id_${item.id}`)
+                    indcation_target?.scrollIntoView({behavior: "smooth",inline: "end"});
                     if(ev.target.checked){
-                        indcation_target.setAttribute("opd_text_review_indication_hidden", "");
-                        indications_fix_enabled[i] = true;
+                        indcation_target?.setAttribute("opd_text_review_indication_hidden", "");
+                        item.enabled = true;
                     }else{
-                        indcation_target.removeAttribute("opd_text_review_indication_hidden");
-                        indications_fix_enabled[i] = false;
+                        indcation_target?.removeAttribute("opd_text_review_indication_hidden");
+                        item.enabled = false;
                     }
-                    indication_fix_str = this.GetReviewedText(text, review_request.indications, indications_fix_enabled);
+                    indication_fix_str = this.GetReviewedText(text, indication_items);
                 });
             });
 
@@ -288,10 +296,10 @@ class OpdExtTextReview {
                 }));
             });
             panel_elem.querySelector(`#opd_text_review_apply_all`).addEventListener("click", (ev)=>{
-                indication_id.forEach((id)=>{
-                    const target = panel_elem.querySelector(`#opd_text_review_iid_${id}`);
+                indication_items.forEach((item)=>{
+                    const target = panel_elem.querySelector(`#opd_text_review_iid_${item.id}`);
                     if(!target.checked){
-                        panel_elem.querySelector(`#opd_text_review_iid_${id}`).click();
+                        target.click();
                     }
                 });
                 column_window.document.dispatchEvent(new CustomEvent('opd_text_review_apply', {
@@ -301,25 +309,37 @@ class OpdExtTextReview {
                 }));
             });
         }
-        this.IndicationTexts = (text, result, indication_ids) =>{
-            //全文指摘表示機能用のHTML生成関数
-            if (!result?.length) return this.EscapeHTML(text);
+        this.NormalizeIndications = (text, result) =>{
+            if(!Array.isArray(result)) return [];
 
-            //offsetの昇順で処理
-            const sorted = [...result].sort((a, b) => a.offset - b.offset);
+            const sorted = result.filter((ind) => {
+                if(ind == null || !Number.isInteger(ind.offset) || !Number.isInteger(ind.length)) return false;
+                if(ind.offset < 0 || ind.length < 0) return false;
+                return ind.offset + ind.length <= text.length;
+            }).sort((a, b) => a.offset - b.offset || a.length - b.length);
+
+            const normalized = [];
+            let current_end = 0;
+            for(const ind of sorted){
+                if(ind.offset < current_end) continue;
+                normalized.push(ind);
+                current_end = ind.offset + ind.length;
+            }
+            return normalized;
+        }
+        this.IndicationTexts = (text, items) =>{
+            //全文指摘表示機能用のHTML生成関数
+            if (!items?.length) return this.EscapeHTML(text);
 
             let cur = 0;
             let html = "";
 
-            for (const [i, ind] of sorted.entries()) {
+            for (const item of items) {
+                const ind = item.indication;
                 const { offset, length, params } = ind;
                 const start = offset;
                 const end = start + length;
                 const suggest = params?.suggests?.at(-1) ?? "";
-
-                //範囲チェック
-                if (start < cur || start > text.length) continue;
-                if (end > text.length) continue;
 
                 html += this.EscapeHTML(text.slice(cur, start));
 
@@ -328,7 +348,7 @@ class OpdExtTextReview {
                     suggest_elem = `<span style="padding:3px;border-radius:3px;background:#14ff0063;">${this.EscapeHTML(suggest)}</span>`;
                 }
 
-                html += `<span class="patch" data-offset="${start}" data-length="${length}"><span id="opd_text_review_problem_id_${indication_ids[i]}" style="padding:3px;border-radius:3px;text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(text.slice(start, end))}</span>${suggest_elem}</span>`;
+                html += `<span class="patch" data-offset="${start}" data-length="${length}"><span id="opd_text_review_problem_id_${item.id}" style="padding:3px;border-radius:3px;text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(text.slice(start, end))}</span>${suggest_elem}</span>`;
 
                 cur = end;
             }
@@ -337,31 +357,25 @@ class OpdExtTextReview {
 
             return html;
         }
-        this.GetReviewedText = (text, result, indication_enabled) =>{
+        this.GetReviewedText = (text, items) =>{
             //指摘適用済みのテキストを生成生成する関数
-            if (!result?.length) return text;
-
-            //offsetの昇順で処理
-            const sorted = [...result].sort((a, b) => a.offset - b.offset);
+            if (!items?.length) return text;
 
             let cur = 0;
             let output = "";
 
-            for (const [i, ind] of sorted.entries()) {
+            for (const item of items) {
+                const ind = item.indication;
                 const { offset, length, params } = ind;
                 const start = offset;
                 const end = start + length;
                 const suggest = params?.suggests?.at(-1) ?? "";
                 const problem = text.slice(start, end);
 
-                //範囲チェック
-                if (start < cur || start > text.length) continue;
-                if (end > text.length) continue;
-
                 //前の修正部分の後から今回の修正部分の前までを追加
                 output += text.slice(cur, start);
 
-                if (indication_enabled[i]) {
+                if (item.enabled) {
                     output += String(suggest);
                 } else {
                     output += String(problem);
@@ -376,10 +390,10 @@ class OpdExtTextReview {
         }
         this.ReviewRquest = async(str)=>{
             //校正を開始し、結果を得る関数
-            const review_result = await chrome.runtime.sendMessage({message: "text_review", review_text: str});
-            if(review_result){
-                return review_result;
-            }else{
+            try{
+                const review_result = await chrome.runtime.sendMessage({message: "text_review", review_text: str});
+                return review_result || false;
+            }catch(error){
                 return false;
             }
         }
