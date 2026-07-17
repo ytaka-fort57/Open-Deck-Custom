@@ -34,6 +34,15 @@
         profile_loader_btn.insertAdjacentHTML("afterend", "<br>");
     }
 
+    //Xのページが読み込まれ、仕掛ける価値のある文書になっているか
+    function is_loaded(iframe){
+        const doc = iframe.contentDocument;
+        if(doc == null || doc.readyState != "complete"){
+            return false;
+        }
+        return doc.location != null && doc.location.href.indexOf("http") == 0;
+    }
+
     //タイムラインカラムを左からの並び順で取得する
     function get_timeline_columns(){
         return Array.from(document.querySelectorAll('#opd_main_element div[opd_column_type="home"]'));
@@ -124,7 +133,9 @@
                 iframe.addEventListener("load", function(){
                     setup_column(iframe, profile_index, column_index);
                 });
-                if(iframe.contentDocument != null && iframe.contentDocument.readyState == "complete"){
+                //生成直後のiframeは about:blank で readyState は complete になる。
+                //その文書はXの読み込みで捨てられるため、仕掛けても無駄に終わる
+                if(is_loaded(iframe)){
                     setup_column(iframe, profile_index, column_index);
                 }
             });
