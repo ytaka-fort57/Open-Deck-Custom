@@ -1,0 +1,97 @@
+name: Sync upstream
+
+# 本家 kawa-nobu/Open-Deck の Release ブランチを検知して、custom 向けの同期 Pull Request を作る。
+# マージは自動化しない。Git の競合が無くても、本家の変更や X 側の DOM 変更で
+# 独自機能が壊れることがあるため、実ブラウザーでの確認を挟む。
+
+on:
+  schedule:
+    # 毎日 03:20 JST (cron は UTC)
+    - cron: "20 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout custom branch
+        # 本家と同じく SHA で固定する (checkout v6.0.2)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: custom
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/kawa-nobu/Open-Deck.git
+          git fetch upstream Release
+
+      - name: Prepare sync branch
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git merge-base --is-ancestor upstream/Release HEAD; then
+            echo "本家の更新はありません"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin sync/upstream:refs/remotes/origin/sync/upstream || true
+          git switch -C sync/upstream
+          git merge --no-edit upstream/Release
+
+          # マニフェストが壊れていないか
+          python3 -m json.tool manifest.json > /dev/null
+          python3 -m json.tool manifest_firefox.json > /dev/null
+
+          # 独自コードの入口が残っているか (本家側の変更で消えると機能が丸ごと死ぬ)
+          for manifest in manifest.json manifest_firefox.json; do
+            grep -q "extensions/custom/index.js" "$manifest" \
+              || { echo "$manifest から独自コードの入口が消えています"; exit 1; }
+          done
+
+          # 空白の混入を確認する。
+          # 本家は content.js などが CRLF のため、cr-at-eol を指定しないと
+          # 行末の CR がすべて trailing whitespace と判定されて必ず失敗する。
+          git -c core.whitespace=cr-at-eol diff --check origin/custom...HEAD
+
+          git push --force-with-lease origin HEAD:sync/upstream
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request if needed
+        if: steps.prepare.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing="$(gh pr list \
+            --base custom \
+            --head sync/upstream \
+            --state open \
+            --json number \
+            --jq '.[0].number')"
+
+          if [ -z "$existing" ]; then
+            gh pr create \
+              --base custom \
+              --head sync/upstream \
+              --title "chore: sync upstream Release" \
+              --body-file .github/sync-pr-body.md
+          else
+            echo "既存の Pull Request #$existing を更新しました"
+          fi
