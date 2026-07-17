@@ -7,6 +7,55 @@
 //dropイベントを発火させて本家の経路にそのまま乗せる。
 window.opd_custom_column_reorder = (function(){
     const CONTROL_CLASS = "opd_custom_reorder";
+    const STYLE_ATTR = "opd_custom_reorder_css";
+
+    function add_style(doc){
+        if(doc.querySelector("style[" + STYLE_ATTR + "]") != null){
+            return;
+        }
+        //カラムバーは flex。縮められて消えないよう flex-shrink を切る
+        doc.querySelector("head").insertAdjacentHTML("beforeend", `<style ${STYLE_ATTR}>
+        .${CONTROL_CLASS}{
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            flex-shrink: 0;
+            margin-right: 5px;
+        }
+        .${CONTROL_CLASS} input[type="button"]{
+            width: 16px;
+            min-width: 16px;
+            height: 18px;
+            padding: 0;
+            margin: 0;
+            font-size: 9px;
+            line-height: 1;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            background-color: #ffffff26;
+            color: inherit;
+        }
+        .${CONTROL_CLASS} input[type="button"]:hover:not(:disabled){
+            background-color: #ffffff59;
+        }
+        .${CONTROL_CLASS} input[type="button"]:disabled{
+            opacity: 0.3;
+            cursor: default;
+        }
+        .${CONTROL_CLASS} select{
+            height: 18px;
+            margin: 0 2px;
+            padding: 0;
+            font-size: 10px;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            background-color: #ffffff26;
+            color: inherit;
+        }
+        </style>`);
+    }
 
     //同じ段の中で並び替えできるカラム。末尾の空カラムなどは含まない
     function get_columns(section){
@@ -74,22 +123,31 @@ window.opd_custom_column_reorder = (function(){
         if(bar == null || bar.querySelector("." + CONTROL_CLASS) != null){
             return false;
         }
-        //カラム設定ボタンと同じ行に置く
+        //カラム設定ボタンと同じ行の、既存ボタンより右に置く。
+        //バーの空き領域(伸縮する)の手前が、幅に余裕があり既存アイコンとも並びが揃う
+        const empty_area = bar.querySelector(".dsp_column_empty_area");
         const settings_btn = bar.querySelector(".opd_settings_btn");
-        if(settings_btn == null){
-            return false;
-        }
-        const anchor = settings_btn.closest("span.dsp_column_btn");
+        const anchor = empty_area != null
+            ? empty_area
+            : (settings_btn != null ? settings_btn.closest("span.dsp_column_btn") : null);
         if(anchor == null){
             return false;
         }
 
+        //本家の dsp_column_btn は input を opacity:0 にして label のアイコンを見せる方式で、
+        //幅も20px固定。そのクラスに乗せるとボタンが透明になり幅も足りないため、独自に持つ
+        add_style(section.ownerDocument);
+
         const wrap = section.ownerDocument.createElement("span");
-        wrap.className = "dsp_column_btn " + CONTROL_CLASS;
+        wrap.className = CONTROL_CLASS;
         wrap.innerHTML = '<input type="button" class="opd_custom_move_left" value="◀" title="左へ移動">'
             + '<select class="opd_custom_move_select" title="表示順"></select>'
             + '<input type="button" class="opd_custom_move_right" value="▶" title="右へ移動">';
-        anchor.insertAdjacentElement("afterend", wrap);
+        if(anchor.classList.contains("dsp_column_empty_area")){
+            anchor.insertAdjacentElement("beforebegin", wrap);
+        }else{
+            anchor.insertAdjacentElement("afterend", wrap);
+        }
 
         wrap.querySelector(".opd_custom_move_left").addEventListener("click", function(){
             const columns = get_columns(section);
