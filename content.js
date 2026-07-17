@@ -159,8 +159,10 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
                         chrome.storage.local.set({'opd_settings': JSON.stringify(recovery_setting)}, function(){
                             alert(i18n_message("msg_settings_auto_repair"));
                             last_load_profile = 0;
-                            window.reload();
+                            location.reload();
                         });
+                        //setは非同期のため、待たずに進むと直後のprofile_store参照で例外になる
+                        return;
                     }
 
                     //Updateされたときに設定のバージョンを上げる
@@ -182,8 +184,10 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
                         chrome.storage.local.set({'opd_settings': JSON.stringify(recovery_setting)}, function(){
                             alert(i18n_message("msg_settings_auto_repair"));
                             last_load_profile = 0;
-                            window.reload();
+                            location.reload();
                         });
+                        //setは非同期のため、待たずに進むと直後のprofile_store参照で例外になる
+                        return;
                     }
                     ext_settings = {column_settings:profile_store[last_load_profile].profile};
                 }
