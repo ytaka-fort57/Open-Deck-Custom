@@ -20,26 +20,10 @@ jobs:
         with:
           fetch-depth: 0 # 一旦、履歴をすべて取得する
 
-      - name: Create ZIP File
+      - name: Run Required Verification
         run: |
-          # 念の為、実行権限を与えておく
-          chmod +x ./package.sh
-          ./package.sh
-
-      - name: Verify ZIP Contents
-        run: |
-          for zip_file in ./package/*.zip; do
-            entries="$(unzip -Z1 "$zip_file")"
-            if grep -Eq '(^|/)(\.agents|\.claude|\.githooks|\.github|docs|package)(/|$)' <<< "$entries"; then
-              echo "$zip_file に開発用ファイルが含まれています"
-              exit 1
-            fi
-            test "$(grep -c '^manifest.json$' <<< "$entries")" -eq 1
-            if grep -q '^manifest_firefox.json$' <<< "$entries"; then
-              echo "$zip_file に置換前のFirefox manifestが残っています"
-              exit 1
-            fi
-          done
+          chmod +x ./package.sh ./verify.sh
+          ./verify.sh
 
       - name: Fetch Latest Merged PR Infomation
         env:

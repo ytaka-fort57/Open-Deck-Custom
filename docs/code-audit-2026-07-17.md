@@ -223,7 +223,7 @@ background の `fetch()` にタイムアウトがなく（`background.js:24-45`�
 | R-2 安定ID | 設計保留 | 保存スキーマと本家のカラム生成・保存経路を同時に変えるため競合範囲が大きい。当面の位置キーremapで既知操作を補う |
 | R-3 storage統合 | 独自領域は対応済み、全面移行は保留 | import/exportは`extensions/custom/settings_codec.js`へ分離済み。本家`content.js`内の保存処理まで一括移動するのは同期競合が大きい |
 | R-4 DOM adapter | 新規独自機能から適用 | 既存helperの一括移動は行わず、`extensions/custom/`側の新規実装でselectorを集約する |
-| R-5 再現可能な検証 | 段階対応 | ZIP allowlistとRelease CI検査は対応済み。今後のテストは本家ファイルを書き換えず`tests/`へ追加できるため同期と両立しやすい |
+| R-5 再現可能な検証 | 対応済み | Node標準テスト12件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
 
 ### R-1. `content.js` のライフサイクル分割
 
@@ -274,6 +274,8 @@ X の React 内部プロパティや DOM 構造へ依存する箇所は `text_re
 - locale キー一致
 - persistence / remap / profile delete の単体テスト
 - ZIP allowlist 検査
+
+対応として、`node tests/run.mjs`へコード回帰を集約し、Windowsでは`.\verify.ps1`、Linux / GitHub Actionsでは`./verify.sh`で回帰テスト、両ブラウザーのZIP生成、内容検査まで一括実行できるようにした。npm依存は追加していない。
 
 ## 6. 既存バックログとの突き合わせ
 
