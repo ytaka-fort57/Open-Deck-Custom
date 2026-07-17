@@ -100,6 +100,49 @@ window.opd_custom_column_reorder = (function(){
         }
     }
 
+    //タイムラインカラムを左からの並び順で返す。タブの保存はこの位置を鍵にしている
+    function get_timeline_sections(doc){
+        return Array.from(doc.querySelectorAll('#opd_main_element div[opd_column_type="home"]'))
+            .map(function(column){
+                return column.closest("section");
+            });
+    }
+
+    //保存したタブをカラムに追従させる。
+    //
+    //本家のプロファイルから見るとタイムラインカラムはどれも同じ type で区別が付かず、
+    //カラムを識別しているのはこちらのタブ保存だけ。位置を鍵にしているため、
+    //付け替えないとリロード時に旧配置のタブが割り当てられ、移動が無かったことになる。
+    function remap_tab_state(before_sections, after_sections){
+        const state_api = window.opd_custom_column_state;
+        if(state_api == undefined){
+            return;
+        }
+        state_api.get_profile_index(function(profile_index){
+            state_api.load_all(function(state){
+                const prefix = profile_index + ":";
+                const next_state = {};
+                //他のプロファイルの保存はそのまま残す
+                Object.keys(state).forEach(function(key){
+                    if(key.indexOf(prefix) != 0){
+                        next_state[key] = state[key];
+                    }
+                });
+                after_sections.forEach(function(section, new_index){
+                    const old_index = before_sections.indexOf(section);
+                    if(old_index < 0){
+                        return;
+                    }
+                    const label = state[prefix + old_index];
+                    if(label != undefined){
+                        next_state[prefix + new_index] = label;
+                    }
+                });
+                state_api.save_all(next_state);
+            });
+        });
+    }
+
     function move_to(section, target_index){
         const columns = get_columns(section);
         const current_index = columns.indexOf(section);
@@ -117,7 +160,9 @@ window.opd_custom_column_reorder = (function(){
         if(drop_target == null){
             return false;
         }
+        const timeline_before = get_timeline_sections(section.ownerDocument);
         dispatch_drop(section, drop_target);
+        remap_tab_state(timeline_before, get_timeline_sections(section.ownerDocument));
         //移動でどのカラムの位置も変わる。監視任せにすると、続けて押したときに
         //古い状態のボタンが押せないままになる
         get_columns(section).forEach(refresh);

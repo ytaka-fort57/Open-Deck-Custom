@@ -49,9 +49,16 @@
         return Array.from(document.querySelectorAll('#opd_main_element div[opd_column_type="home"]'));
     }
 
+    //このカラムが今どこにあるか。並び替えで動くため、保存のたびに求め直す
+    function current_column_index(iframe){
+        return get_timeline_columns().findIndex(function(column){
+            return column.querySelector("iframe") === iframe;
+        });
+    }
+
     //ユーザーがタブを切り替えたら、そのカラムの選択として覚える
     //desired はこのカラムが表示すべきタブ。ユーザー操作が常に優先される
-    function watch_tab_click(doc, profile_index, column_index, desired){
+    function watch_tab_click(doc, profile_index, iframe, desired){
         doc.addEventListener("click", function(event){
             const target = event.target;
             if(target == null || target.closest == undefined){
@@ -63,6 +70,10 @@
             }
             const label = selectors.tab_label(tab);
             desired.label = label;
+            const column_index = current_column_index(iframe);
+            if(column_index < 0){
+                return;
+            }
             column_state.save_tab(profile_index, column_index, label);
         }, true);
     }
@@ -105,15 +116,19 @@
         });
     }
 
-    function setup_column(iframe, profile_index, column_index){
+    function setup_column(iframe, profile_index){
         //iframeは同一オリジンのため親から直接操作できる
         const doc = iframe.contentDocument;
         if(doc == null){
             return;
         }
+        const column_index = current_column_index(iframe);
+        if(column_index < 0){
+            return;
+        }
         column_state.get_tab(profile_index, column_index, function(saved_label){
             const desired = {label: saved_label};
-            watch_tab_click(doc, profile_index, column_index, desired);
+            watch_tab_click(doc, profile_index, iframe, desired);
             apply_saved_tab(doc, desired);
         });
     }
@@ -124,7 +139,7 @@
             return;
         }
         column_state.get_profile_index(function(profile_index){
-            columns.forEach(function(column, column_index){
+            columns.forEach(function(column){
                 const iframe = column.querySelector("iframe");
                 if(iframe == null || iframe.getAttribute(APPLIED_ATTR) != null){
                     return;
@@ -132,12 +147,12 @@
                 iframe.setAttribute(APPLIED_ATTR, "true");
                 //自動更新などで再読み込みされた場合も選択し直す
                 iframe.addEventListener("load", function(){
-                    setup_column(iframe, profile_index, column_index);
+                    setup_column(iframe, profile_index);
                 });
                 //生成直後のiframeは about:blank で readyState は complete になる。
                 //その文書はXの読み込みで捨てられるため、仕掛けても無駄に終わる
                 if(is_loaded(iframe)){
-                    setup_column(iframe, profile_index, column_index);
+                    setup_column(iframe, profile_index);
                 }
             });
         });

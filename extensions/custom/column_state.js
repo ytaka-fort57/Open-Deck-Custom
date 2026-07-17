@@ -104,9 +104,26 @@ window.opd_custom_column_state = (function(){
         });
     }
 
+    //並び替えでカラムとタブの対応を付け替えるために、保存全体を読み書きする
+    function load_all(callback){
+        load_state(callback);
+    }
+
+    function save_all(state, callback){
+        const store = {};
+        store[STATE_KEY] = JSON.stringify(state);
+        safe_set(store, function(){
+            if(callback != undefined){
+                callback();
+            }
+        });
+    }
+
     return {
         get_profile_index: get_profile_index,
         get_tab: get_tab,
-        save_tab: save_tab
+        save_tab: save_tab,
+        load_all: load_all,
+        save_all: save_all
     };
 })();
