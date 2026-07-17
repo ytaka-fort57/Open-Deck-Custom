@@ -1,0 +1,43 @@
+#!/bin/sh
+# 改行コードの変換を検知してコミットを止める
+#
+# 本家は改行コードがファイルごとに異なる(content.js は CRLF、manifest_firefox.json は LF)。
+# ファイル全体を書き換えるツールは改行コードを変換してしまうことがあり、
+# 気付かずコミットすると本家との差分が全面化して取り込み時に衝突する。
+#
+# 判定は git 自身に任せる。--ignore-cr-at-eol は行末のCRの違いを無視するため、
+# 通常の差分より行数が減るなら、CRだけが変わった行がある = 改行コードが変換されている。
+# (Git Bash の grep は CR を数えられないため、バイトを自前で数えてはいけない)
+#
+# 有効化(クローンごとに一度だけ必要):
+#   git config core.hooksPath .githooks
+
+status=0
+
+for file in $(git diff --cached --name-only --diff-filter=M); do
+    numstat=$(git diff --cached --numstat -- "$file")
+    # バイナリは "-<TAB>-" となるため対象外
+    case "$numstat" in
+        -*) continue ;;
+        "") continue ;;
+    esac
+
+    plain_lines=$(echo "$numstat" | awk '{print $1 + $2}')
+    nocr_lines=$(git diff --cached --ignore-cr-at-eol --numstat -- "$file" | awk '{print $1 + $2}')
+    [ -z "$nocr_lines" ] && nocr_lines=0
+
+    if [ "$plain_lines" -gt "$nocr_lines" ]; then
+        echo "改行コードが変換されています: $file"
+        echo "  差分 ${plain_lines} 行のうち、実際の変更は ${nocr_lines} 行だけです"
+        status=1
+    fi
+done
+
+if [ "$status" -ne 0 ]; then
+    echo ""
+    echo "このままコミットすると本家との差分が全面化し、更新の取り込みで衝突します。"
+    echo "元の改行コードに戻してからコミットしてください。"
+    echo "意図した変更である場合のみ git commit --no-verify で回避できます。"
+fi
+
+exit $status
