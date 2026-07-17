@@ -68,6 +68,38 @@ window.opd_custom_column_reorder = (function(){
         });
     }
 
+    //本家のdropハンドラーへ処理を渡す。
+    //
+    //本家は insertBefore で移動するが、iframeはDOM上で動かすと中身が作り直される。
+    //(実測: 移動したカラムだけ再読み込みが走る。本家のドラッグ＆ドロップでも同じ)
+    //moveBefore は状態を保ったまま移動できるため、dropを発火する間だけ差し替える。
+    //未対応のブラウザーでは従来どおり insertBefore が使われ、再読み込みが起きるだけ。
+    function dispatch_drop(section, drop_target){
+        const original_insert_before = Node.prototype.insertBefore;
+        Node.prototype.insertBefore = function(node, reference){
+            if(this.moveBefore != undefined && node.isConnected && node.parentNode === this){
+                try{
+                    return this.moveBefore(node, reference);
+                }catch(error){
+                    //moveBeforeが使えない条件のときは従来どおり動かす
+                }
+            }
+            return original_insert_before.call(this, node, reference);
+        };
+        try{
+            const transfer = new DataTransfer();
+            transfer.setData("text/plain", section.id);
+            drop_target.dispatchEvent(new DragEvent("drop", {
+                dataTransfer: transfer,
+                bubbles: true,
+                cancelable: true
+            }));
+        }finally{
+            //差し替えは本家のdrop処理の間だけに留める
+            Node.prototype.insertBefore = original_insert_before;
+        }
+    }
+
     function move_to(section, target_index){
         const columns = get_columns(section);
         const current_index = columns.indexOf(section);
@@ -85,13 +117,7 @@ window.opd_custom_column_reorder = (function(){
         if(drop_target == null){
             return false;
         }
-        const transfer = new DataTransfer();
-        transfer.setData("text/plain", section.id);
-        drop_target.dispatchEvent(new DragEvent("drop", {
-            dataTransfer: transfer,
-            bubbles: true,
-            cancelable: true
-        }));
+        dispatch_drop(section, drop_target);
         //移動でどのカラムの位置も変わる。監視任せにすると、続けて押したときに
         //古い状態のボタンが押せないままになる
         get_columns(section).forEach(refresh);
