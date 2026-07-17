@@ -37,7 +37,8 @@
     }
 
     //ユーザーがタブを切り替えたら、そのカラムの選択として覚える
-    function watch_tab_click(doc, profile_index, column_index){
+    //desired はこのカラムが表示すべきタブ。ユーザー操作が常に優先される
+    function watch_tab_click(doc, profile_index, column_index, desired){
         doc.addEventListener("click", function(event){
             const target = event.target;
             if(target == null || target.closest == undefined){
@@ -47,38 +48,47 @@
             if(tab == null){
                 return;
             }
-            column_state.save_tab(profile_index, column_index, selectors.tab_label(tab));
+            const label = selectors.tab_label(tab);
+            desired.label = label;
+            column_state.save_tab(profile_index, column_index, label);
         }, true);
     }
 
-    //保存済みのタブを選び直す
-    //Xはタブ選択をアカウント単位で共有するため、カラムごとに読み込み後の再選択が必要
-    //描画直後はクリックが効かず、こちらの選択がX側の状態で戻される場合もあるため、
-    //選択されたか確かめて必要なら押し直す
-    function apply_saved_tab(doc, profile_index, column_index){
-        const RETRY_LIMIT = 4;
-        const RETRY_INTERVAL_MS = 700;
-        column_state.get_tab(profile_index, column_index, function(saved_label){
-            if(saved_label == undefined){
+    //Xはタブ選択をアカウント単位で共有し、読み込み後もしばらく自前の状態を適用し続ける。
+    //一度選び直すだけではX側に上書きされて戻るため、しばらく監視して選び直し続ける。
+    //desired.label はユーザーのクリックで更新されるため、ユーザー操作と競合しない。
+    function enforce_tab(doc, desired){
+        const ENFORCE_MS = 20000;
+        const INTERVAL_MS = 1000;
+        let elapsed_ms = 0;
+        const timer = setInterval(function(){
+            elapsed_ms += INTERVAL_MS;
+            if(elapsed_ms >= ENFORCE_MS || doc.defaultView == null){
+                clearInterval(timer);
                 return;
             }
-            selectors.wait_for_tabs(doc, 15000, function(){
-                let tried_count = 0;
-                function select_tab(){
-                    const target = selectors.find_tab_by_label(doc, saved_label);
-                    //タブ自体が無くなった場合(リスト削除など)は諦める
-                    if(target == null || selectors.is_selected(target)){
-                        return;
-                    }
-                    if(tried_count >= RETRY_LIMIT){
-                        return;
-                    }
-                    tried_count += 1;
-                    selectors.click_tab(target);
-                    setTimeout(select_tab, RETRY_INTERVAL_MS);
-                }
-                select_tab();
-            });
+            if(desired.label == undefined){
+                return;
+            }
+            const target = selectors.find_tab_by_label(doc, desired.label);
+            //タブ自体が無くなった場合(リスト削除など)は諦める
+            if(target == null || selectors.is_selected(target)){
+                return;
+            }
+            selectors.click_tab(target);
+        }, INTERVAL_MS);
+    }
+
+    function apply_saved_tab(doc, desired){
+        if(desired.label == undefined){
+            return;
+        }
+        selectors.wait_for_tabs(doc, 15000, function(){
+            const target = selectors.find_tab_by_label(doc, desired.label);
+            if(target != null && !selectors.is_selected(target)){
+                selectors.click_tab(target);
+            }
+            enforce_tab(doc, desired);
         });
     }
 
@@ -88,8 +98,11 @@
         if(doc == null){
             return;
         }
-        watch_tab_click(doc, profile_index, column_index);
-        apply_saved_tab(doc, profile_index, column_index);
+        column_state.get_tab(profile_index, column_index, function(saved_label){
+            const desired = {label: saved_label};
+            watch_tab_click(doc, profile_index, column_index, desired);
+            apply_saved_tab(doc, desired);
+        });
     }
 
     function setup_timeline_columns(){
