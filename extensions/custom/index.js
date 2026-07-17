@@ -9,8 +9,10 @@
 
     const CUSTOM_MENU_ID = "opd_custom_settings_import";
     const APPLIED_ATTR = "opd_custom_tab_applied";
+    const KEYS_ATTR = "opd_custom_keys_attached";
     const selectors = window.opd_custom_selectors;
     const column_state = window.opd_custom_column_state;
+    const keyboard = window.opd_custom_keyboard;
 
     function open_settings_import(){
         window.open(chrome.runtime.getURL("extensions/custom/settings_import.html"), "OPD-Custom-Settings-Import", 'width=760, height=680');
@@ -128,12 +130,32 @@
         });
     }
 
+    //メディアビューアーのキー操作は、フォーカスがどのカラムにあっても効かせる必要があるため、
+    //タイムライン以外も含めたすべてのカラムの文書に仕掛ける
+    function setup_media_viewer_keys(){
+        keyboard.attach(document, document);
+        const iframes = document.querySelectorAll("#opd_main_element div[opd_column_type] iframe");
+        iframes.forEach(function(iframe){
+            if(iframe.getAttribute(KEYS_ATTR) != null){
+                return;
+            }
+            iframe.setAttribute(KEYS_ATTR, "true");
+            //読み込みのたびに文書が入れ替わるため、その都度仕掛け直す
+            iframe.addEventListener("load", function(){
+                keyboard.attach(iframe.contentDocument, document);
+            });
+            keyboard.attach(iframe.contentDocument, document);
+        });
+    }
+
     //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
     const observer = new MutationObserver(function(){
         add_menu_button();
         setup_timeline_columns();
+        setup_media_viewer_keys();
     });
     observer.observe(document.documentElement, {childList: true, subtree: true});
     add_menu_button();
     setup_timeline_columns();
+    setup_media_viewer_keys();
 })();
