@@ -23,26 +23,43 @@ window.opd_custom_keyboard = (function(){
         button.click();
     }
 
-    function handle_key(event, deck_document){
-        const dialog = find_open_viewer(deck_document);
-        if(dialog == null){
-            return;
+    //文字入力中のBackspaceを奪うと文字が消せなくなる
+    function is_typing(event){
+        const element = event.target;
+        if(element == null){
+            return false;
         }
-        let handled = false;
+        if(element.isContentEditable){
+            return true;
+        }
+        return ["INPUT", "TEXTAREA", "SELECT"].includes(element.tagName);
+    }
+
+    function handle_viewer_key(event, dialog){
         switch(event.key){
             case "Escape":
                 //closeイベント経由で本家の後片付けが走る
                 dialog.close();
-                handled = true;
-                break;
+                return true;
             case "ArrowLeft":
                 click_button(dialog, "[data-media-forward]");
-                handled = true;
-                break;
+                return true;
             case "ArrowRight":
                 click_button(dialog, "[data-media-next]");
-                handled = true;
-                break;
+                return true;
+        }
+        return false;
+    }
+
+    //iframe はキーを受け取ったカラム。デッキ本体の場合は null
+    function handle_key(event, deck_document, iframe){
+        let handled = false;
+        const dialog = find_open_viewer(deck_document);
+        if(dialog != null){
+            handled = handle_viewer_key(event, dialog);
+        }else if(event.key === "Backspace" && iframe != null && !is_typing(event)){
+            //ブラウザーの戻るは別のカラムを動かしてしまうため、独自履歴で戻す
+            handled = window.opd_custom_column_history.back(iframe);
         }
         if(handled){
             //X側のスクロールなどを起こさせない
@@ -51,13 +68,13 @@ window.opd_custom_keyboard = (function(){
         }
     }
 
-    function attach(doc, deck_document){
+    function attach(doc, deck_document, iframe){
         if(doc == null || attached_docs.has(doc)){
             return;
         }
         attached_docs.add(doc);
         doc.addEventListener("keydown", function(event){
-            handle_key(event, deck_document);
+            handle_key(event, deck_document, iframe != undefined ? iframe : null);
         }, true);
     }
 
