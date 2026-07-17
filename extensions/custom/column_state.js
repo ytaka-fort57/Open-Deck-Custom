@@ -36,8 +36,23 @@ window.opd_custom_column_state = (function(){
         }
     }
 
-    //本家の内部変数へ依存しないよう、現在のプロファイル番号は設定から読む
+    //現在のプロファイル番号を返す
+    //
+    //storageから読んではいけない。本家のプロファイル切り替えは、新しい番号の保存(非同期)を
+    //待たずにカラムを作り直すため(content.js:977)、カラム生成を検知して読むと切り替え前の
+    //番号を掴む。復元を間違えるだけでなく、切り替え前のプロファイルの保存を壊す。
+    //
+    //サイドバーの表示はカラムと同時に作られるため、こちらを読めば必ず一致する。
     function get_profile_index(callback){
+        const profile_label = document.querySelector(".profile_val_now");
+        if(profile_label != null){
+            const index = parseInt(profile_label.textContent, 10);
+            if(!isNaN(index)){
+                callback(index);
+                return;
+            }
+        }
+        //サイドバーが見つからない場合の保険
         safe_get("opd_settings", function(value){
             if(value.opd_settings == null){
                 callback(0);
