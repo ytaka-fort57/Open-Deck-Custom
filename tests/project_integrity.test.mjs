@@ -67,4 +67,11 @@ test("manifests and locale files are valid and complete", () => {
         const scripts = manifest.content_scripts[0].js;
         assert.ok(scripts.indexOf("extensions/custom/storage_repository.js") < scripts.indexOf("content.js"));
     }
+
+    const upstreamBase = readFileSync(join(root, ".github/upstream-base"), "utf8").trim();
+    assert.match(upstreamBase, /^[0-9a-f]{40}$/);
+    const upstreamWorkflow = readFileSync(join(root, ".github/workflows/sync-upstream.yml"), "utf8");
+    assert.match(upstreamWorkflow, /issues: write/);
+    assert.match(upstreamWorkflow, /gh issue (create|edit)/);
+    assert.doesNotMatch(upstreamWorkflow, /\bgit merge(?:\s|$)|\bgit push(?:\s|$)|\bgh pr(?:\s|$)/m);
 });

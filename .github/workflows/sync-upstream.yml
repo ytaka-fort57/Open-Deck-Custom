@@ -1,25 +1,24 @@
-name: Sync upstream
+name: Review upstream
 
-# 本家 kawa-nobu/Open-Deck の Release ブランチを検知して、custom 向けの同期 Pull Request を作る。
-# マージは自動化しない。Git の競合が無くても、本家の変更や X 側の DOM 変更で
-# 独自機能が壊れることがあるため、実ブラウザーでの確認を挟む。
+# 本家 Release をcustomへmergeせず、前回確認済みSHAとの差分をレビューIssueにまとめる。
+# 採用する変更は現在のcustom構造へ意味単位で再実装し、確認済みSHAをPR内で更新する。
 
 on:
   schedule:
-    # 毎日 03:20 JST (cron は UTC)
-    - cron: "20 18 * * *"
+    # 毎週月曜 03:20 JST (cron は UTC)
+    - cron: "20 18 * * 0"
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  issues: write
 
 concurrency:
-  group: sync-upstream
+  group: review-upstream
   cancel-in-progress: false
 
 jobs:
-  sync:
+  review:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,63 +34,82 @@ jobs:
           git remote add upstream https://github.com/kawa-nobu/Open-Deck.git
           git fetch upstream Release
 
-      - name: Prepare sync branch
-        id: prepare
+      - name: Prepare review report
+        id: review
         shell: bash
         run: |
           set -euo pipefail
 
-          if git merge-base --is-ancestor upstream/Release HEAD; then
-            echo "本家の更新はありません"
+          base="$(tr -d '[:space:]' < .github/upstream-base)"
+          latest="$(git rev-parse upstream/Release)"
+          report="$RUNNER_TEMP/upstream-review.md"
+
+          if [[ ! "$base" =~ ^[0-9a-f]{40}$ ]]; then
+            echo ".github/upstream-base must contain one full commit SHA" >&2
+            exit 1
+          fi
+          git cat-file -e "$base^{commit}"
+
+          if [ "$base" = "$latest" ]; then
+            echo "本家の未確認更新はありません"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if ! git merge-base --is-ancestor "$base" "$latest"; then
+            echo "確認済みSHAが upstream/Release の祖先ではありません。履歴を手動確認してください。" >&2
+            exit 1
+          fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin sync/upstream:refs/remotes/origin/sync/upstream || true
-          git switch -C sync/upstream
-          git merge --no-edit upstream/Release
+          {
+            echo "本家 \`kawa-nobu/Open-Deck:Release\` に未確認の更新があります。"
+            echo
+            echo "- 確認済み: \`$base\`"
+            echo "- 最新: \`$latest\`"
+            echo "- 比較: https://github.com/kawa-nobu/Open-Deck/compare/$base...$latest"
+            echo
+            echo "## コミット"
+            git log --reverse --format='- `%h` %s (%cs)' "$base..$latest"
+            echo
+            echo "## 変更ファイル"
+            echo '```text'
+            git diff --name-status "$base..$latest"
+            echo '```'
+            echo
+            echo "## 見積もり"
+            echo '```text'
+            git diff --stat "$base..$latest"
+            echo '```'
+            echo
+            echo "## 対応"
+            echo "- 各コミットを 採用 / 対応不要 / 既に独自実装済み に分類する"
+            echo "- 採用分はmergeせず、customの現在構造へ意味単位で再実装する"
+            echo "- \`./verify.sh\` と実ブラウザー確認を行う"
+            echo "- PRで \`.github/upstream-base\` と \`docs/upstream-port-log.md\` を更新する"
+          } > "$report"
 
-          # マニフェストが壊れていないか
-          python3 -m json.tool manifest.json > /dev/null
-          python3 -m json.tool manifest_firefox.json > /dev/null
-
-          # 独自コードの入口が残っているか (本家側の変更で消えると機能が丸ごと死ぬ)
-          for manifest in manifest.json manifest_firefox.json; do
-            grep -q "extensions/custom/index.js" "$manifest" \
-              || { echo "$manifest から独自コードの入口が消えています"; exit 1; }
-          done
-
-          # 空白の混入を確認する。
-          # 本家は content.js などが CRLF のため、cr-at-eol を指定しないと
-          # 行末の CR がすべて trailing whitespace と判定されて必ず失敗する。
-          git -c core.whitespace=cr-at-eol diff --check origin/custom...HEAD
-
-          git push --force-with-lease origin HEAD:sync/upstream
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
 
-      - name: Create pull request if needed
-        if: steps.prepare.outputs.changed == 'true'
+      - name: Create or update review issue
+        if: steps.review.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          REPORT_PATH: ${{ steps.review.outputs.report }}
         shell: bash
         run: |
           set -euo pipefail
 
-          existing="$(gh pr list \
-            --base custom \
-            --head sync/upstream \
+          title="chore: upstream Release の変更をレビュー"
+          existing="$(gh issue list \
             --state open \
-            --json number \
-            --jq '.[0].number')"
+            --search "$title in:title" \
+            --json number,title \
+            --jq '.[] | select(.title == "chore: upstream Release の変更をレビュー") | .number' \
+            | head -n 1)"
 
           if [ -z "$existing" ]; then
-            gh pr create \
-              --base custom \
-              --head sync/upstream \
-              --title "chore: sync upstream Release" \
-              --body-file .github/sync-pr-body.md
+            gh issue create --title "$title" --body-file "$REPORT_PATH"
           else
-            echo "既存の Pull Request #$existing を更新しました"
+            gh issue edit "$existing" --body-file "$REPORT_PATH"
+            echo "既存のレビューIssue #$existing を更新しました"
           fi

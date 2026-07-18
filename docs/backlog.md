@@ -1,6 +1,6 @@
 # カスタム版の残課題
 
-更新日: 2026-07-17
+更新日: 2026-07-18
 
 対応済みの経緯は [issue-column-timeline-restore.md](issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
@@ -30,9 +30,9 @@ X の戻るボタンも同じ仕組みに乗せ換えれば直せるが、ボタ
 
 マニフェストには独自コードを登録済みだが、動作確認をしていない。
 
-### 4. 同期 Pull Request の初回動作確認
+### 4. 本家レビューworkflowの初回動作確認
 
-`.github/workflows/sync-upstream.yml`は設定済み。GitHub上で手動dispatchし、`sync/upstream`から`custom`への確認用Pull Requestが作成されることをまだ確認していない。
+`.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
 
 ### 5. 動画variantの選択
 
@@ -44,15 +44,18 @@ X の戻るボタンも同じ仕組みに乗せ換えれば直せるが、ボタ
 - メディアトークンをiframeごとの`WeakMap`へ変更し、再読込・削除後の古いtokenを保持しないよう修正
 - 設定import/exportのスキーマ化、検証、一括保存
 - 配布ZIPの許可リスト化とRelease CIでの混入検査
-- Node標準テスト12件とWindows / Bashの単一検証コマンド
+- ページ単位のlistener、observer、自動更新破棄、メディアtokenを`lifecycle.js`へ分離
+- storageキー、JSON変換、書き込み直列化を`storage_repository.js`へ統合
+- Node標準テスト16件とWindows / Bashの単一検証コマンド
+- 本家の直接mergeを廃止し、週次レビューと意味移植の運用へ変更
 
 ## リファクタ方針
 
-本家`upstream/Release`の同期Pull Requestと両立させるため、`content.js`の全面分割、保存モデルの全面置換、既存helperの一括移動は当面行わない。
+本家更新は意味移植するため、競合回避だけを理由に有益なリファクタを止めない。ただし、一度に全面置換せず、検証できる責務単位で分割する。
 
 - 不具合へ直結する処理だけを小さく修正する
 - 新しい独自処理は可能な限り`extensions/custom/`へ置く
-- 本家ファイルを移動・改名せず、同期時に比較可能な差分を維持する
+- 本家差分を読む際に変更意図を追えるよう、責務とテストの対応を明確にする
 - 検証コードは`tests/`などの新規領域へ追加し、本家ファイルとの競合を避ける
 
 ## 既知の制約（対応しない）
@@ -65,8 +68,7 @@ X の戻るボタンも同じ仕組みに乗せ換えれば直せるが、ボタ
 
 - 改行コードは本家に合わせる（[.gitattributes](../.gitattributes) 参照）。
   本家はファイルごとに改行コードが異なるため、LF に統一してはいけない。
-  統一すると本家由来のファイル約 2400 行が差分となり、取り込みで全面衝突し、
-  本家への Pull Request も送れなくなる（現在の差分はわずか 14 行）。
+  統一すると本家との差分レビューが改行変更に埋まり、本家へ純粋な不具合修正を提案しにくくなる。
 - 改行コードの変換は pre-commit フックが検知して止める。クローンごとに一度だけ有効化が必要:
 
   ```

@@ -215,12 +215,12 @@ background の `fetch()` にタイムアウトがなく（`background.js:24-45`�
 
 ## 5. リファクタ対象
 
-本家`upstream/Release`を同期PRで継続的に取り込む方針を踏まえ、2026-07-17時点では次のように判断した。
+本家`upstream/Release`は直接mergeせず、差分をレビューして必要な意味だけを再実装する方針へ変更した。これにより競合回避だけを理由にリファクタを止めず、回帰テストで区切れる単位から進める。
 
 | 項目 | 方針 | 理由 |
 | --- | --- | --- |
 | R-1 `content.js`のライフサイクル分割 | 第1段階対応済み | `extensions/custom/lifecycle.js`へタイマー破棄、ページ監視、共有イベント、メディアトークンを移し、`content.js`側は呼び出しへ限定した |
-| R-2 安定ID | 設計保留 | 保存スキーマと本家のカラム生成・保存経路を同時に変えるため競合範囲が大きい。当面の位置キーremapで既知操作を補う |
+| R-2 安定ID | 設計保留 | 全プロファイルの移行と旧データ互換を伴い、現在の位置キーremapで既知操作は保護できている。実ブラウザーfixtureを整えてから移行する |
 | R-3 storage統合 | 対応済み | `extensions/custom/storage_repository.js`へキー、JSON変換、context失効時の防御、複数キー保存、read-modify-write直列化を集約した |
 | R-4 DOM adapter | 新規独自機能から適用 | 既存helperの一括移動は行わず、`extensions/custom/`側の新規実装でselectorを集約する |
 | R-5 再現可能な検証 | 対応済み | Node標準テスト16件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
@@ -286,7 +286,7 @@ X の React 内部プロパティや DOM 構造へ依存する箇所は `text_re
 `docs/backlog.md` は現在の実装と一部ずれている。
 
 - 「並べ替え・追加・削除でタブ対応がずれる」は、独自の並べ替えボタン経路だけ修正済み。標準ドラッグ、追加、削除、プロファイル操作は H-3 として残る。
-- 「同期 Pull Request の自動化」は `.github/workflows/sync-upstream.yml` が存在するため、実行権限と初回動作確認を残す記述へ更新すべきである。
+- 本家追従は同期Pull Requestではなく、`.github/upstream-base`以降の差分を週次Issueへまとめ、必要な変更だけを意味移植する。workflowの初回手動実行確認は残る。
 - Firefox 未検証は引き続き有効。`Element.moveBefore()` は対応が限定的で、未対応時は既存の `insertBefore()` フォールバックにより iframe が再読み込みされる設計である。互換性は [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Element/moveBefore) を基準に実機確認する。
 - X 内の戻るボタン問題は残る。Backspace 独自履歴は別機能として動作するが、X のボタン操作は同じ経路へ統合されていない。
 
