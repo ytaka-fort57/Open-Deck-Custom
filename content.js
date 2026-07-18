@@ -18,6 +18,7 @@ let profile_store;
 let last_load_profile = 0;
 let is_removed_default_style = false;
 const deck_lifecycle = window.opd_custom_lifecycle;
+const deck_storage = window.opd_custom_storage;
 let shared_media_viewer = null;
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
@@ -119,83 +120,65 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
     //chrome.runtime.sendMessage({message: "dnr_upd"});
     function init(){
         //console.log("Welcome to Open-Deck!");
-        chrome.storage.local.get("opd_settings", function(value){
-            if(value.opd_settings == undefined){
+        const storage_defaults = {};
+        storage_defaults[deck_storage.KEYS.SETTINGS] = null;
+        storage_defaults[deck_storage.KEYS.PROFILE_STORE] = null;
+        deck_storage.get_json_many(storage_defaults, function(storage_error, stored){
+            if(storage_error != null){
+                console.error("Open-Deck settings could not be loaded.", storage_error);
+                if(confirm(i18n_message("msg_profile_data_broken_confirm"))){
+                    settings_init();
+                }
+                return;
+            }
+            const stored_settings = stored[deck_storage.KEYS.SETTINGS];
+            if(stored_settings == null){
                 last_load_profile = 0;
                 settings_init();
-            }else{
-                if(JSON.parse(value.opd_settings).last_load_profile == undefined){
-                    if(confirm(i18n_message("msg_profile_data_broken_confirm"))){
-                        chrome.storage.local.remove("opd_settings", function(){
-                            alert(i18n_message("msg_profile_init_completed"));
-                        });
-                    }else{
-                        last_load_profile = 0;
-                    }
-                }else{
-                    last_load_profile = JSON.parse(value.opd_settings).last_load_profile;
-                }
-                //console.log(last_load_profile);
+                return;
             }
-            
-            chrome.storage.local.get("opd_profile_store", function(store_value){
-                //console.log(store_value)
-                //console.log(JSON.parse(store_value.opd_profile_store))
-                profile_store = JSON.parse(store_value.opd_profile_store);
-                //RUN
-                let ext_update_flag = null;
-                let ext_settings = null;
-                if(value.opd_settings != undefined){
-                    if(JSON.parse(value.opd_settings).version != manifest.version){
-                        ext_update_flag = true;
-                    }else{
-                        ext_update_flag = false;
-                    }
+            if(stored_settings.last_load_profile == undefined){
+                last_load_profile = 0;
+                if(confirm(i18n_message("msg_profile_data_broken_confirm"))){
+                    deck_storage.remove(deck_storage.KEYS.SETTINGS, function(){
+                        alert(i18n_message("msg_profile_init_completed"));
+                    });
                 }
-                if(value.opd_settings == undefined || ext_update_flag == true){
-                    //settings_init();
-                    //ext_settings = JSON.parse(value.opd_settings);
-                    if(profile_store[last_load_profile]?.profile == undefined){
-                        let recovery_setting = JSON.parse(value.opd_settings);
-                        recovery_setting.last_load_profile = 0;
-                        chrome.storage.local.set({'opd_settings': JSON.stringify(recovery_setting)}, function(){
-                            alert(i18n_message("msg_settings_auto_repair"));
-                            last_load_profile = 0;
-                            location.reload();
-                        });
-                        //setは非同期のため、待たずに進むと直後のprofile_store参照で例外になる
-                        return;
-                    }
+            }else{
+                last_load_profile = stored_settings.last_load_profile;
+            }
+            profile_store = stored[deck_storage.KEYS.PROFILE_STORE];
+            if(!Array.isArray(profile_store) || profile_store.length === 0){
+                if(confirm(i18n_message("msg_profile_data_broken_confirm"))){
+                    settings_init();
+                }
+                return;
+            }
 
-                    //Updateされたときに設定のバージョンを上げる
-                    if(ext_update_flag){
-                        const setting = JSON.parse(value.opd_settings);
-                        setting.version = manifest.version;
-                        chrome.storage.local.set({'opd_settings': JSON.stringify(setting)}, function(){
-                            if(confirm(i18n_message("app_update"))){
-                                open(`https://github.com/kawa-nobu/Open-Deck/releases/tag/v${manifest.version}`, '_blank', 'popup');
-                            }
-                        });
-                    }
-                    ext_settings = {column_settings:profile_store[last_load_profile].profile};
-                }else{
-                    //ext_settings = JSON.parse(value.opd_settings);
-                    if(profile_store[last_load_profile]?.profile == undefined){
-                        let recovery_setting = JSON.parse(value.opd_settings);
-                        recovery_setting.last_load_profile = 0;
-                        chrome.storage.local.set({'opd_settings': JSON.stringify(recovery_setting)}, function(){
-                            alert(i18n_message("msg_settings_auto_repair"));
-                            last_load_profile = 0;
-                            location.reload();
-                        });
-                        //setは非同期のため、待たずに進むと直後のprofile_store参照で例外になる
+            if(profile_store[last_load_profile]?.profile == undefined){
+                const recovery_setting = Object.assign({}, stored_settings, {last_load_profile: 0});
+                deck_storage.set_json(deck_storage.KEYS.SETTINGS, recovery_setting, function(error){
+                    if(error != null){
+                        console.error("Open-Deck settings could not be repaired.", error);
                         return;
                     }
-                    ext_settings = {column_settings:profile_store[last_load_profile].profile};
-                }
-                //console.log(ext_settings);
-                run(ext_settings);
-            });
+                    alert(i18n_message("msg_settings_auto_repair"));
+                    last_load_profile = 0;
+                    location.reload();
+                });
+                return;
+            }
+
+            const ext_update_flag = stored_settings.version != manifest.version;
+            if(ext_update_flag){
+                const next_settings = Object.assign({}, stored_settings, {version: manifest.version});
+                deck_storage.set_json(deck_storage.KEYS.SETTINGS, next_settings, function(error){
+                    if(error == null && confirm(i18n_message("app_update"))){
+                        open(`https://github.com/kawa-nobu/Open-Deck/releases/tag/v${manifest.version}`, '_blank', 'popup');
+                    }
+                });
+            }
+            run({column_settings: profile_store[last_load_profile].profile});
         });
     }
 }
@@ -973,11 +956,9 @@ function run(settings){
                     deck_lifecycle.dispose_all_auto_reload();
                     document.querySelector("#opd_main_element").remove();
                     last_load_profile = index;
-                    chrome.storage.local.get("opd_settings", function(value){
-                        let load_setting = JSON.parse(value.opd_settings);
-                        load_setting.last_load_profile = index;
-                        chrome.storage.local.set({'opd_settings': JSON.stringify(load_setting)}, function () {
-                        });
+                    deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
+                        settings.last_load_profile = index;
+                        return settings;
                     });
                     const column_settings = {column_settings:profile_store[index].profile};
                     //console.log(column_settings)
@@ -1484,7 +1465,7 @@ function run(settings){
     }
     //メインバーイベント
     document.getElementById("init_settings").addEventListener("click", function(){
-        chrome.storage.local.remove("opd_settings", function(value){
+        deck_storage.remove(deck_storage.KEYS.SETTINGS, function(){
             alert(i18n_message("msg_settings_reset_completed"));
         });
     });
@@ -1625,7 +1606,7 @@ function run(settings){
             profile_store.push(save_object);
             const new_profile_index = profile_store.length - 1;
             //console.log(profile_store)
-            chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile_store)}, function () {
+            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
                 copy_profile_tab_state(last_load_profile, new_profile_index);
                 let profile_list_btn_html = "";
                 //プロファイルリスト初期化
@@ -1658,25 +1639,25 @@ function run(settings){
                 let after_profile_num = null;
                 profile_store.splice(delete_num, 1);
                 //console.log(profile_store)
-                chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile_store)}, function () {
+                deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
                     delete_profile_tab_state(delete_num);
                     //
-                    chrome.storage.local.get("opd_settings", function(load_value){
-                        //console.log(last_load_profile)
-                        if(last_load_profile<delete_num){
-                            after_profile_num = last_load_profile;
-                        }else{
-                            after_profile_num = last_load_profile - 1;
-                        }
-                        if(after_profile_num < 0){
-                            after_profile_num = 0;
-                        }
-                        last_load_profile = after_profile_num;
-                        //
-                        console.log(after_profile_num)
-                        let load_setting = JSON.parse(load_value.opd_settings);
-                        load_setting.last_load_profile = after_profile_num;
-                        chrome.storage.local.set({'opd_settings': JSON.stringify(load_setting)}, function () {
+                    //console.log(last_load_profile)
+                    if(last_load_profile<delete_num){
+                        after_profile_num = last_load_profile;
+                    }else{
+                        after_profile_num = last_load_profile - 1;
+                    }
+                    if(after_profile_num < 0){
+                        after_profile_num = 0;
+                    }
+                    last_load_profile = after_profile_num;
+                    //
+                    console.log(after_profile_num)
+                    deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
+                        settings.last_load_profile = after_profile_num;
+                        return settings;
+                    }, function(){
                             let profile_list_btn_html = "";
                             //プロファイルリスト初期化
                             for (let index = 0; index < profile_store.length; index++) {
@@ -1685,7 +1666,6 @@ function run(settings){
                             document.querySelector(".profile_val_now").textContent = after_profile_num;
                             document.querySelector("#profile_btn_list").innerHTML = profile_list_btn_html;
                             create_profile_list_btn();
-                        });
                     });
                 });
             }
@@ -1907,14 +1887,11 @@ function run(settings){
             return settings_array;
         }else{
             //console.log(settings_array);
-            /*chrome.storage.local.set({'opd_settings': JSON.stringify(settings_array)}, function () {
-                console.log(settings_array);
-            });*/
             const save_object = {name:"user_profile", profile:settings_array.column_settings};
             //profile_store.push(save_object);
             Object.assign(profile_store[profile_num], save_object);
             //console.log(profile_store);
-            chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile_store)}, function () {
+            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
                 //console.log(settings_array);
             });
         }
@@ -2067,15 +2044,19 @@ function settings_init(){
     };
     let profile = [{name:"default", profile: profile_store_default}];
     //console.log(profile);
-    chrome.storage.local.set({'opd_profile_store': JSON.stringify(profile)}, function () {
-        chrome.storage.local.set({'opd_settings': JSON.stringify(settings)}, function () {
+    const initial_storage = {};
+    initial_storage[deck_storage.KEYS.PROFILE_STORE] = profile;
+    initial_storage[deck_storage.KEYS.SETTINGS] = settings;
+    deck_storage.set_json_many(initial_storage, function(error){
+        if(error == null){
             if(is_prototype){
                 alert(i18n_message("msg_initial_setup_completed_prototype"));
             }else{
                 alert(i18n_message("msg_initial_setup_completed"));
             }
-            
             location.reload();
-        });
+        }else{
+            console.error("Open-Deck initial settings could not be saved.", error);
+        }
     });
 }

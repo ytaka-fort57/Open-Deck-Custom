@@ -30,6 +30,13 @@ test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
     assert.doesNotMatch(content, /media_viewer_token\.push/);
 });
 
+test("settings and profiles use the shared storage repository", () => {
+    assert.match(content, /const deck_storage = window\.opd_custom_storage/);
+    assert.match(content, /deck_storage\.get_json_many/);
+    assert.match(content, /deck_storage\.update_json/);
+    assert.doesNotMatch(content, /chrome\.storage\.local/);
+});
+
 test("text review always has a timeout and failure recovery", () => {
     assert.match(background, /new AbortController\(\)/);
     assert.match(background, /setTimeout\(\(\) => controller\.abort\(\), 15000\)/);

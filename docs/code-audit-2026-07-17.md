@@ -221,9 +221,9 @@ background の `fetch()` にタイムアウトがなく（`background.js:24-45`�
 | --- | --- | --- |
 | R-1 `content.js`のライフサイクル分割 | 第1段階対応済み | `extensions/custom/lifecycle.js`へタイマー破棄、ページ監視、共有イベント、メディアトークンを移し、`content.js`側は呼び出しへ限定した |
 | R-2 安定ID | 設計保留 | 保存スキーマと本家のカラム生成・保存経路を同時に変えるため競合範囲が大きい。当面の位置キーremapで既知操作を補う |
-| R-3 storage統合 | 独自領域は対応済み、全面移行は保留 | import/exportは`extensions/custom/settings_codec.js`へ分離済み。本家`content.js`内の保存処理まで一括移動するのは同期競合が大きい |
+| R-3 storage統合 | 対応済み | `extensions/custom/storage_repository.js`へキー、JSON変換、context失効時の防御、複数キー保存、read-modify-write直列化を集約した |
 | R-4 DOM adapter | 新規独自機能から適用 | 既存helperの一括移動は行わず、`extensions/custom/`側の新規実装でselectorを集約する |
-| R-5 再現可能な検証 | 対応済み | Node標準テスト14件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
+| R-5 再現可能な検証 | 対応済み | Node標準テスト16件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
 
 ### R-1. `content.js` のライフサイクル分割
 
@@ -261,6 +261,8 @@ DeckController
 - 旧形式の移行
 - 原子的な import / export
 - 書き込み直列化
+
+実装では既存storageとの互換性を保つため値のJSON文字列形式は変更せず、`content.js`、カラムタブ状態、設定import/exportのアクセスだけをrepository経由へ統一した。複数キーの初期化・importは1回の`storage.local.set`で反映し、単一キーの更新は共有queue内でread-modify-writeする。
 
 ### R-4. DOM 依存セレクターを adapter として隔離する
 
