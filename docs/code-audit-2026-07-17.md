@@ -219,11 +219,11 @@ background の `fetch()` にタイムアウトがなく（`background.js:24-45`�
 
 | 項目 | 方針 | 理由 |
 | --- | --- | --- |
-| R-1 `content.js`のライフサイクル分割 | 全面分割は保留 | 本家の中心ファイルを広範囲に移動すると同期PRがほぼ毎回競合する。タイマー・ページ監視など、不具合へ直結する小さなライフサイクル単位だけを段階的に整理する |
+| R-1 `content.js`のライフサイクル分割 | 第1段階対応済み | `extensions/custom/lifecycle.js`へタイマー破棄、ページ監視、共有イベント、メディアトークンを移し、`content.js`側は呼び出しへ限定した |
 | R-2 安定ID | 設計保留 | 保存スキーマと本家のカラム生成・保存経路を同時に変えるため競合範囲が大きい。当面の位置キーremapで既知操作を補う |
 | R-3 storage統合 | 独自領域は対応済み、全面移行は保留 | import/exportは`extensions/custom/settings_codec.js`へ分離済み。本家`content.js`内の保存処理まで一括移動するのは同期競合が大きい |
 | R-4 DOM adapter | 新規独自機能から適用 | 既存helperの一括移動は行わず、`extensions/custom/`側の新規実装でselectorを集約する |
-| R-5 再現可能な検証 | 対応済み | Node標準テスト12件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
+| R-5 再現可能な検証 | 対応済み | Node標準テスト14件とWindows / Bashの必須検証入口を追加し、Release CIも同じ`verify.sh`を実行 |
 
 ### R-1. `content.js` のライフサイクル分割
 
@@ -244,6 +244,8 @@ DeckController
 ```
 
 一度に全面書き換えず、最初に AutoReloadController と persistence 層を切り出すと高優先度不具合へ直接効く。
+
+第1段階では`extensions/custom/lifecycle.js`を追加し、プロファイル切り替え後もページ単位で一つだけ存在すべきlistener／observerと、iframeに紐づく自動更新・メディアトークン管理を分離した。独立テストではlistenerの一重登録、古いiframe tokenの拒否、disposerの一括解放を確認する。
 
 ### R-2. 位置ではなく安定 ID をデータモデルの中心にする
 

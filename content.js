@@ -12,37 +12,17 @@ const url_path = new URL(location.href);
 let is_added_system_color_mode = false;
 let apply_ui_color = null;
 let system_color_scheme = null;
-let is_page_observer_initialized = false;
-let is_title_favicon_initialized = false;
-let is_page_event_listener_initialized = false;
 const i18n_message = chrome.i18n.getMessage;
 let is_shift_pressed = false;
 let profile_store;
 let last_load_profile = 0;
 let is_removed_default_style = false;
-const media_viewer_tokens_by_frame = new WeakMap();
+const deck_lifecycle = window.opd_custom_lifecycle;
+let shared_media_viewer = null;
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
     media_viewer: {active: false},
 };
-const auto_reload_disposers = new Set();
-
-function dispose_all_auto_reload(){
-    Array.from(auto_reload_disposers).forEach(function(dispose){
-        dispose();
-    });
-}
-
-function dispose_auto_reload_in(root){
-    if(root == null){
-        return;
-    }
-    root.querySelectorAll("iframe").forEach(function(iframe){
-        if(typeof iframe.opd_dispose_auto_reload === "function"){
-            iframe.opd_dispose_auto_reload();
-        }
-    });
-}
 const ui_icon_define = {
     banner_hide:"icon/banner_hide.svg",
     top_bar_hide:"icon/top_hide.svg",
@@ -221,7 +201,7 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
 }
 function run(settings){
     //再構築前のカラムが保持していた自動更新を確実に停止する
-    dispose_all_auto_reload();
+    deck_lifecycle.dispose_all_auto_reload();
     //console.log(settings)
     let profile_list_html;
     let profile_list_btn_html = "";
@@ -231,11 +211,8 @@ function run(settings){
     }
     profile_list_html = `<div class="profile_val_now" title="${i18n_message("ui_profile_current_title")}">${last_load_profile}</div><div class="dsp_profile_list"><div id="profile_btn_list">${profile_list_btn_html}</div>`;
     //console.log(profile_list_btn_html)
-    if(!is_page_event_listener_initialized){
-        is_page_event_listener_initialized = true;
-        //カラム全体のテキストフォーカスの状態で自動更新を制御できるようにする
-        window.addEventListener('opd_post_focus', (e) => {
-            const detail = JSON.parse(e.detail);
+    deck_lifecycle.initialize_page_event_listeners({
+        on_post_focus: function(detail){
             if(detail){
                 column_auto_update_state.text_focus.date = Date.now();
                 column_auto_update_state.text_focus.active = true;
@@ -243,25 +220,17 @@ function run(settings){
                 column_auto_update_state.text_focus.date = 0;
                 column_auto_update_state.text_focus.active = false;
             }
-        });
-        //画像表示パネルとページ全体の受信listenerも、プロファイル切り替え後に重複させない
-        const media_viewer = new OpdExtMediaViewer();
-        document.addEventListener('opd_send_media_info', (e) => {
-            const detail = JSON.parse(e.detail);
-            const is_current_frame = Array.from(document.querySelectorAll('#main_rack_element iframe')).some((frame) => {
-                return media_viewer_tokens_by_frame.get(frame) === detail.token;
-            });
-            if(is_current_frame){
-                //ビューワーを閉じた際のコールバック関数
-                function viewer_close(){
-                    column_auto_update_state.media_viewer.active = false;
-                }
-
-                column_auto_update_state.media_viewer.active = true;
-                media_viewer.Preview(detail.media_info, detail.selected_index, viewer_close);
+        },
+        on_media_info: function(detail){
+            if(shared_media_viewer == null){
+                shared_media_viewer = new OpdExtMediaViewer();
             }
-        });
-    }
+            column_auto_update_state.media_viewer.active = true;
+            shared_media_viewer.Preview(detail.media_info, detail.selected_index, function(){
+                column_auto_update_state.media_viewer.active = false;
+            });
+        },
+    });
     //CSSタグ追加
     document.querySelector("head").insertAdjacentHTML("afterbegin", `<style second_column_css></style>
     <style opd_default_css>
@@ -896,28 +865,21 @@ function run(settings){
     document.body.insertAdjacentElement("afterbegin", ins_html);
 
     //favicon・タイトルとページ全体の監視は、プロファイル切り替え後も同じdocumentを使うため1度だけ登録する
-    set_title_favicon()
-    if(!is_page_observer_initialized){
-        is_page_observer_initialized = true;
-        //react-rootを監視しマスク処理をする
-        observe_when_ready(
-            () => document.getElementById("react-root"),
-            document.body,
-            main_dsp,
-            { childList: true, characterData: true, subtree: false }
-        );
-
-        //headを監視しカラーモード機能やCSSを設定・変更する
-        observe_when_ready(
-            () => document.querySelector("head"),
-            document.documentElement,
-            head_observer_callback,
-            { childList: true, subtree: false }
-        );
-    }else{
-        main_dsp(document.getElementById("react-root"));
-        head_observer_callback(document.head);
-    }
+    deck_lifecycle.initialize_title_favicon("Open-Deck", chrome.runtime.getURL("icon.png"));
+    deck_lifecycle.initialize_page_observers({
+        get_react_root: function(){
+            return document.getElementById("react-root");
+        },
+        react_watch_root: document.body,
+        on_react_change: main_dsp,
+        react_observer_options: {childList: true, characterData: true, subtree: false},
+        get_head: function(){
+            return document.head;
+        },
+        head_watch_root: document.documentElement,
+        on_head_change: head_observer_callback,
+        head_observer_options: {childList: true, subtree: false},
+    });
     //APIリミット表示用
     document.querySelector("#api_limit_status").addEventListener("click", function(){
         if(api_limit_obj != null){
@@ -1008,7 +970,7 @@ function run(settings){
                 }
                 //console.log(preload_desc_array)
                 if(confirm(`${i18n_message("msg_profile_load_confirm", [index, preload_desc_array.join("\r\n")])}`)){
-                    dispose_all_auto_reload();
+                    deck_lifecycle.dispose_all_auto_reload();
                     document.querySelector("#opd_main_element").remove();
                     last_load_profile = index;
                     chrome.storage.local.get("opd_settings", function(value){
@@ -1302,7 +1264,7 @@ function run(settings){
                         };
                         const dispose_auto_reload = function(){
                             stop_auto_reload();
-                            auto_reload_disposers.delete(dispose_auto_reload);
+                            deck_lifecycle.untrack_auto_reload(dispose_auto_reload);
                             if(auto_reload_target_elem.opd_dispose_auto_reload === dispose_auto_reload){
                                 delete auto_reload_target_elem.opd_dispose_auto_reload;
                             }
@@ -1333,7 +1295,7 @@ function run(settings){
                             }, interval_ms);
                         };
                         auto_reload_target_elem.opd_dispose_auto_reload = dispose_auto_reload;
-                        auto_reload_disposers.add(dispose_auto_reload);
+                        deck_lifecycle.track_auto_reload(dispose_auto_reload);
                         //Home, Exproleカラムホバー中 自動更新上部遷移停止
                         opd_column_div.querySelector("iframe").addEventListener("mouseover", function(){
                             this.setAttribute("auto_reload_mouse_hover", "true");
@@ -1555,7 +1517,7 @@ function run(settings){
         }else{
             if(confirm(i18n_message("msg_second_rack_to_single_confirm"))){
                 const timeline_before = snapshot_timeline_state();
-                dispose_auto_reload_in(document.querySelector("#second_rack_element"));
+                deck_lifecycle.dispose_auto_reload_in(document.querySelector("#second_rack_element"));
                 document.querySelector("#second_rack_element").textContent = "";
                 remap_timeline_state(timeline_before);
                 document.querySelector("style[second_column_css]").textContent = ``;
@@ -1756,7 +1718,7 @@ function run(settings){
                 const blocker = new OpdMediaViewerBlocker();
                 blocker.Init(column_frame);
                 //同じiframeの再読込では最新tokenへ置き換え、削除済みiframeはWeakMapに保持させない
-                media_viewer_tokens_by_frame.set(column_frame, blocker.opd_send_media_info_token);
+                deck_lifecycle.register_media_viewer_token(column_frame, blocker.opd_send_media_info_token);
             }
         };
 
@@ -1854,7 +1816,7 @@ function run(settings){
                 if(pin_checkbox == false || pin_checkbox == undefined){
                     const timeline_before = snapshot_timeline_state();
                     const column = this.closest(".dsp_column");
-                    dispose_auto_reload_in(column);
+                    deck_lifecycle.dispose_auto_reload_in(column);
                     column.remove();
                     remap_timeline_state(timeline_before);
                     append_object_css();
@@ -1863,7 +1825,7 @@ function run(settings){
                     if(confirm(i18n_message("msg_pinned_column_close_confirm"))){
                         const timeline_before = snapshot_timeline_state();
                         const column = this.closest(".dsp_column");
-                        dispose_auto_reload_in(column);
+                        deck_lifecycle.dispose_auto_reload_in(column);
                         column.remove();
                         remap_timeline_state(timeline_before);
                         append_object_css();
@@ -1986,29 +1948,6 @@ function run(settings){
     }
 }
 
-//MutationObserverを仕掛ける
-function observe_when_ready(get_target, watch_root, observer_callback, observer_options){
-    const target = get_target();
-    if(target){
-        //既に存在していたらすぐに仕掛ける
-        observer_callback(target);
-        new MutationObserver(() => observer_callback(target)).observe(target, observer_options);
-        return;
-    }
-
-    if(!watch_root) return;
-
-    const wait_observer = new MutationObserver(() => {
-        const target_retry = get_target();
-        if(target_retry){
-            wait_observer.disconnect();
-            observer_callback(target_retry);
-            new MutationObserver(() => observer_callback(target_retry)).observe(target_retry, observer_options);
-        }
-    });
-    wait_observer.observe(watch_root, { childList: true });
-}
-
 //カラー・CSS周りを設定する
 function head_observer_callback(head_elem){
     //デフォルトのCSSがUIに影響を与えないように削除する
@@ -2069,90 +2008,6 @@ function main_dsp(react_root){
     if(!react_root) return;
     react_root.style.visibility = "hidden";
     react_root.style.overflow = "hidden";
-}
-
-//タイトルやfaviconを設定する
-function set_title_favicon(){
-    if(is_title_favicon_initialized) return;
-    is_title_favicon_initialized = true;
-    const OPD_TITLE = "Open-Deck";
-    const OPD_FAVICON_URL = chrome.runtime.getURL("icon.png");
-
-    //タイトルを設定する
-    document.head.querySelectorAll("title").forEach(elem => {
-        if(elem.dataset.opd !== "1") elem.remove();
-    });
-    let opd_title = document.head.querySelector('title[data-opd="1"]');
-    if(!opd_title){
-        opd_title = document.createElement("title");
-        opd_title.dataset.opd = "1";
-        opd_title.textContent = OPD_TITLE;
-        document.head.appendChild(opd_title);
-    }
-
-    //titleを監視
-    const title_observer = new MutationObserver(() => {
-        //自分の title の中身が変わっていたら戻す
-        if(opd_title.textContent !== OPD_TITLE){
-            opd_title.textContent = OPD_TITLE;
-        }
-        document.head.querySelectorAll("title").forEach(elem => {
-            if(elem.dataset.opd !== "1") elem.remove();
-        });
-    });
-    title_observer.observe(opd_title, {
-        childList: true,
-        characterData: true,
-        subtree: true
-    });
-    //headも監視
-    const head_title_observer = new MutationObserver(mutations => {
-        for(const m of mutations){
-            for(const node of m.addedNodes){
-                if(node.tagName === "TITLE" && node.dataset.opd !== "1"){
-                    node.remove();
-                }
-            }
-        }
-    });
-    head_title_observer.observe(document.head, { childList: true });
-
-    //faviconを設定する
-    document.head.querySelectorAll('link[rel="shortcut icon"], link[rel="icon"]').forEach(l => {
-        if(l.dataset.opd !== "1") l.remove();
-    });
-    let opd_favicon = document.head.querySelector('link[data-opd="1"]');
-    if(!opd_favicon){
-        opd_favicon = document.createElement("link");
-        opd_favicon.rel = "shortcut icon";
-        opd_favicon.href = OPD_FAVICON_URL;
-        opd_favicon.dataset.opd = "1";
-        document.head.appendChild(opd_favicon);
-    }
-
-    //favicon監視
-    const favicon_observer = new MutationObserver(() => {
-        if(opd_favicon.getAttribute("href") !== OPD_FAVICON_URL){
-            opd_favicon.setAttribute("href", OPD_FAVICON_URL);
-        }
-    });
-    favicon_observer.observe(opd_favicon, {
-        attributes: true,
-        attributeFilter: ["href", "rel"]
-    });
-    //head自体も監視
-    const head_favicon_observer = new MutationObserver(mutations => {
-        for(const m of mutations){
-            for(const node of m.addedNodes){
-                if(node.tagName === "LINK"
-                    && (node.rel === "shortcut icon" || node.rel === "icon")
-                    && node.dataset.opd !== "1"){
-                    node.remove();
-                }
-            }
-        }
-    });
-    head_favicon_observer.observe(document.head, { childList: true });
 }
 
 //Cookieからカラーモードを取得する

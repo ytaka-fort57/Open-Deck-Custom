@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const content = readFileSync("content.js", "utf8");
 const background = readFileSync("background.js", "utf8");
 const textReview = readFileSync("extensions/text_review.js", "utf8");
+const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
 
 test("new auto-reload columns use seconds in the UI", () => {
     const tenSecondTemplates = content.match(/replaceAll\("%column_auto_reload_time%", "10"\)/g) ?? [];
@@ -18,11 +19,14 @@ test("profile deletion validates a non-negative in-range integer", () => {
 });
 
 test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
-    assert.match(content, /const auto_reload_disposers = new Set\(\)/);
-    assert.match(content, /is_page_observer_initialized/);
-    assert.match(content, /is_page_event_listener_initialized/);
-    assert.match(content, /const media_viewer_tokens_by_frame = new WeakMap\(\)/);
-    assert.match(content, /media_viewer_tokens_by_frame\.set\(column_frame,/);
+    assert.match(lifecycle, /const auto_reload_disposers = new Set\(\)/);
+    assert.match(lifecycle, /is_page_observer_initialized/);
+    assert.match(lifecycle, /is_page_event_listener_initialized/);
+    assert.match(lifecycle, /const media_viewer_tokens_by_frame = new WeakMap\(\)/);
+    assert.match(content, /deck_lifecycle\.register_media_viewer_token\(column_frame,/);
+    assert.match(content, /deck_lifecycle\.initialize_page_observers/);
+    assert.doesNotMatch(content, /function observe_when_ready/);
+    assert.doesNotMatch(content, /function set_title_favicon/);
     assert.doesNotMatch(content, /media_viewer_token\.push/);
 });
 
