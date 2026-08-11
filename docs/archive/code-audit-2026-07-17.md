@@ -1,6 +1,7 @@
 # Open-Deck Custom コード監査
 
 監査日: 2026-07-17
+状態: 2026-07-18 対応完了のためアーカイブ
 対象: `custom` ブランチ `e431bcc`
 範囲: JavaScript、HTML、マニフェスト、ロケール、パッケージスクリプト、GitHub Actions、既存ドキュメント
 

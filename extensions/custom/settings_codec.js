@@ -1,5 +1,6 @@
 //カスタム版の設定import/exportで共有するスキーマ・検証処理
 window.opd_custom_settings_codec = (function(){
+    const safe_values = window.opd_custom_safe_values;
     const FORMAT = "open-deck-custom-settings";
     const SCHEMA_VERSION = 1;
     const COLUMN_TYPES = new Set([
@@ -40,11 +41,14 @@ window.opd_custom_settings_codec = (function(){
             return false;
         }
         for(const string_field of ["column_save_path", "column_save_title", "column_pinned_path"]){
-            if(column[string_field] != null && typeof column[string_field] !== "string"){
+            if(column[string_field] != null && !safe_values.is_safe_text(column[string_field], 2048)){
                 return false;
             }
         }
-        if(column.column_pinned_path && !column.column_pinned_path.startsWith("/")){
+        if(column.column_save_path && !safe_values.is_safe_x_path(column.column_save_path)){
+            return false;
+        }
+        if(column.column_pinned_path && !safe_values.is_safe_x_path(column.column_pinned_path)){
             return false;
         }
         if(column.auto_reload_time != null){

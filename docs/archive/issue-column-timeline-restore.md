@@ -1,6 +1,7 @@
 # リロード時にカラムのタイムライン選択が復元されない
 
 記録日: 2026-07-17
+状態: 対応完了のため2026-07-18にアーカイブ
 対象: Open-Deck v1.1.3.7（本家 Release `aae4fdb` 相当）
 
 ## 症状
@@ -15,7 +16,7 @@ Timeline カラムを複数開いて別々のタブを選択していても、�
 
 ### カラムの実装
 
-各カラムは同一オリジンの iframe である（[content.js:780](../content.js:780)）。
+各カラムは同一オリジンの iframe である（[content.js:780](../../content.js:780)）。
 Timeline カラムの `src` は `https://x.com/home` 固定で、タブ情報を含まない。
 
 ```text
@@ -27,7 +28,7 @@ post         → https://x.com/intent/tweet 固定
 
 ### 保存される値
 
-`column_settings_save()`（[content.js:1766](../content.js:1766)）が DOM 属性からカラム設定を組み立て、
+`column_settings_save()`（[content.js:1766](../../content.js:1766)）が DOM 属性からカラム設定を組み立て、
 `opd_profile_store` へ保存する。保存されるのは次の項目のみ。
 
 - `type` / `banner` / `top_visible` / `tw_view_mode`（表示フィルター）
@@ -55,7 +56,7 @@ X 側が遅れて選択を戻すため、読み込み後 20 秒は監視して�
 
 なお、リストのタブは `/i/lists/<id>` という URL を持つため、
 Explore カラムとして開けば本家の既存機能だけでも復元できる（おすすめ／フォロー中は不可）。
-Explore カラムは iframe 内の URL 変化を監視して自動保存する（[content.js:1455](../content.js:1455)）ため、
+Explore カラムは iframe 内の URL 変化を監視して自動保存する（[content.js:1455](../../content.js:1455)）ため、
 X の共有状態の影響を受けずカラムごとに独立して復元できる。リスト中心の構成ならこちらが確実。
 
 ## 実機で確認した事実（2026-07-17）
@@ -80,7 +81,7 @@ X の共有状態の影響を受けずカラムごとに独立して復元でき
 
 - カラムの並べ替え・追加・削除を行うと、保存が位置基準のためカラムとタブの対応がずれる
   （ずれてもタブを選び直せば直る）
-- プロファイル切り替えはページをリロードせずカラムを作り直すため（[content.js:976](../content.js:976)）、
+- プロファイル切り替えはページをリロードせずカラムを作り直すため（[content.js:976](../../content.js:976)）、
   切り替え直後の復元が正しいプロファイルの保存を読めているか要確認
 - 監視期間（20秒）を過ぎてから X が選択を戻す場合は追従できない
 - 自動更新（auto_reload）で iframe が再読み込みされた場合の復元
@@ -90,9 +91,9 @@ X の共有状態の影響を受けずカラムごとに独立して復元でき
 
 ## 併せて発見した別不具合
 
-プロファイル自動復旧の経路（[content.js:156](../content.js:156)、[content.js:179](../content.js:179)）が壊れている。
+プロファイル自動復旧の経路（[content.js:156](../../content.js:156)、[content.js:179](../../content.js:179)）が壊れている。
 
-- `window.reload()` は存在しない API。他所では `location.reload()` を使用（[content.js:1532](../content.js:1532)）
+- `window.reload()` は存在しない API。他所では `location.reload()` を使用（[content.js:1532](../../content.js:1532)）
 - 復旧の `if` ブロックに `return` がなく、非同期の `set` コールバックを待たずに
   直後の `profile_store[last_load_profile].profile` を参照して例外になる
 

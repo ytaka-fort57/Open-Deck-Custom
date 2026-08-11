@@ -77,3 +77,16 @@ test("page event listeners are registered once and reject stale media events", (
     assert.equal(mediaEvents.length, 1);
     assert.equal(mediaEvents[0].token, "current");
 });
+
+test("column resources are replaced by key and disposed with their frame", () => {
+    const frame = { tagName: "IFRAME", querySelectorAll: () => [] };
+    const { lifecycle } = loadLifecycle();
+    const disposed = [];
+    lifecycle.register_column_resource(frame, "review", () => disposed.push("old"));
+    lifecycle.register_column_resource(frame, "review", () => disposed.push("current"));
+    lifecycle.register_column_resource(frame, "back", () => disposed.push("back"));
+    assert.deepEqual(disposed, ["old"]);
+    lifecycle.dispose_column_resources_in(frame);
+    lifecycle.dispose_column_resources_in(frame);
+    assert.deepEqual(disposed, ["old", "current", "back"]);
+});

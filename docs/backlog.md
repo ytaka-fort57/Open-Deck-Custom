@@ -1,42 +1,33 @@
 # カスタム版の残課題
 
-更新日: 2026-07-18
+更新日: 2026-07-26
 
-対応済みの経緯は [issue-column-timeline-restore.md](issue-column-timeline-restore.md) を参照。
+対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
-
-## 優先度: 高
-
-### 1. 本家への Pull Request を検討する
-
-プロファイル自動復旧の不具合（`window.reload()` の誤りと `return` 漏れ）は本家にも存在する。
-修正は `b54246d` で取り込み済み。本家 kawa-nobu/Open-Deck へ提案するか判断する。
-
-独自機能ではなく純粋な不具合修正のため、受け入れられれば以後の差分が減る。
-
-### 2. カラムごとの「戻る」が別のカラムに効く
-
-ブラウザーの戻る操作は、フレームをまたいだ joint session history を対象とするため、
-「最後に遷移したカラム」が戻る。実ブラウザーで検証済みで、フレームを指定して戻る手段は無い。
-X のカラム内の戻るボタンも内部で同じ経路を使うため、別のカラムが動く。
-
-Backspace は独自の URL 履歴で戻すため正しく動く（`69cb846`）。
-X の戻るボタンも同じ仕組みに乗せ換えれば直せるが、ボタンの特定に X の DOM 情報が必要。
-現状は Backspace を使う運用で回避している。
 
 ## 優先度: 中
 
-### 3. Firefox（Manifest V2）未検証
+### 1. Firefox（Manifest V2）実機未検証
 
 マニフェストには独自コードを登録済みだが、動作確認をしていない。
 
-### 4. 本家レビューworkflowの初回動作確認
+### 2. 本家レビューworkflowの初回動作確認
 
 `.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
 
-### 5. 動画variantの選択
+### 3. `misskey` / `bsky`カラム対応（保留）
 
-表示・ダウンロードとも配列末尾のvariantを使っている。実際のXのpayloadで、MP4候補、HLS候補、bitrate、配列順を確認してから選択規則を決める。
+現行deckには描画templateがなく利用予定もないため、`settings_codec`だけで受理する変更は行わない。必要になった時点で、描画・保存・import・移行testをまとめて実装する。
+
+## 優先度: 低
+
+### 4. `content.js`のDOM実行テスト拡大
+
+安全値、background sender、storageは実行テスト化済み。残る巨大なDOM処理は、責務を純粋関数・controllerへ分離するタイミングで文字列検査から置き換える。
+
+### 5. タブ状態を位置キーから安定IDへ移行（設計保留）
+
+現在の追加・削除・並べ替え・プロファイル操作は位置の再配置で保護済み。安定ID化は全プロファイルの移行と旧データ互換を伴うため、実ブラウザーfixtureを整える段階まで保留する。
 
 ## 対応済み
 
@@ -46,8 +37,19 @@ X の戻るボタンも同じ仕組みに乗せ換えれば直せるが、ボタ
 - 配布ZIPの許可リスト化とRelease CIでの混入検査
 - ページ単位のlistener、observer、自動更新破棄、メディアtokenを`lifecycle.js`へ分離
 - storageキー、JSON変換、書き込み直列化を`storage_repository.js`へ統合
-- Node標準テスト16件とWindows / Bashの単一検証コマンド
+- Node標準テスト24件とWindows / Bashの単一検証コマンド
 - 本家の直接mergeを廃止し、週次レビューと意味移植の運用へ変更
+- 属性値escape、同一オリジンpath検証、メディアURLのDOM安全化
+- 自動更新周期の再作成、cross-origin iframe監視の例外防止
+- background sender検証、FileReader失敗表示、storage mutator返り値検証
+- Xの戻るボタンを対象iframeの独自URL履歴へ接続
+- 動画variantを配列順に依存せず、HTTPSのMP4から最高bitrateを選択
+- column共通disposerを追加し、文章校正observerとイベントを破棄
+
+## 運用判断済み
+
+- 本家更新の頻度が低い間は、fork側の構造を優先し、必要な変更だけを意味単位で再実装する。
+- プロファイル自動復旧の本家PRは現時点では作成しない。小さな純粋修正を本家へ戻す効果が明確になった場合だけ再検討する。
 
 ## リファクタ方針
 

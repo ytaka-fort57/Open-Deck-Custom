@@ -46,6 +46,11 @@ window.addEventListener("load", function(){
             document.getElementById("import_input_area").value = reader.result;
             set_status("ファイルを読み込みました。内容を確認して「インポート」を押してください。", false);
         });
+        reader.addEventListener("error", function(){
+            document.getElementById("import_input_area").value = "";
+            const detail = reader.error?.message ? ": " + reader.error.message : "";
+            set_status("ファイルを読み込めませんでした" + detail, true);
+        });
         reader.readAsText(file);
     });
 

@@ -9,6 +9,7 @@ class OpdExtTextReview {
             let editable_elem = null;
             let is_textarea_empty = true;
             let review_state = false;
+            const editor_observers = new Set();
             const requested_lang = String(ui_lang || "").split("-")[0];
             this.opd_use_lang = this.UITexts[requested_lang] != undefined ? requested_lang : "en";
             column_window.document.head.insertAdjacentHTML("beforeend", `<style opd_post_textreview_css>
@@ -140,30 +141,34 @@ class OpdExtTextReview {
                 }));
             });
             
-            column_window.document.addEventListener("focusin", (ev) => {
+            const on_focusin = (ev) => {
                 //テキストエリアフォーカスタイミングで文字有無のカウンタを仕込む
                 if (ev.target && ev.target.isContentEditable) {
                     editable_elem = ev.target;
                     if(!editable_elem.getAttribute("opd_text_counter")){
                         //input イベントでは半角文字の削除が取得できないため、MutationObserver を使う
-                        const editor_observer = new MutationObserver((mutations, obs) => {
-                            is_textarea_empty = editable_elem.innerText.trim() === '';
+                        const observed_editor = editable_elem;
+                        const editor_observer = new MutationObserver(() => {
+                            is_textarea_empty = observed_editor.innerText.trim() === '';
                             if(is_textarea_empty){
-                                column_window.document.getElementById("opd_post_text_review").setAttribute("disabled", "");
+                                column_window.document.getElementById("opd_post_text_review")?.setAttribute("disabled", "");
                             }else{
-                                column_window.document.getElementById("opd_post_text_review").removeAttribute("disabled");
+                                column_window.document.getElementById("opd_post_text_review")?.removeAttribute("disabled");
                             }
-                        }).observe(editable_elem, {
+                        });
+                        editor_observer.observe(observed_editor, {
                             childList: true,
                             subtree: true
                         });
+                        editor_observers.add(editor_observer);
                         editable_elem.setAttribute("opd_text_counter", "true");
                     }
                 }else{
                     editable_elem = null;
                 }
-            });
-            const observer = new MutationObserver((mutations, obs) => {
+            };
+            column_window.document.addEventListener("focusin", on_focusin);
+            const observer = new MutationObserver(() => {
                 //戻るボタンの表示を制御する
                 const allow_back_btn_path = ["/unsent"];
                 const current_path = column_window.location.pathname;
@@ -227,9 +232,18 @@ class OpdExtTextReview {
                         }));
                     });
                 }
-            }).observe(column_window.document, {
+            });
+            observer.observe(column_window.document, {
                 childList: true,
                 subtree: true
+            });
+            window.opd_custom_lifecycle?.register_column_resource(column_frame, "text-review", function(){
+                column_window.document.removeEventListener("focusin", on_focusin);
+                observer.disconnect();
+                editor_observers.forEach(function(editor_observer){
+                    editor_observer.disconnect();
+                });
+                editor_observers.clear();
             });
         }
         this.Review = async(text, panel_elem, column_window) => {

@@ -15,6 +15,8 @@
     const keyboard = window.opd_custom_keyboard;
     const column_history = window.opd_custom_column_history;
     const column_reorder = window.opd_custom_column_reorder;
+    const lifecycle = window.opd_custom_lifecycle;
+    const list_repost_filter = window.opd_custom_list_repost_filter;
 
     function open_settings_import(){
         window.open(chrome.runtime.getURL("extensions/custom/settings_import.html"), "OPD-Custom-Settings-Import", 'width=760, height=680');
@@ -172,8 +174,37 @@
             //読み込みのたびに文書が入れ替わるため、その都度仕掛け直す
             iframe.addEventListener("load", function(){
                 keyboard.attach(iframe.contentDocument, document, iframe);
+                attach_column_back(iframe.contentDocument, iframe);
             });
             keyboard.attach(iframe.contentDocument, document, iframe);
+            attach_column_back(iframe.contentDocument, iframe);
+        });
+    }
+
+    function setup_list_repost_filter(){
+        if(list_repost_filter != null){
+            list_repost_filter.setup(document, lifecycle);
+        }
+    }
+
+    // X標準の戻るボタンはブラウザー全体のjoint session historyを使うため、
+    // 独自履歴がある場合だけ対象カラムの履歴へ置き換える。
+    function attach_column_back(doc, iframe){
+        if(doc == null){
+            return;
+        }
+        const on_click = function(event){
+            const back_button = event.target?.closest?.('button[data-testid="app-bar-back"]');
+            if(back_button == null || !column_history.can_back(iframe)){
+                return;
+            }
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            column_history.back(iframe);
+        };
+        doc.addEventListener("click", on_click, true);
+        lifecycle.register_column_resource(iframe, "column-back-button", function(){
+            doc.removeEventListener("click", on_click, true);
         });
     }
 
@@ -182,10 +213,12 @@
         add_menu_button();
         setup_timeline_columns();
         setup_column_keys();
+        setup_list_repost_filter();
         column_reorder.setup(document);
     });
     observer.observe(document.documentElement, {childList: true, subtree: true});
     add_menu_button();
     setup_timeline_columns();
     setup_column_keys();
+    setup_list_repost_filter();
 })();

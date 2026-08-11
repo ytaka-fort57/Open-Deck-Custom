@@ -46,6 +46,9 @@ foreach ($ZipName in $ExpectedZips) {
         if ($Entries -notcontains "extensions/custom/settings_codec.js") {
             throw "$ZipName にカスタム設定codecがありません"
         }
+        if ($Entries -notcontains "extensions/custom/safe_values.js") {
+            throw "$ZipName に安全な値境界helperがありません"
+        }
         Write-Host "$ZipName : OK ($($Entries.Count) entries)"
     } finally {
         $Zip.Dispose()

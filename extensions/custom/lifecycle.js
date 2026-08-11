@@ -1,6 +1,7 @@
 window.opd_custom_lifecycle = (function(){
     const auto_reload_disposers = new Set();
     const media_viewer_tokens_by_frame = new WeakMap();
+    const column_resources_by_frame = new WeakMap();
     let is_page_event_listener_initialized = false;
     let is_page_observer_initialized = false;
     let is_title_favicon_initialized = false;
@@ -28,6 +29,49 @@ window.opd_custom_lifecycle = (function(){
                 iframe.opd_dispose_auto_reload();
             }
         });
+    }
+
+    function register_column_resource(frame, key, dispose){
+        if(frame == null || typeof dispose !== "function"){
+            return;
+        }
+        let resources = column_resources_by_frame.get(frame);
+        if(resources == null){
+            resources = new Map();
+            column_resources_by_frame.set(frame, resources);
+        }
+        const previous = resources.get(key);
+        if(typeof previous === "function"){
+            previous();
+        }
+        resources.set(key, dispose);
+    }
+
+    function dispose_column_frame(frame){
+        const resources = column_resources_by_frame.get(frame);
+        column_resources_by_frame.delete(frame);
+        if(resources != null){
+            Array.from(resources.values()).forEach(function(dispose){
+                dispose();
+            });
+        }
+        if(typeof frame?.opd_dispose_auto_reload === "function"){
+            frame.opd_dispose_auto_reload();
+        }
+    }
+
+    function dispose_column_resources_in(root){
+        if(root == null){
+            return;
+        }
+        const frames = [];
+        if(root.tagName === "IFRAME"){
+            frames.push(root);
+        }
+        root.querySelectorAll?.("iframe").forEach(function(frame){
+            frames.push(frame);
+        });
+        frames.forEach(dispose_column_frame);
     }
 
     function register_media_viewer_token(frame, token){
@@ -213,11 +257,13 @@ window.opd_custom_lifecycle = (function(){
     return {
         dispose_all_auto_reload,
         dispose_auto_reload_in,
+        dispose_column_resources_in,
         initialize_page_event_listeners,
         initialize_page_observers,
         initialize_title_favicon,
         is_current_media_viewer_token,
         register_media_viewer_token,
+        register_column_resource,
         track_auto_reload,
         untrack_auto_reload,
     };

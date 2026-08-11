@@ -13,6 +13,7 @@ function createReview(sendMessage) {
         querySelector: () => null
     };
     const context = {
+        window: {},
         chrome: { runtime: { getURL: (value) => value, sendMessage } },
         crypto: { randomUUID: () => "token" },
         MutationObserver: class { observe() { return this; } },

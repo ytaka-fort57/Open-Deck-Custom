@@ -59,12 +59,14 @@ test("manifests and locale files are valid and complete", () => {
     assert.deepEqual(Object.keys(ja).sort(), Object.keys(en).sort());
 
     const importHtml = readFileSync(join(root, "extensions/custom/settings_import.html"), "utf8");
+    assert.match(importHtml, /<script src="safe_values\.js"/);
     assert.match(importHtml, /<script src="settings_codec\.js"/);
     assert.match(importHtml, /<script src="storage_repository\.js"/);
 
     for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
         const manifest = JSON.parse(readFileSync(join(root, manifestName), "utf8"));
         const scripts = manifest.content_scripts[0].js;
+        assert.ok(scripts.indexOf("extensions/custom/safe_values.js") < scripts.indexOf("content.js"));
         assert.ok(scripts.indexOf("extensions/custom/storage_repository.js") < scripts.indexOf("content.js"));
     }
 

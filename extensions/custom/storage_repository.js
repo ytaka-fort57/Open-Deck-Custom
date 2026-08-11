@@ -6,6 +6,7 @@ window.opd_custom_storage = (function(){
         COLUMN_STATE: "opd_custom_column_state",
     });
     const STORAGE_SCHEMA_VERSION = 1;
+    const NO_CHANGE = Symbol("opd_custom_storage_no_change");
     const mutation_queue = [];
     let is_mutating = false;
 
@@ -193,14 +194,18 @@ window.opd_custom_storage = (function(){
                 try{
                     current = parse_json(value[key], key, fallback);
                     next = mutator(current);
+                    if(next === undefined){
+                        throw new Error(key + " の更新関数が値を返しませんでした");
+                    }
                 }catch(update_error){
                     finish(update_error);
                     return;
                 }
+                const next_value = next === NO_CHANGE ? current : next;
                 const items = {};
-                items[key] = JSON.stringify(next == null ? current : next);
+                items[key] = JSON.stringify(next_value);
                 set_raw(items, function(set_error){
-                    finish(set_error, next == null ? current : next);
+                    finish(set_error, next_value);
                 });
             });
         }, callback);
@@ -214,6 +219,7 @@ window.opd_custom_storage = (function(){
 
     return {
         KEYS,
+        NO_CHANGE,
         STORAGE_SCHEMA_VERSION,
         get_json,
         get_json_many,

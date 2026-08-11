@@ -66,7 +66,7 @@
     ],
     "content_scripts": [{
       "matches": ["https://twitter.com/*", "https://x.com/*"],
-      "js": ["extensions/custom/storage_repository.js", "extensions/custom/lifecycle.js", "content.js", "extensions/utils.js", "extensions/text_review.js", "extensions/auto_reload.js", "extensions/media_viewer_block.js", "extensions/media_viewer/media_viewer.js", "extensions/custom/selectors.js", "extensions/custom/column_reorder.js", "extensions/custom/column_history.js", "extensions/custom/keyboard_shortcuts.js", "extensions/custom/column_state.js", "extensions/custom/index.js"]
+      "js": ["extensions/custom/safe_values.js", "extensions/custom/storage_repository.js", "extensions/custom/lifecycle.js", "content.js", "extensions/utils.js", "extensions/text_review.js", "extensions/auto_reload.js", "extensions/media_viewer_block.js", "extensions/media_viewer/media_viewer.js", "extensions/custom/selectors.js", "extensions/custom/column_reorder.js", "extensions/custom/column_history.js", "extensions/custom/keyboard_shortcuts.js", "extensions/custom/column_state.js", "extensions/custom/list_repost_filter.js", "extensions/custom/index.js"]
       }],
       "browser_action": {
         "default_popup": "popup.html",

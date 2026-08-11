@@ -5,30 +5,41 @@ class OpdExtMediaViewer {
             let current_media_idx = pre_index;
             const media_viewer_div = document.createElement("div");
             const media_viewer_dialog = document.createElement("dialog");
-            const mediaHTMLAt = (idx) => {
-                const info = media_info[idx];
-                if (!info) return "";
-
-                if (["animated_gif","video"].includes(info.type)) {
-                    return `
-                    <video data-media
-                        style="width:auto;height:auto;max-width:calc(100% - 160px);max-height:100%;object-fit:contain;"
-                        src="${info.video_info.variants.at(-1).url}"
-                        controls
-                        autoplay
-                        playsinline
-                    ></video>`;
+            const safe_values = window.opd_custom_safe_values;
+            const mediaURL = (info) => {
+                let raw_url = null;
+                if (["animated_gif", "video"].includes(info?.type)) {
+                    return safe_values.select_video_variant_url(info.video_info?.variants);
+                }else if(info?.type === "photo"){
+                    raw_url = info.media_url_https;
                 }
-
-                if (info.type === "photo") {
-                    return `
-                        <img data-media
-                            style="width:auto;height:auto;max-width:calc(100% - 160px);max-height:100%;object-fit:contain;"
-                            src="${info.media_url_https + "?name=orig"}"
-                        />`;
+                const normalized_url = safe_values.normalize_https_url(raw_url);
+                if(normalized_url == null || info?.type !== "photo"){
+                    return normalized_url;
                 }
-
-                return "";
+                const photo_url = new URL(normalized_url);
+                photo_url.searchParams.set("name", "orig");
+                return photo_url.href;
+            };
+            const createMediaElement = (info) => {
+                const source = mediaURL(info);
+                if(source == null){
+                    return null;
+                }
+                const is_video = ["animated_gif", "video"].includes(info.type);
+                const element = document.createElement(is_video ? "video" : "img");
+                element.dataset.media = "";
+                element.style.cssText = "width:auto;height:auto;max-width:calc(100% - 160px);max-height:100%;object-fit:contain;";
+                element.src = source;
+                if(is_video){
+                    element.controls = true;
+                    element.autoplay = true;
+                    element.playsInline = true;
+                    element.addEventListener("loadedmetadata", () => {
+                        element.volume = 0.2;
+                    }, {once: true});
+                }
+                return element;
             };
 
             const stopVideo = (elem) => {
@@ -43,32 +54,14 @@ class OpdExtMediaViewer {
             const setMedia = (idx) => {
                 const current = media_viewer_dialog.querySelector("[data-media]");
                 const nextInfo = media_info[idx];
-                if (!current || !nextInfo) return;
-
+                if (!current || !nextInfo) return false;
+                const next_element = createMediaElement(nextInfo);
+                if(next_element == null){
+                    return false;
+                }
                 stopVideo(current);
-
-                if (["animated_gif","video"].includes(nextInfo.type) && current.tagName === "VIDEO") {
-                    current.src = nextInfo.video_info.variants.at(-1).url;
-                    current.load();
-                    current.play();
-                    return;
-                }
-                if (nextInfo.type === "photo" && current.tagName === "IMG") {
-                    current.src = nextInfo.media_url_https + "?name=orig";
-                    return;
-                }
-
-                const wrapper = document.createElement("div");
-                wrapper.innerHTML = mediaHTMLAt(idx);
-                const next_elment = wrapper.firstElementChild;
-                if (!next_elment) return;
-
-                current.replaceWith(next_elment);
-                if (next_elment.tagName === "VIDEO") {
-                    next_elment.addEventListener("loadedmetadata", () => {
-                        next_elment.volume = 0.2;
-                    }, {once: true});
-                }
+                current.replaceWith(next_element);
+                return true;
             };
 
 
@@ -85,7 +78,7 @@ class OpdExtMediaViewer {
 
                 <div style="display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden;align-items:center;width:fit-content;">
                     <button type="button" class="opd_media_viewer_func_btn media_switch_btn" data-media-forward><span class="media_viewer_icon_forward opd_media_viewer_func_btn_icon_color"></span></button>
-                    ${mediaHTMLAt(current_media_idx)}
+                    <div data-media-container style="display:contents;"></div>
                     <button type="button" class="opd_media_viewer_func_btn media_switch_btn" data-media-next><span class="media_viewer_icon_next opd_media_viewer_func_btn_icon_color"></span></button>
                 </div>
 
@@ -94,6 +87,11 @@ class OpdExtMediaViewer {
                 </div>
             </div>
             `;
+            const initial_media = createMediaElement(media_info[current_media_idx]);
+            if(initial_media == null){
+                return;
+            }
+            media_viewer_dialog.querySelector("[data-media-container]").appendChild(initial_media);
             media_viewer_div.appendChild(media_viewer_dialog);
             const append_viewer_element = document.body.appendChild(media_viewer_div);
 
@@ -138,18 +136,9 @@ class OpdExtMediaViewer {
 
                 if (current_media_idx === 0) return;
 
-                const current_media_elem = media_viewer_dialog.querySelector("[data-media]");
                 const forward_idx = current_media_idx - 1;
-
-                if (["animated_gif","video"].includes(media_info[forward_idx]?.type) ) {
-                    current_media_elem.src = media_info[forward_idx].video_info.variants.at(-1).url;
-                }
-                if (media_info[forward_idx]?.type === "photo") {
-                    current_media_elem.src = media_info[forward_idx].media_url_https + '?name=orig';
-                }
-                current_media_idx -= 1;
-
-                setMedia(current_media_idx);
+                if(!setMedia(forward_idx)) return;
+                current_media_idx = forward_idx;
 
                 this.SkipBtnDisabled(media_viewer_dialog, media_info, current_media_idx);
             });
@@ -159,16 +148,8 @@ class OpdExtMediaViewer {
 
                 if (media_info.length === next_idx) return;
 
-                const current_media_elem = media_viewer_dialog.querySelector("[data-media]");
-                if (["animated_gif","video"].includes(media_info[next_idx]?.type) ) {
-                    current_media_elem.src = media_info[next_idx].video_info.variants.at(-1).url;
-                }
-                if (media_info[next_idx]?.type === "photo") {
-                    current_media_elem.src = media_info[next_idx].media_url_https + '?name=orig';
-                }
-                current_media_idx += 1;
-
-                setMedia(current_media_idx);
+                if(!setMedia(next_idx)) return;
+                current_media_idx = next_idx;
 
                 this.SkipBtnDisabled(media_viewer_dialog, media_info, current_media_idx);
             });
@@ -205,13 +186,22 @@ class OpdExtMediaViewer {
             }
         }
         this.DownloadMedia = async (media) => {
-            let media_src = null;
+            let raw_media_src = null;
             if (["animated_gif","video"].includes(media?.type)) {
-                media_src = media.video_info.variants.at(-1).url;
+                raw_media_src = window.opd_custom_safe_values.select_video_variant_url(media.video_info?.variants);
             }
             if (media?.type === "photo") {
-                media_src = media.media_url_https + '?name=orig';
+                raw_media_src = media.media_url_https;
             }
+            const normalized_media_src = window.opd_custom_safe_values.normalize_https_url(raw_media_src);
+            if(normalized_media_src == null){
+                return;
+            }
+            const media_url = new URL(normalized_media_src);
+            if(media?.type === "photo"){
+                media_url.searchParams.set("name", "orig");
+            }
+            const media_src = media_url.href;
             const res = await fetch(media_src);
             const blob = await res.blob();
 

@@ -7,6 +7,20 @@
     ※引用を開いた際の判定と引用のメディア情報を抽出する方法を調査する
     */
     document.addEventListener("click", (e) => {
+        // ネイティブ動画コントロールと再生/一時停止ボタンは、拡大ビューアーに渡さない。
+        // 動画コントロールの内部要素は Shadow DOM のため、composedPath で確認する。
+        const click_path = typeof e.composedPath === "function" ? e.composedPath() : [e.target];
+        const is_playback_control = click_path.some((element) => {
+            if(element?.tagName === "VIDEO"){
+                return true;
+            }
+            const label = element?.getAttribute?.("aria-label")?.trim().toLocaleLowerCase();
+            return label === "play" || label === "pause" || label === "再生" || label === "一時停止";
+        });
+        if(is_playback_control){
+            return;
+        }
+
         //Alt(Option)キーが押されている場合はメディアビューワーを使用しないようにする
         if (e.altKey) {
             const target_root = e.target.closest('div[data-testid="cellInnerDiv"]');

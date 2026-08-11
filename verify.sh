@@ -43,6 +43,7 @@ for zip_file in "${ZIP_FILES[@]}"; do
         exit 1
     fi
     grep -q '^extensions/custom/settings_codec.js$' <<< "$entries"
+    grep -q '^extensions/custom/safe_values.js$' <<< "$entries"
     echo "$zip_file : OK ($(wc -l <<< "$entries") entries)"
 done
 

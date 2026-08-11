@@ -19,7 +19,8 @@ const profileStore = [{
 }];
 
 test("settings codec imports old/new formats and rejects malformed state", () => {
-    const context = { window: {} };
+    const context = { window: {}, URL };
+    loadScript("extensions/custom/safe_values.js", context);
     loadScript("extensions/custom/settings_codec.js", context);
     const codec = context.window.opd_custom_settings_codec;
 
@@ -39,6 +40,8 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     assert.throws(() => codec.decode({ opd_profile_store: "{broken" }));
     assert.throws(() => codec.decode([{ name: "bad", profile: [{ type: "unknown" }] }]));
     assert.throws(() => codec.decode({ opd_profile_store: profileStore, opd_custom_column_state: { bad: "x" } }));
+    assert.throws(() => codec.decode([{ name: "bad path", profile: [{ type: "explore", column_save_path: "//evil.example" }] }]));
+    assert.throws(() => codec.decode([{ name: "bad text", profile: [{ type: "home", column_save_title: "bad\u0000title" }] }]));
 });
 
 test("column state serializes concurrent writes and profile remapping", async () => {
@@ -127,6 +130,13 @@ test("storage repository preserves concurrent JSON mutations and atomic multi-ke
             resolve();
         });
     });
+
+    await assert.rejects(
+        update(() => undefined),
+        /更新関数が値を返しませんでした/
+    );
+    await update((state) => Object.assign(state, { "0:2": "After error" }));
+    assert.equal(JSON.parse(stored.opd_custom_column_state)["0:2"], "After error");
 });
 
 test("column reorder remaps selections through the serialized mutation path", () => {

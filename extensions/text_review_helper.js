@@ -5,11 +5,7 @@
     new MutationObserver(function(){
         const back_button = document.querySelector('main button[data-testid="app-bar-back"]');
         if(!back_button) return;
-        if(location.pathname === "/intent/tweet"){
-            back_button.style.display = "none";
-        }else{
-            back_button.style.display = "block";
-        }
+        back_button.style.display = "block";
     }).observe(document, {childList: true, subtree: true});
 
     let instance = null;

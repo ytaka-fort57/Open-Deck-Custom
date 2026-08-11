@@ -19,6 +19,7 @@ let last_load_profile = 0;
 let is_removed_default_style = false;
 const deck_lifecycle = window.opd_custom_lifecycle;
 const deck_storage = window.opd_custom_storage;
+const deck_safe_values = window.opd_custom_safe_values;
 let shared_media_viewer = null;
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
@@ -49,6 +50,37 @@ const ui_icon_define = {
     download:"icon/download.svg",
     hashtag_restore:"icon/hashtag_restore.svg",
 }
+
+//トップ表示を隠す場合も、タイムライン上部のタブ切り替えは残す。
+function get_top_visible_css(column_type, legacy_mode = false){
+    if(column_type == "post"){
+        return `div[data-testid="tweetTextarea_0"], div[contenteditable="true"][data-testid*="tweetTextarea"]{display:none;}[data-testid="app-bar-back"]{visibility:visible !important; display:block !important; filter:none;}`;
+    }
+    const top_child = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1)`;
+    const hidden_style = legacy_mode
+        ? "display:none;"
+        : "visibility:hidden; height:0; top:calc(100vh - 60px); position:sticky; backdrop-filter:blur(0px) !important;";
+    const top_parts = [
+        `${top_child}:not(:has([role="tab"])){${hidden_style}}`,
+        `${top_child} div:has(form[role="search"]):not(:has([role="tab"])){${hidden_style}}`,
+        `${top_child} div:has(h2[role="heading"]):not(:has([role="tab"])){${hidden_style}}`,
+    ];
+
+    if(legacy_mode){
+        if(column_type == "home"){
+            top_parts.push(`div[role="progressbar"] + div{display:none;}`);
+        }
+        return top_parts.join("");
+    }
+
+    top_parts.push(`[data-testid="app-bar-back"]{visibility:visible; filter:none;}`);
+    if(column_type == "home"){
+        top_parts.push(`div[role="progressbar"] + div{display:none;}`);
+    }
+    top_parts.push(`div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`);
+    return top_parts.join("");
+}
+
 //UNIX時間分秒変換
 function unix_time_mmss(input){
     const date = new Date(input * 1000);
@@ -183,7 +215,8 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
     }
 }
 function run(settings){
-    //再構築前のカラムが保持していた自動更新を確実に停止する
+    //再構築前のカラムが保持していた監視・イベント・自動更新を確実に停止する
+    deck_lifecycle.dispose_column_resources_in(document.querySelector("#opd_main_element"));
     deck_lifecycle.dispose_all_auto_reload();
     //console.log(settings)
     let profile_list_html;
@@ -825,11 +858,29 @@ function run(settings){
                     }else{
                     }
                 }
+                const column_template = default_element[Object.keys(default_element)[default_index]]["html"];
+                const column_replacements = {
+                    "%column_save_path%": init_column_save_path,
+                    "%column_num%": create_random_id(),
+                    "%column_banner_ch%": banner_checked,
+                    "%column_top_bar_ch%": init_top_visible_checked,
+                    "%column_tw_view_mode%": tw_view_type,
+                    "%column_pinned_ch%": init_pinned_checked,
+                    "%column_pinned_save_path%": init_pinned_path,
+                    "%column_save_title%": init_column_save_title,
+                    "%column_width_num%": column_width_init,
+                    "%column_auto_reload_ch%": init_auto_reload_checked,
+                    "%column_auto_reload_time%": auto_reload_time,
+                };
+                const rendered_column_html = deck_safe_values.render_attribute_template(
+                    column_template,
+                    column_replacements
+                );
                 //一段目終了検出にもかかわらず設定が存在していた場合2段目の変数に保存
                 if(first_column_end == true){
-                    second_column_html += default_element[Object.keys(default_element)[default_index]]["html"].replaceAll("%column_save_path%", init_column_save_path).replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", banner_checked).replace("%column_top_bar_ch%", init_top_visible_checked).replace("%column_tw_view_mode%", tw_view_type).replace("%column_pinned_ch%", init_pinned_checked).replaceAll("%column_pinned_save_path%", init_pinned_path).replaceAll("%column_save_title%", init_column_save_title).replaceAll("%column_width_num%", column_width_init).replaceAll("%column_auto_reload_ch%", init_auto_reload_checked).replaceAll("%column_auto_reload_time%", auto_reload_time);
+                    second_column_html += rendered_column_html;
                 }else{
-                    main_column_html += default_element[Object.keys(default_element)[default_index]]["html"].replaceAll("%column_save_path%", init_column_save_path).replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", banner_checked).replace("%column_top_bar_ch%", init_top_visible_checked).replace("%column_tw_view_mode%", tw_view_type).replace("%column_pinned_ch%", init_pinned_checked).replaceAll("%column_pinned_save_path%", init_pinned_path).replaceAll("%column_save_title%", init_column_save_title).replaceAll("%column_width_num%", column_width_init).replaceAll("%column_auto_reload_ch%", init_auto_reload_checked).replaceAll("%column_auto_reload_time%", auto_reload_time);
+                    main_column_html += rendered_column_html;
                 }
                 //一段目読込終了検出
                 if(first_column_end == false && settings.column_settings[index].type == "empty_column"){
@@ -953,6 +1004,7 @@ function run(settings){
                 }
                 //console.log(preload_desc_array)
                 if(confirm(`${i18n_message("msg_profile_load_confirm", [index, preload_desc_array.join("\r\n")])}`)){
+                    deck_lifecycle.dispose_column_resources_in(document.querySelector("#opd_main_element"));
                     deck_lifecycle.dispose_all_auto_reload();
                     document.querySelector("#opd_main_element").remove();
                     last_load_profile = index;
@@ -1021,16 +1073,8 @@ function run(settings){
                         this.contentWindow.document.querySelector("head").insertAdjacentHTML("beforeend", `<style opd_top_visible_css></style>`);
                     }
                     if(opd_column_top_visible_checkbox?.checked != true){
-                        if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "explore"){
-                            //div[data-testid="primaryColumn"] div[tabindex="0"][aria-label] div:has(form[role="search"]){display:none;}
-                            this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1)div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1)`;
-                        }else{
-                            if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "home"){
-                                this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){display:none;} div[role="progressbar"] + div{display:none;}`;
-                            }else{
-                                this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){display:none;}`;
-                            }
-                        }
+                        const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
+                        this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = get_top_visible_css(column_type, true);
                     }else{
                         //console.log("else")
                         this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = ``;
@@ -1199,16 +1243,8 @@ function run(settings){
                         this.contentWindow.document.querySelector("head").insertAdjacentHTML("beforeend", `<style opd_top_visible_css></style>`);
                     }
                     if(opd_column_top_visible_checkbox?.checked != true){
-                        //console.log("home_notcheck")
-                        if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "explore"){
-                            this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;}[data-testid="app-bar-back"]{visibility: visible; filter: none;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                        }else{
-                            if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "home"){
-                                this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;}[data-testid="app-bar-back"]{visibility: visible; filter: none;} div[role="progressbar"] + div{display:none;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                            }else{
-                                this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;}[data-testid="app-bar-back"]{visibility: visible; filter: none;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                            }
-                        }
+                        const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
+                        this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = get_top_visible_css(column_type);
                     }else{
                         //console.log("else")
                         this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = ``;
@@ -1290,10 +1326,16 @@ function run(settings){
                                 const auto_reload_time = auto_reload_target_elem.closest('div[opd_column_type]').querySelector(".opd_a_reload_time_setting");
                                 if(Number(auto_reload_time.value) >= 1){
                                     alert(i18n_message("msg_auto_reload_set", [auto_reload_time.value]));
+                                    if(opd_column_auto_reload_checkbox.checked){
+                                        start_auto_reload(Number(auto_reload_time.value) * 1000);
+                                    }
                                     column_settings_save("", last_load_profile);
                                 }else{
                                     alert(i18n_message("msg_auto_reload_minimum_alert"));
                                     auto_reload_time.value = '10';
+                                    if(opd_column_auto_reload_checkbox.checked){
+                                        start_auto_reload(10000);
+                                    }
                                     column_settings_save("", last_load_profile);
                                 }
                             });
@@ -1337,18 +1379,8 @@ function run(settings){
                                 topvisible_mode_target_object.contentWindow.document.querySelector("head").insertAdjacentHTML("beforeend", `<style opd_top_visible_css></style>`);
                             }
                             if(this.checked != true){
-                                //console.log(this)
-                                //topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"] div[tabindex="0"][aria-label] div:has(form[role="search"]), div[data-testid="primaryColumn"] div[tabindex="0"][aria-label] div:has(h2[role="heading"]){display:none;};`;
-                                if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "explore"){
-                                    topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;}[data-testid="app-bar-back"]{visibility: visible;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                                }else{
-                                    //console.log(this.closest("div[opd_column_type]").getAttribute("opd_column_type"))
-                                    if(this.closest("div[opd_column_type]").getAttribute("opd_column_type") == "home"){
-                                        topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;} [data-testid="app-bar-back"]{visibility: visible;} div[aria-label="ホームタイムライン"] * +div:first-of-type [data-testid="cellInnerDiv"]{} div[role="progressbar"] + div{display:none;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                                    }else{
-                                        topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1){visibility: hidden; height: 0;top: calc(100vh - 60px);position: sticky;backdrop-filter: blur(0px) !important;}[data-testid="app-bar-back"]{visibility: visible;}div[data-testid="cellInnerDiv"]:has(button[aria-describedby], div[data-testid="UserAvatar-Container-unknown"]):not(:has(article[tabindex="-1"])){display:none;}`;
-                                    }
-                                }
+                                const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
+                                topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = get_top_visible_css(column_type);
                             }else{
                                 //console.log("else")
                                 topvisible_mode_target_object.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = ``;
@@ -1445,22 +1477,44 @@ function run(settings){
     }
     //URL, ページタイトル監視
     function mutate_url(element){
-        let exp_object = element.querySelector("iframe");
+        const exp_object = element.querySelector("iframe");
+        const read_explore_state = function(){
+            try{
+                const href = exp_object.contentWindow.location.href;
+                const url = new URL(href);
+                return {
+                    href: href,
+                    path: `${url.pathname}${url.search}`,
+                    title: exp_object.contentWindow.document.title.replace(" / X", ""),
+                    document: exp_object.contentWindow.document,
+                };
+            }catch(error){
+                //外部オリジンや遷移途中は読めないため、次回loadへ委ねる
+                return null;
+            }
+        };
         exp_object.addEventListener("load", function(){
-            let exp_old_url = exp_object.contentWindow.location.href;
-                    let exp_observer = new MutationObserver(function(){
-                        if(exp_old_url != exp_object.contentWindow.location.href){
-                            let exp_url = new URL(exp_object.contentWindow.location.href);
-                            let exp_title = exp_object.contentWindow.document.title.replace(" / X", "");
-                            //console.log(`${exp_url.pathname}${exp_url.search}`);
-                            element.setAttribute("opd_explore_path", `${exp_url.pathname}${exp_url.search}`);
-                            exp_old_url = exp_object.contentWindow.location.href;
-                            element.setAttribute("opd_explore_title", exp_title);
-                            //console.log(exp_title);
-                            column_settings_save("", last_load_profile);
-                        }
-                    });
-                    exp_observer.observe(exp_object.contentWindow.document, {childList: true, subtree: true});
+            if(exp_object.opd_url_observer != null){
+                exp_object.opd_url_observer.disconnect();
+                delete exp_object.opd_url_observer;
+            }
+            const initial_state = read_explore_state();
+            if(initial_state == null){
+                return;
+            }
+            let exp_old_url = initial_state.href;
+            const exp_observer = new MutationObserver(function(){
+                const current_state = read_explore_state();
+                if(current_state == null || exp_old_url === current_state.href){
+                    return;
+                }
+                element.setAttribute("opd_explore_path", current_state.path);
+                exp_old_url = current_state.href;
+                element.setAttribute("opd_explore_title", current_state.title);
+                column_settings_save("", last_load_profile);
+            });
+            exp_object.opd_url_observer = exp_observer;
+            exp_observer.observe(initial_state.document, {childList: true, subtree: true});
         })
     }
     //メインバーイベント
@@ -1498,7 +1552,7 @@ function run(settings){
         }else{
             if(confirm(i18n_message("msg_second_rack_to_single_confirm"))){
                 const timeline_before = snapshot_timeline_state();
-                deck_lifecycle.dispose_auto_reload_in(document.querySelector("#second_rack_element"));
+                deck_lifecycle.dispose_column_resources_in(document.querySelector("#second_rack_element"));
                 document.querySelector("#second_rack_element").textContent = "";
                 remap_timeline_state(timeline_before);
                 document.querySelector("style[second_column_css]").textContent = ``;
@@ -1796,7 +1850,7 @@ function run(settings){
                 if(pin_checkbox == false || pin_checkbox == undefined){
                     const timeline_before = snapshot_timeline_state();
                     const column = this.closest(".dsp_column");
-                    deck_lifecycle.dispose_auto_reload_in(column);
+                    deck_lifecycle.dispose_column_resources_in(column);
                     column.remove();
                     remap_timeline_state(timeline_before);
                     append_object_css();
@@ -1805,7 +1859,7 @@ function run(settings){
                     if(confirm(i18n_message("msg_pinned_column_close_confirm"))){
                         const timeline_before = snapshot_timeline_state();
                         const column = this.closest(".dsp_column");
-                        deck_lifecycle.dispose_auto_reload_in(column);
+                        deck_lifecycle.dispose_column_resources_in(column);
                         column.remove();
                         remap_timeline_state(timeline_before);
                         append_object_css();

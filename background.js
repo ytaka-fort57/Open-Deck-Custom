@@ -9,7 +9,11 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse){
-        if(request.message == "dnr_upd"){
+        if(sender?.id !== chrome.runtime.id || request == null || typeof request !== "object"){
+            sendResponse(false);
+            return false;
+        }
+        if(request.message === "dnr_upd"){
             (async () => {
                 try {
                     await update_dnr();
@@ -20,8 +24,9 @@ chrome.runtime.onMessage.addListener(
                     sendResponse(false);
                 }
             })();
+            return true;
         }
-        if(request.message == "text_review"){
+        if(request.message === "text_review"){
             const api_url = "https://opd.kwdev-sys.com/api/opd/text_review/review";
             (async () => {
                 const controller = new AbortController();
@@ -47,11 +52,14 @@ chrome.runtime.onMessage.addListener(
                     clearTimeout(timeout_id);
                 }
             })();
+            return true;
         }
-        if(request.message == "ext_reload"){
+        if(request.message === "ext_reload"){
             chrome.runtime.reload();
+            return false;
         }
-        return true;
+        sendResponse(false);
+        return false;
     }
 )
 //
