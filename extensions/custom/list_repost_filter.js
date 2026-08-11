@@ -8,6 +8,10 @@ window.opd_custom_list_repost_filter = (function(){
     const HOME_NON_LIST_TAB_LABELS = new Set([
         "おすすめ", "フォロー中", "for you", "following"
     ]);
+    const PAID_PARTNERSHIP_LABELS = [
+        "有料パートナーシップ",
+        "paid partnership",
+    ];
     const EXCLUDED_PROFILE_PATHS = new Set([
         "home", "explore", "search", "notifications", "messages", "settings",
         "compose", "login", "signup", "i", "intent", "hashtag"
@@ -117,8 +121,13 @@ window.opd_custom_list_repost_filter = (function(){
     }
 
     function has_paid_partnership(article){
-        return typeof article?.textContent === "string"
-            && article.textContent.includes("有料パートナーシップ");
+        if(typeof article?.textContent !== "string"){
+            return false;
+        }
+        const text = normalize_display_name(article.textContent);
+        return PAID_PARTNERSHIP_LABELS.some(function(label){
+            return text.includes(label);
+        });
     }
 
     function get_document_path(iframe){

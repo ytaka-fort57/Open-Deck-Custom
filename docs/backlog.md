@@ -8,23 +8,23 @@
 
 ## 優先度: 中
 
-### 1. Firefox（Manifest V2）実機未検証
-
-マニフェストには独自コードを登録済みだが、動作確認をしていない。
-
-### 2. 本家レビューworkflowの初回動作確認
+### 1. 本家レビューworkflowの初回動作確認
 
 `.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
 
-### 3. 引用付きメディアの選択境界
+### 2. 引用付きメディアの選択境界
 
 引用コンテナを特定できた場合に引用側のメディア情報を優先するコード修正と回帰テストを追加済み。Xの現行DOMとReact propsを使った実ブラウザーfixtureで、引用元・引用先の選択結果を確認する。
 
-### 4. `misskey` / `bsky`カラム対応（保留）
+### 3. `misskey` / `bsky`カラム対応（保留）
 
 現行deckには描画templateがなく利用予定もないため、`settings_codec`だけで受理する変更は行わない。必要になった時点で、描画・保存・import・移行testをまとめて実装する。
 
 ## 優先度: 低
+
+### 4. Firefox（Manifest V2）実機未検証
+
+マニフェストには独自コードを登録済みだが、現時点で使用予定がないため優先度を下げる。
 
 ### 5. `content.js`のDOM実行テスト拡大
 

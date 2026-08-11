@@ -96,6 +96,7 @@ test("only a repost by the original author is classified as a self repost", () =
 test("paid partnership posts are classified independently of repost metadata", () => {
     const filter = loadFilter();
     assert.equal(filter.has_paid_partnership(article({ textContent: "有料パートナーシップ" })), true);
+    assert.equal(filter.has_paid_partnership(article({ textContent: "Paid partnership" })), true);
     assert.equal(filter.has_paid_partnership(article({ textContent: "通常の投稿" })), false);
     assert.equal(filter.has_paid_partnership({}), false);
 });
