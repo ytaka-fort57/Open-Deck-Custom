@@ -1,9 +1,10 @@
 # カスタム版の残課題
 
-更新日: 2026-07-26
+更新日: 2026-08-11
 
 対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
+最新監査は [code-audit-2026-08-11.md](code-audit-2026-08-11.md) を参照。
 
 ## 優先度: 中
 
@@ -15,17 +16,29 @@
 
 `.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
 
-### 3. `misskey` / `bsky`カラム対応（保留）
+### 3. 引用付きメディアの選択境界
+
+`extensions/media_viewer_block_helper.js`に、引用内のメディアをクリックした際に元投稿側のメディアが選ばれる可能性を示すTODOが残っている。Xの現行DOMとReact propsを使った実ブラウザーfixtureを用意してから、引用元・引用先の選択規則を確定する。
+
+### 4. `misskey` / `bsky`カラム対応（保留）
 
 現行deckには描画templateがなく利用予定もないため、`settings_codec`だけで受理する変更は行わない。必要になった時点で、描画・保存・import・移行testをまとめて実装する。
 
 ## 優先度: 低
 
-### 4. `content.js`のDOM実行テスト拡大
+### 5. `content.js`のDOM実行テスト拡大
 
 安全値、background sender、storageは実行テスト化済み。残る巨大なDOM処理は、責務を純粋関数・controllerへ分離するタイミングで文字列検査から置き換える。
 
-### 5. タブ状態を位置キーから安定IDへ移行（設計保留）
+### 6. ハッシュタグ保存先の分離
+
+文章校正ヘルパーのハッシュタグはXページの`localStorage`へ保存される。Open-Deckのプロファイル単位で保持・削除する必要が生じた場合は、共有storage repositoryとの境界を設計する。
+
+### 7. リストフィルタの監視負荷計測
+
+リスト候補のiframeごとにMutationObserverと1秒周期のURL確認を動かし、更新のたびに投稿全体を走査する。大量フィードで負荷が確認された場合に、対象領域・イベント・差分走査を見直す。
+
+### 8. タブ状態を位置キーから安定IDへ移行（設計保留）
 
 現在の追加・削除・並べ替え・プロファイル操作は位置の再配置で保護済み。安定ID化は全プロファイルの移行と旧データ互換を伴うため、実ブラウザーfixtureを整える段階まで保留する。
 
@@ -37,7 +50,7 @@
 - 配布ZIPの許可リスト化とRelease CIでの混入検査
 - ページ単位のlistener、observer、自動更新破棄、メディアtokenを`lifecycle.js`へ分離
 - storageキー、JSON変換、書き込み直列化を`storage_repository.js`へ統合
-- Node標準テスト24件とWindows / Bashの単一検証コマンド
+- Node標準テスト32件とWindows / Bashの単一検証コマンド
 - 本家の直接mergeを廃止し、週次レビューと意味移植の運用へ変更
 - 属性値escape、同一オリジンpath検証、メディアURLのDOM安全化
 - 自動更新周期の再作成、cross-origin iframe監視の例外防止

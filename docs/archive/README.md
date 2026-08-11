@@ -6,4 +6,4 @@
 - [2026-07-18 フォローアップ監査](code-audit-2026-07-18.md)
 - [カラムのタイムライン選択復元 調査記録](issue-column-timeline-restore.md)
 
-現在の残課題は[backlog.md](../backlog.md)、最新監査は[code-audit-2026-07-26.md](../code-audit-2026-07-26.md)を参照する。
+現在の残課題は[backlog.md](../backlog.md)、最新監査は[code-audit-2026-08-11.md](../code-audit-2026-08-11.md)を参照する。
