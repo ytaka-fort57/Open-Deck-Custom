@@ -2,10 +2,7 @@
 (() => {
     let opd_send_media_info_token = null;
     //カラム側の画像表示を停止させて、表示画像などの情報をOPD側に渡す
-    /*
-    TODO:ツイートページのツイートに画像や動画付きの引用が付いていて、引用のメディアをクリックした際に元のメディアが表示される問題を修正する。
-    ※引用を開いた際の判定と引用のメディア情報を抽出する方法を調査する
-    */
+    //引用内のメディアをクリックした場合は、外側のポストではなく引用側のメディアを優先する。
     document.addEventListener("click", (e) => {
         // ネイティブ動画コントロールと再生/一時停止ボタンは、拡大ビューアーに渡さない。
         // 動画コントロールの内部要素は Shadow DOM のため、composedPath で確認する。
@@ -70,12 +67,13 @@
             if(!media_details_quoted){
                 media_details_quoted = root_props?.children[0]?.[0]?.props?.children[1]?.props?.children[0]?.props?.children[1]?.props?.children?.props?.mediaDetails;
             }
+            media_details = media_details_quoted ?? media_details;
+        }else{
+            media_details ??= media_details_quoted;
         }
 
         //TwitterCardなどの場合は、一旦対象外とする
-        if(!media_details && !media_details_quoted) return;
-
-        media_details ??= media_details_quoted;
+        if(!Array.isArray(media_details) || media_details.length === 0) return;
         
         //ビューワー自体の動作を止める
         e.preventDefault();

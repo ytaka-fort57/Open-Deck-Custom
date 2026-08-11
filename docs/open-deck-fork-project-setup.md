@@ -371,7 +371,7 @@ Issueへの書き込みには`issues: write`だけを使い、repository content
 - 採用分がカスタム版の責務分割とstorage形式を壊していない
 - 対応不要／既存対応とした理由が`docs/upstream-port-log.md`にある
 - `manifest.json`と`manifest_firefox.json`の独自入口が維持されている
-- `.\verify.ps1`が32テストとChromium／Firefox両ZIPの検査を完了する
+- `.\verify.ps1`が33テストとChromium／Firefox両ZIPの検査を完了する
 - Open-Deck起動、プロファイル切り替え、カラム追加・並べ替え・削除を確認した
 - 画像の開閉とリロード後のカラム状態を確認した
 - コンソールに新しい例外が出ていない

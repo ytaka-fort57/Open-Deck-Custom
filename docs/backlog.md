@@ -18,7 +18,7 @@
 
 ### 3. 引用付きメディアの選択境界
 
-`extensions/media_viewer_block_helper.js`に、引用内のメディアをクリックした際に元投稿側のメディアが選ばれる可能性を示すTODOが残っている。Xの現行DOMとReact propsを使った実ブラウザーfixtureを用意してから、引用元・引用先の選択規則を確定する。
+引用コンテナを特定できた場合に引用側のメディア情報を優先するコード修正と回帰テストを追加済み。Xの現行DOMとReact propsを使った実ブラウザーfixtureで、引用元・引用先の選択結果を確認する。
 
 ### 4. `misskey` / `bsky`カラム対応（保留）
 
@@ -50,7 +50,7 @@
 - 配布ZIPの許可リスト化とRelease CIでの混入検査
 - ページ単位のlistener、observer、自動更新破棄、メディアtokenを`lifecycle.js`へ分離
 - storageキー、JSON変換、書き込み直列化を`storage_repository.js`へ統合
-- Node標準テスト32件とWindows / Bashの単一検証コマンド
+- Node標準テスト33件とWindows / Bashの単一検証コマンド
 - 本家の直接mergeを廃止し、週次レビューと意味移植の運用へ変更
 - 属性値escape、同一オリジンpath検証、メディアURLのDOM安全化
 - 自動更新周期の再作成、cross-origin iframe監視の例外防止
