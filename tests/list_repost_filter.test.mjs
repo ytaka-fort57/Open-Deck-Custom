@@ -52,6 +52,32 @@ function article({reposter, author, reposterName = "", authorName = "", context 
     };
 }
 
+function replyArticle({target = "Alice", context = "Replying to"} = {}){
+    const targetLink = {
+        getAttribute: (name) => name === "href" ? `/${target}` : null,
+        textContent: `@${target}`,
+        parentElement: null,
+    };
+    const contextNode = {
+        textContent: `${context} @${target}`,
+        parentElement: null,
+    };
+    targetLink.parentElement = contextNode;
+    return {
+        querySelectorAll: (selector) => selector === "a[href]"
+            ? [targetLink]
+            : selector === "*" ? [contextNode] : [],
+    };
+}
+
+function textOnlyReplyArticle(textContent){
+    return {
+        querySelectorAll: (selector) => selector === "*"
+            ? [{ textContent }]
+            : [],
+    };
+}
+
 test("list path detection is limited to list feeds", () => {
     const filter = loadFilter();
     assert.equal(filter.is_list_path("/i/lists/123"), true);
@@ -83,6 +109,29 @@ test("profile keys ignore non-profile routes and normalize case", () => {
     assert.equal(filter.profile_key_from_href("/Alice/status/123"), null);
 });
 
+test("home path detection includes the normal home timeline", () => {
+    const filter = loadFilter();
+    assert.equal(filter.is_home_path("/home"), true);
+    assert.equal(filter.is_home_path("/home/"), true);
+    assert.equal(filter.is_home_path("/i/lists/123"), false);
+    assert.equal(filter.should_apply_reply_filter("home", "/home", {}), true);
+    assert.equal(filter.should_apply_reply_filter("explore", "/home", {}), false);
+});
+
+test("current profile is read from X's profile navigation link", () => {
+    const filter = loadFilter();
+    const profileLink = {
+        getAttribute: (name) => name === "href" ? "/Alice" : null,
+    };
+    const doc = {
+        querySelectorAll: (selector) => selector === 'a[data-testid="AppTabBar_Profile_Link"]'
+            ? [profileLink]
+            : [],
+    };
+    assert.equal(filter.current_profile_key(doc), "alice");
+    assert.equal(filter.current_profile_key({ querySelectorAll: () => [] }), null);
+});
+
 test("only a repost by the original author is classified as a self repost", () => {
     const filter = loadFilter();
     assert.equal(filter.is_same_author_repost(article({ reposter: "/Alice", author: "/Alice" })), true);
@@ -91,6 +140,31 @@ test("only a repost by the original author is classified as a self repost", () =
     assert.equal(filter.is_same_author_repost(article({ reposterName: "暇空茜", authorName: "暇空茜" })), true);
     assert.equal(filter.is_same_author_repost(article({ reposterName: "暇空茜", authorName: "別の作者" })), false);
     assert.equal(filter.is_same_author_repost(article({ reposter: null, author: "/Alice" })), false);
+});
+
+test("only replies addressed to the current profile are classified for hiding", () => {
+    const filter = loadFilter();
+    assert.equal(filter.reply_target_key(replyArticle({ target: "Alice" })), "alice");
+    assert.equal(filter.is_reply_to_current_user(replyArticle({ target: "Alice" }), "alice"), true);
+    assert.equal(filter.is_reply_to_current_user(replyArticle({ target: "Bob" }), "alice"), false);
+    assert.equal(filter.is_reply_to_current_user(replyArticle({ target: "Alice", context: "通常の投稿" }), "alice"), false);
+    assert.equal(filter.is_reply_to_current_user(replyArticle({ target: "Alice" }), ""), false);
+});
+
+test("reply handle fallback is fail-open when the target link is unavailable", () => {
+    const filter = loadFilter();
+    assert.equal(filter.is_reply_to_current_user(
+        textOnlyReplyArticle("返信先 @Alice"),
+        "alice"
+    ), true);
+    assert.equal(filter.is_reply_to_current_user(
+        textOnlyReplyArticle("返信先 @AliceExtra"),
+        "alice"
+    ), false);
+    assert.equal(filter.is_reply_to_current_user(
+        textOnlyReplyArticle("通常の投稿 @Alice"),
+        "alice"
+    ), false);
 });
 
 test("paid partnership posts are classified independently of repost metadata", () => {

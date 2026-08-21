@@ -1,6 +1,7 @@
-//リスト内で、同一作者のリポストと有料パートナーシップ投稿を非表示にする
+//リスト内の同一作者リポスト等と、自分宛ての返信を非表示にする
 window.opd_custom_list_repost_filter = (function(){
     const HIDDEN_CLASS = "opd_custom_same_author_repost";
+    const HIDDEN_REPLY_CLASS = "opd_custom_reply_to_current_user";
     const STYLE_ATTR = "opd_custom_same_author_repost_css";
     const FRAME_ATTR = "opd_custom_list_repost_filter_attached";
     const RESOURCE_KEY = "list-repost-filter";
@@ -11,6 +12,13 @@ window.opd_custom_list_repost_filter = (function(){
     const PAID_PARTNERSHIP_LABELS = [
         "有料パートナーシップ",
         "paid partnership",
+    ];
+    const REPLY_CONTEXT_RE = /replying\s+to|返信先|リプライ先/i;
+    const CURRENT_PROFILE_SELECTORS = [
+        'a[data-testid="AppTabBar_Profile_Link"]',
+        '[data-testid="SideNav_AccountSwitcher_Button"] a[href]',
+        'a[aria-label*="Profile"]',
+        'a[aria-label*="プロフィール"]',
     ];
     const EXCLUDED_PROFILE_PATHS = new Set([
         "home", "explore", "search", "notifications", "messages", "settings",
@@ -75,6 +83,14 @@ window.opd_custom_list_repost_filter = (function(){
         return null;
     }
 
+    function profile_key_from_node(node){
+        if(node == null){
+            return null;
+        }
+        const direct_key = profile_key_from_href(node.getAttribute?.("href"));
+        return direct_key ?? first_profile_key(node);
+    }
+
     function normalize_display_name(value){
         return typeof value === "string"
             ? value.replace(/\s+/g, " ").trim().toLocaleLowerCase()
@@ -99,6 +115,79 @@ window.opd_custom_list_repost_filter = (function(){
     function is_repost_context(node){
         const text = (node?.textContent || "").toLowerCase();
         return /repost|retweet|リポスト|リツイート/.test(text);
+    }
+
+    function is_reply_context_text(value){
+        return REPLY_CONTEXT_RE.test(normalize_display_name(value));
+    }
+
+    function current_profile_key(doc){
+        if(doc == null || typeof doc.querySelectorAll !== "function"){
+            return null;
+        }
+        for(const selector of CURRENT_PROFILE_SELECTORS){
+            const candidates = doc.querySelectorAll(selector);
+            for(const candidate of candidates){
+                const key = profile_key_from_node(candidate);
+                if(key != null){
+                    return key;
+                }
+            }
+        }
+        return null;
+    }
+
+    function reply_target_key(article){
+        if(article == null || typeof article.querySelectorAll !== "function"){
+            return null;
+        }
+        const links = article.querySelectorAll("a[href]");
+        let best_match = null;
+        for(const link of links){
+            const key = profile_key_from_node(link);
+            if(key == null){
+                continue;
+            }
+            let node = link;
+            for(let level = 0; node != null && level <= 6; level += 1){
+                const text = node.textContent || "";
+                if(is_reply_context_text(text) && text.length <= 240){
+                    if(best_match == null || text.length < best_match.length){
+                        best_match = { key, length: text.length };
+                    }
+                    break;
+                }
+                node = node.parentElement ?? node.parentNode ?? null;
+            }
+        }
+        return best_match?.key ?? null;
+    }
+
+    function has_reply_context_for_handle(article, profile_key){
+        if(article == null || typeof article.querySelectorAll !== "function"){
+            return false;
+        }
+        const escaped_key = profile_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const handle_re = new RegExp(`(?:^|\\s)@${escaped_key}(?![A-Za-z0-9_])`, "i");
+        for(const node of article.querySelectorAll("*")){
+            const text = node?.textContent || "";
+            if(text.length <= 240 && is_reply_context_text(text) && handle_re.test(text)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function is_reply_to_current_user(article, profile_key){
+        if(typeof profile_key !== "string" || profile_key === ""){
+            return false;
+        }
+        profile_key = profile_key.replace(/^@/, "").toLowerCase();
+        const target_key = reply_target_key(article);
+        if(target_key != null){
+            return target_key === profile_key;
+        }
+        return has_reply_context_for_handle(article, profile_key);
     }
 
     function is_same_author_repost(article){
@@ -146,7 +235,7 @@ window.opd_custom_list_repost_filter = (function(){
         if(style == null){
             style = doc.createElement("style");
             style.setAttribute(STYLE_ATTR, "");
-            style.textContent = `.${HIDDEN_CLASS}{display:none !important;}`;
+            style.textContent = `.${HIDDEN_CLASS},.${HIDDEN_REPLY_CLASS}{display:none !important;}`;
             doc.head.appendChild(style);
         }
     }
@@ -158,6 +247,9 @@ window.opd_custom_list_repost_filter = (function(){
         doc.querySelectorAll(`.${HIDDEN_CLASS}`).forEach(function(element){
             element.classList.remove(HIDDEN_CLASS);
         });
+        doc.querySelectorAll(`.${HIDDEN_REPLY_CLASS}`).forEach(function(element){
+            element.classList.remove(HIDDEN_REPLY_CLASS);
+        });
     }
 
     function get_hide_target(article){
@@ -168,16 +260,22 @@ window.opd_custom_list_repost_filter = (function(){
         return article;
     }
 
-    function apply_filter(doc){
+    function apply_filter(doc, options = {}){
         if(typeof doc?.querySelectorAll !== "function"){
             return;
         }
         ensure_style(doc);
         clear_hidden(doc);
+        const include_existing_filters = options.include_existing_filters !== false;
+        const include_reply_filter = options.include_reply_filter !== false;
+        const profile_key = include_reply_filter ? current_profile_key(doc) : null;
         const articles = doc.querySelectorAll('article[data-testid="tweet"]');
         articles.forEach(function(article){
-            if(is_same_author_repost(article) || has_paid_partnership(article)){
+            if(include_existing_filters && (is_same_author_repost(article) || has_paid_partnership(article))){
                 get_hide_target(article).classList.add(HIDDEN_CLASS);
+            }
+            if(include_reply_filter && profile_key != null && is_reply_to_current_user(article, profile_key)){
+                get_hide_target(article).classList.add(HIDDEN_REPLY_CLASS);
             }
         });
     }
@@ -191,7 +289,17 @@ window.opd_custom_list_repost_filter = (function(){
         state.doc.querySelector(`style[${STYLE_ATTR}]`)?.remove();
     }
 
-    function setup_frame(iframe, lifecycle){
+    function is_home_path(pathname){
+        return typeof pathname === "string" && /^\/home\/?$/i.test(pathname);
+    }
+
+    function should_apply_reply_filter(column_type, pathname, doc){
+        return is_list_path(pathname)
+            || is_home_list_tab(doc)
+            || (column_type === "home" && is_home_path(pathname));
+    }
+
+    function setup_frame(iframe, lifecycle, column_type){
         const doc = iframe.contentDocument;
         if(doc == null){
             return;
@@ -214,8 +322,13 @@ window.opd_custom_list_repost_filter = (function(){
         };
         state.refresh = function(){
             state.path = get_document_path(iframe);
-            if(is_list_path(state.path) || is_home_list_tab(doc)){
-                apply_filter(doc);
+            const include_existing_filters = is_list_path(state.path) || is_home_list_tab(doc);
+            const include_reply_filter = should_apply_reply_filter(column_type, state.path, doc);
+            if(include_existing_filters || include_reply_filter){
+                apply_filter(doc, {
+                    include_existing_filters,
+                    include_reply_filter,
+                });
             }else{
                 clear_hidden(doc);
             }
@@ -267,11 +380,11 @@ window.opd_custom_list_repost_filter = (function(){
             if(iframe.getAttribute(FRAME_ATTR) == null){
                 iframe.setAttribute(FRAME_ATTR, "true");
                 iframe.addEventListener("load", function(){
-                    setup_frame(iframe, lifecycle);
+                    setup_frame(iframe, lifecycle, column.getAttribute("opd_column_type"));
                 });
             }
             if(is_loaded(iframe)){
-                setup_frame(iframe, lifecycle);
+                setup_frame(iframe, lifecycle, column.getAttribute("opd_column_type"));
             }
         });
     }
@@ -279,12 +392,18 @@ window.opd_custom_list_repost_filter = (function(){
     return {
         apply_filter,
         is_home_list_tab,
+        is_home_path,
         is_list_path,
         is_repost_context,
         is_same_author_repost,
+        is_reply_context_text,
+        is_reply_to_current_user,
+        current_profile_key,
         has_paid_partnership,
         normalize_display_name,
         profile_key_from_href,
+        reply_target_key,
+        should_apply_reply_filter,
         setup,
     };
 })();

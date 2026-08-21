@@ -9,6 +9,47 @@ window.opd_custom_column_reorder = (function(){
     const CONTROL_CLASS = "opd_custom_reorder";
     const STYLE_ATTR = "opd_custom_reorder_css";
 
+    function get_direct_sections(rack){
+        return Array.from(rack?.children ?? []).filter(function(element){
+            return element.tagName === "SECTION";
+        });
+    }
+
+    //iframeを含むsectionをDOMから移動すると、ブラウザーによってはiframeが再読み込みされる。
+    //表示順はflexのorderで変更し、iframeをDOMから外さない。
+    function get_visual_sections(rack){
+        return get_direct_sections(rack)
+            .map(function(section, index){
+                const raw_order = section.style.order;
+                const order = raw_order === "" ? Number.POSITIVE_INFINITY : Number(raw_order);
+                return {section: section, index: index, order: Number.isNaN(order) ? index : order};
+            })
+            .sort(function(left, right){
+                return left.order - right.order || left.index - right.index;
+            })
+            .map(function(item){
+                return item.section;
+            });
+    }
+
+    function apply_visual_order(rack, sections){
+        sections.forEach(function(section, index){
+            section.style.order = String(index);
+        });
+    }
+
+    function get_racks(doc){
+        if(typeof doc?.querySelector !== "function"){
+            return [];
+        }
+        return [
+            doc.querySelector("#first_rack_element"),
+            doc.querySelector("#second_rack_element")
+        ].filter(function(rack){
+            return rack != null;
+        });
+    }
+
     function add_style(doc){
         if(doc.querySelector("style[" + STYLE_ATTR + "]") != null){
             return;
@@ -63,52 +104,78 @@ window.opd_custom_column_reorder = (function(){
         if(rack == null){
             return [];
         }
-        return Array.from(rack.children).filter(function(element){
+        return get_visual_sections(rack).filter(function(element){
             return element.tagName === "SECTION" && element.getAttribute("draggable") === "true";
         });
     }
 
-    //本家のdropハンドラーへ処理を渡す。
-    //
-    //本家は insertBefore で移動するが、iframeはDOM上で動かすと中身が作り直される。
-    //(実測: 移動したカラムだけ再読み込みが走る。本家のドラッグ＆ドロップでも同じ)
-    //moveBefore は状態を保ったまま移動できるため、dropを発火する間だけ差し替える。
-    //未対応のブラウザーでは従来どおり insertBefore が使われ、再読み込みが起きるだけ。
-    function dispatch_drop(section, drop_target){
-        const original_insert_before = Node.prototype.insertBefore;
-        Node.prototype.insertBefore = function(node, reference){
-            if(this.moveBefore != undefined && node.isConnected && node.parentNode === this){
-                try{
-                    return this.moveBefore(node, reference);
-                }catch(error){
-                    //moveBeforeが使えない条件のときは従来どおり動かす
-                }
-            }
-            return original_insert_before.call(this, node, reference);
-        };
-        try{
-            const transfer = new DataTransfer();
-            transfer.setData("text/plain", section.id);
-            const drop_event = new DragEvent("drop", {
-                dataTransfer: transfer,
-                bubbles: true,
-                cancelable: true
+    function get_visual_column_elements(doc){
+        const all_elements = Array.from(doc.querySelectorAll("#opd_main_element div[opd_column_type]"));
+        const ordered_elements = get_racks(doc).flatMap(function(rack){
+            return get_visual_sections(rack).map(function(section){
+                return Array.from(section.children).find(function(element){
+                    return element.getAttribute?.("opd_column_type") != null;
+                });
+            }).filter(function(element){
+                return element != null;
             });
-            //独自操作は move_to() 側で状態を付け替えるため、本家側の追加処理と二重にしない
-            drop_event.opd_custom_tab_remap = true;
-            drop_target.dispatchEvent(drop_event);
-        }finally{
-            //差し替えは本家のdrop処理の間だけに留める
-            Node.prototype.insertBefore = original_insert_before;
+        });
+        const ordered_set = new Set(ordered_elements);
+        const result = [];
+        let inserted = false;
+        all_elements.forEach(function(element){
+            if(!ordered_set.has(element)){
+                result.push(element);
+            }else if(!inserted){
+                result.push(...ordered_elements);
+                inserted = true;
+            }
+        });
+        return result;
+    }
+
+    function move_before(section, target){
+        if(section == null || target == null || section === target){
+            return false;
         }
+        const source_rack = section.parentElement;
+        const target_rack = target.parentElement;
+        if(source_rack == null || target_rack == null){
+            return false;
+        }
+        const source_sections = get_visual_sections(source_rack).filter(function(item){
+            return item !== section;
+        });
+        const target_sections = source_rack === target_rack
+            ? source_sections
+            : get_visual_sections(target_rack);
+        const target_index = target_sections.indexOf(target);
+        if(target_index < 0){
+            return false;
+        }
+        target_sections.splice(target_index, 0, section);
+        if(source_rack === target_rack){
+            apply_visual_order(source_rack, target_sections);
+        }else{
+            apply_visual_order(source_rack, source_sections);
+            apply_visual_order(target_rack, target_sections);
+        }
+        return true;
     }
 
     //タイムラインカラムを左からの並び順で返す。タブの保存はこの位置を鍵にしている
     function get_timeline_sections(doc){
-        return Array.from(doc.querySelectorAll('#opd_main_element div[opd_column_type="home"]'))
-            .map(function(column){
-                return column.closest("section");
+        if(typeof doc?.querySelector !== "function"){
+            return Array.from(doc.querySelectorAll('#opd_main_element div[opd_column_type="home"]'))
+                .map(function(column){
+                    return column.closest("section");
+                });
+        }
+        return get_racks(doc).flatMap(function(rack){
+            return get_visual_sections(rack).filter(function(section){
+                return section.querySelector('div[opd_column_type="home"]') != null;
             });
+        });
     }
 
     //保存したタブをカラムに追従させる。
@@ -167,16 +234,20 @@ window.opd_custom_column_reorder = (function(){
         if(target_index < 0 || target_index >= columns.length){
             return false;
         }
-        //本家のdropは「この要素の前に差し込む」ため、右へ動かす場合は
-        //目的地の次の要素へ落とす。末尾へ動かす場合の落とし先は空カラムになる
-        const drop_target = target_index < current_index
-            ? columns[target_index]
-            : columns[target_index].nextElementSibling;
-        if(drop_target == null){
+        const visual_sections = get_visual_sections(section.parentElement).filter(function(item){
+            return item !== section;
+        });
+        const target_column = columns[target_index];
+        let insert_index = visual_sections.indexOf(target_column);
+        if(target_index > current_index){
+            insert_index += 1;
+        }
+        if(insert_index < 0){
             return false;
         }
         const timeline_before = get_timeline_sections(section.ownerDocument);
-        dispatch_drop(section, drop_target);
+        visual_sections.splice(insert_index, 0, section);
+        apply_visual_order(section.parentElement, visual_sections);
         remap_tab_state(timeline_before, get_timeline_sections(section.ownerDocument));
         //移動でどのカラムの位置も変わる。監視任せにすると、続けて押したときに
         //古い状態のボタンが押せないままになる
@@ -252,6 +323,9 @@ window.opd_custom_column_reorder = (function(){
     //カラムの追加や削除で並び順が変わるため、その都度呼ぶ
     function setup(deck_document){
         const sections = deck_document.querySelectorAll('#opd_main_element section[draggable="true"]');
+        get_racks(deck_document).forEach(function(rack){
+            apply_visual_order(rack, get_visual_sections(rack));
+        });
         sections.forEach(function(section){
             add_controls(section);
             refresh(section);
@@ -259,6 +333,8 @@ window.opd_custom_column_reorder = (function(){
     }
 
     return {
+        get_visual_column_elements: get_visual_column_elements,
+        move_before: move_before,
         setup: setup,
         move_to: move_to,
         snapshot_timeline_sections: snapshot_timeline_sections,

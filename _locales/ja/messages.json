@@ -14,6 +14,9 @@
   "ui_column_settings_title": {
     "message": "カラム設定"
   },
+  "ui_column_reload_title": {
+    "message": "このカラムを更新"
+  },
   "ui_column_banner_toggle_title": {
     "message": "バナー表示切り替え"
   },

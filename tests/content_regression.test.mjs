@@ -7,12 +7,28 @@ const background = readFileSync("background.js", "utf8");
 const textReview = readFileSync("extensions/text_review.js", "utf8");
 const textReviewHelper = readFileSync("extensions/text_review_helper.js", "utf8");
 const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
+const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8");
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
 
 test("new auto-reload columns use seconds in the UI", () => {
     const tenSecondTemplates = content.match(/replaceAll\("%column_auto_reload_time%", "10"\)/g) ?? [];
     assert.ok(tenSecondTemplates.length >= 2);
+});
+
+test("auto reload controls stay in the handler scope and columns expose a manual refresh", () => {
+    const start_index = content.indexOf("const start_auto_reload = function");
+    const branch_index = content.indexOf("if(opd_column_auto_reload_checkbox != null){");
+    assert.ok(start_index > 0 && branch_index > start_index);
+    assert.match(content, /const reload_column_content = function/);
+    assert.match(content, /opd_column_reload_btn\.addEventListener\("click"/);
+    assert.match(content, /class="opd_column_reload_btn"/);
+    assert.match(content, /column_reload:"icon\/column_reload\.svg"/);
+});
+
+test("auto reload helper re-resolves the timeline refresh function on every reload", () => {
+    assert.match(autoReloadHelper, /function resolve_reload_func\(\)/);
+    assert.match(autoReloadHelper, /const refresh = resolve_reload_func\(\) \?\? reload_func/);
 });
 
 test("profile deletion validates a non-negative in-range integer", () => {
@@ -74,9 +90,22 @@ test("top visibility keeps timeline tabs available", () => {
 test("post top visibility hides only the composer and keeps back navigation", () => {
     assert.match(content, /if\(column_type == "post"\)/);
     assert.match(content, /tweetTextarea_0/);
+    assert.match(content, /tweetTextarea_0.*display:block !important/);
     assert.match(content, /app-bar-back.*display:block/);
     assert.match(textReviewHelper, /back_button\.style\.display = "block"/);
     assert.doesNotMatch(textReviewHelper, /back_button\.style\.display = "none"/);
+});
+
+test("column reorder preserves iframe documents and saves visual order", () => {
+    const reorder = readFileSync("extensions/custom/column_reorder.js", "utf8");
+    assert.match(reorder, /section\.style\.order/);
+    assert.match(reorder, /get_visual_column_elements/);
+    assert.match(content, /reorder_api\?\.move_before\?\./);
+    assert.doesNotMatch(reorder, /Node\.prototype\.insertBefore/);
+});
+
+test("column load recovery does not force a post-column src reload", () => {
+    assert.doesNotMatch(content, /column\.src = column\.src/);
 });
 
 test("text review always has a timeout and failure recovery", () => {

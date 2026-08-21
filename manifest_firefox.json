@@ -50,7 +50,8 @@
     "icon/forward.svg",
     "icon/next.svg",
     "icon/download.svg",
-    "icon/hashtag_restore.svg"
+    "icon/hashtag_restore.svg",
+    "icon/column_reload.svg"
     ],
     "background" : {
       "scripts": ["background.js"]

@@ -1,6 +1,6 @@
 # カスタム版の残課題
 
-更新日: 2026-08-11
+更新日: 2026-08-15
 
 対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
@@ -16,29 +16,35 @@
 
 現行deckには描画templateがなく利用予定もないため、`settings_codec`だけで受理する変更は行わない。必要になった時点で、描画・保存・import・移行testをまとめて実装する。
 
+### 3. タイムラインのリアルタイム流し込み（X Pro相当）
+
+現在の自動更新は、Xの内部更新関数(`onRefresh`)を周期的に呼ぶ方式で、TweetDeck / X Proのように
+新着が上から流れ続ける挙動ではない。実現するには、カラムiframe内のGraphQL応答または新着通知の購読を
+監視し、差分を先頭へ挿入する仕組みが要る。周期更新の安定化を優先し、ここでは見送る。
+
 ## 優先度: 低
 
-### 3. 本家レビューworkflowの初回動作確認
+### 4. 本家レビューworkflowの初回動作確認
 
 `.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
 
-### 4. Firefox（Manifest V2）実機未検証
+### 5. Firefox（Manifest V2）実機未検証
 
 マニフェストには独自コードを登録済みだが、現時点で使用予定がないため優先度を下げる。
 
-### 5. `content.js`のDOM実行テスト拡大
+### 6. `content.js`のDOM実行テスト拡大
 
 安全値、background sender、storageは実行テスト化済み。残る巨大なDOM処理は、責務を純粋関数・controllerへ分離するタイミングで文字列検査から置き換える。
 
-### 6. ハッシュタグ保存先の分離
+### 7. ハッシュタグ保存先の分離
 
 文章校正ヘルパーのハッシュタグはXページの`localStorage`へ保存される。Open-Deckのプロファイル単位で保持・削除する必要が生じた場合は、共有storage repositoryとの境界を設計する。
 
-### 7. リストフィルタの監視負荷計測
+### 8. リストフィルタの監視負荷計測
 
 リスト候補のiframeごとにMutationObserverと1秒周期のURL確認を動かし、更新のたびに投稿全体を走査する。大量フィードで負荷が確認された場合に、対象領域・イベント・差分走査を見直す。
 
-### 8. タブ状態を位置キーから安定IDへ移行（設計保留）
+### 9. タブ状態を位置キーから安定IDへ移行（設計保留）
 
 現在の追加・削除・並べ替え・プロファイル操作は位置の再配置で保護済み。安定ID化は全プロファイルの移行と旧データ互換を伴うため、実ブラウザーfixtureを整える段階まで保留する。
 
@@ -58,6 +64,10 @@
 - Xの戻るボタンを対象iframeの独自URL履歴へ接続
 - 動画variantを配列順に依存せず、HTTPSのMP4から最高bitrateを選択
 - column共通disposerを追加し、文章校正observerとイベントを破棄
+- 自動更新の開始・停止関数をハンドラー直下へ移し、`start_auto_reload is not defined`を解消
+- ブロックスコープ外呼び出しの静的検査(`tests/scope_lint.mjs`)と規約を追加
+- 更新関数をReactの現在の描画から毎回取り直し、遷移後に更新が走らない問題を解消
+- カラムごとの手動更新ボタンを追加
 
 ## 運用判断済み
 

@@ -49,12 +49,13 @@ const ui_icon_define = {
     next:"icon/next.svg",
     download:"icon/download.svg",
     hashtag_restore:"icon/hashtag_restore.svg",
+    column_reload:"icon/column_reload.svg",
 }
 
 //トップ表示を隠す場合も、タイムライン上部のタブ切り替えは残す。
 function get_top_visible_css(column_type, legacy_mode = false){
     if(column_type == "post"){
-        return `div[data-testid="tweetTextarea_0"], div[contenteditable="true"][data-testid*="tweetTextarea"]{display:none;}[data-testid="app-bar-back"]{visibility:visible !important; display:block !important; filter:none;}`;
+        return `div[data-testid="tweetTextarea_0"], div[contenteditable="true"][data-testid*="tweetTextarea"]{display:block !important; visibility:visible !important;}[data-testid="app-bar-back"]{visibility:visible !important; display:block !important; filter:none;}`;
     }
     const top_child = `div[data-testid="primaryColumn"]>[tabindex="0"][aria-label]>div:nth-child(1)`;
     const hidden_style = legacy_mode
@@ -483,6 +484,26 @@ function run(settings){
     .dsp_column_settings_btn input{
         display: none;
     }
+    .dsp_column_reload_icon{
+        display: block;
+        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_reload)});
+        background-size: cover;
+        width: 20px;
+        height: 20px;
+    }
+    .dsp_column_reload_icon:hover{
+        cursor: pointer;
+    }
+    .dsp_column_reload_icon input{
+        display: none;
+    }
+    .dsp_column_reload_icon[opd_reloading]{
+        animation: opd_column_reload_spin 0.6s linear;
+    }
+    @keyframes opd_column_reload_spin{
+        from{ transform: rotate(0deg); }
+        to{ transform: rotate(360deg); }
+    }
     .dsp_column_empty_area {
     	width: 100%;
     }
@@ -781,7 +802,7 @@ function run(settings){
     }
     </style>`);
     //カラム要素作成-挿入
-    let default_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span><span class="dsp_column_btn"><input class="opd_banner" type="checkbox" title="${i18n_message("ui_column_banner_toggle_title")}" %column_banner_ch%><label class="dsp_column_banner_btn opd_ui_icon_color"></label></span><span class="dsp_column_btn"><input class="opd_top_bar" type="checkbox" title="${i18n_message("ui_column_top_toggle_title")}" %column_top_bar_ch%><label class="dsp_column_top_btn opd_ui_icon_color"></label></span>`;
+    let default_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_reload_icon opd_ui_icon_color" title="${i18n_message("ui_column_reload_title")}"><input class="opd_column_reload_btn" type="button" value="R"></label></span><span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span><span class="dsp_column_btn"><input class="opd_banner" type="checkbox" title="${i18n_message("ui_column_banner_toggle_title")}" %column_banner_ch%><label class="dsp_column_banner_btn opd_ui_icon_color"></label></span><span class="dsp_column_btn"><input class="opd_top_bar" type="checkbox" title="${i18n_message("ui_column_top_toggle_title")}" %column_top_bar_ch%><label class="dsp_column_top_btn opd_ui_icon_color"></label></span>`;
     let post_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span>`;
     let othersns_default_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span>`;
     let column_settings_panel = `<div class="dsp_column_settings_panel"><div class="dsp_column_settings_panel_content"><h2>${i18n_message("ui_settings_header")}</h2><div class="dsp_column_settings_list"><div class="dsp_column_settings_content_div">${i18n_message("ui_settings_view_mode_label")}<span><select class="opd_tw_view_mode" column_tw_view_mode_val="%column_tw_view_mode%"><option value="0">${i18n_message("ui_settings_view_mode_all")}</option><option value="1">${i18n_message("ui_settings_view_mode_text_only")}</option><option value="2">${i18n_message("ui_settings_view_mode_media_only")}</option></select></span></div><div class="dsp_column_settings_content_div">${i18n_message("ui_settings_column_width_label")}<span><select class="opd_column_size_preset"><option value="0">${i18n_message("ui_settings_column_width_small")}</option><option value="1">${i18n_message("ui_settings_column_width_medium")}</option><option value="2">${i18n_message("ui_settings_column_width_large")}</option><option value="3">${i18n_message("ui_settings_column_width_custom")}</option></select></span></div><div class="dsp_column_settings_content_div">${i18n_message("ui_settings_column_width_custom_label")}<span><input type="button" class="column_width_btn" value="${i18n_message("ui_settings_column_width_custom_button")}" style="vertical-align: text-top;font-size: 0.8rem;"/></span></div><div class="dsp_column_settings_content_div">${i18n_message("ui_settings_auto_reload_label")}<span><input class="opd_a_reload_bar" type="checkbox" %column_auto_reload_ch%></span></div><div class="dsp_column_settings_content_div">${i18n_message("ui_settings_auto_reload_interval_label")}<span><input class="opd_column_settings_input_text opd_a_reload_time_setting" type="number" value="%column_auto_reload_time%">${i18n_message("ui_settings_seconds_suffix")}</span></div></div><div class="dsp_column_settings_panel_close_btn_wrap"><input type="button" class="dsp_column_settings_panel_close_btn" value="${i18n_message("ui_settings_close_button")}" style="vertical-align: text-top;font-size: 0.8rem;"/></div></div></div>` ;
@@ -1072,8 +1093,8 @@ function run(settings){
                     if(this.contentWindow.document.querySelector('head style[opd_top_visible_css]') == null){
                         this.contentWindow.document.querySelector("head").insertAdjacentHTML("beforeend", `<style opd_top_visible_css></style>`);
                     }
+                    const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
                     if(opd_column_top_visible_checkbox?.checked != true){
-                        const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
                         this.contentWindow.document.querySelector('head style[opd_top_visible_css]').textContent = get_top_visible_css(column_type, true);
                     }else{
                         //console.log("else")
@@ -1118,6 +1139,82 @@ function run(settings){
                 let opd_column_auto_reload_time_reload = opd_column_div.querySelector(".opd_a_reload_time_setting");
                 let opd_column_tw_view_mode_opt = opd_column_div.querySelector(".opd_tw_view_mode");
                 let opd_column_scroll_to_top = opd_column_div.querySelector(".opd_column_scroll_to_top");
+                let opd_column_reload_btn = opd_column_div.querySelector(".opd_column_reload_btn");
+
+                //自動更新と手動更新は複数のイベントハンドラーから呼ぶため、
+                //条件分岐の内側ではなくハンドラー直下(関数スコープ)で宣言する
+                const auto_reload_target_elem = this;
+                //loadのたびに新しいclosureを作るため、前回のintervalをここで確実に止める
+                if(typeof auto_reload_target_elem.opd_dispose_auto_reload === "function"){
+                    auto_reload_target_elem.opd_dispose_auto_reload();
+                }
+                let auto_reload_int = null;
+                const stop_auto_reload = function(){
+                    if(auto_reload_int != null){
+                        clearInterval(auto_reload_int);
+                        auto_reload_int = null;
+                    }
+                };
+                const dispose_auto_reload = function(){
+                    stop_auto_reload();
+                    deck_lifecycle.untrack_auto_reload(dispose_auto_reload);
+                    if(auto_reload_target_elem.opd_dispose_auto_reload === dispose_auto_reload){
+                        delete auto_reload_target_elem.opd_dispose_auto_reload;
+                    }
+                };
+                //Xの更新処理を呼べるカラムはページ遷移せずに最新を取り込む
+                const reload_column_content = function(){
+                    if(!auto_reload_target_elem.isConnected) return false;
+                    try{
+                        if(auto_reload_target_elem.opd_auto_reload){
+                            auto_reload_target_elem.opd_auto_reload.Reload(auto_reload_target_elem.contentWindow);
+                            setTimeout(() => {
+                                if(auto_reload_target_elem.isConnected){
+                                    auto_reload_target_elem.contentWindow.scrollTo({ top: 0, behavior: 'auto' });
+                                }
+                            }, 100);
+                            return true;
+                        }
+                        auto_reload_target_elem.contentWindow.location.reload();
+                        return true;
+                    }catch(err){
+                        console.warn("column reload failed->", err);
+                        return false;
+                    }
+                };
+                const start_auto_reload = function(interval_ms){
+                    stop_auto_reload();
+                    if(!Number.isFinite(interval_ms) || interval_ms < 1000){
+                        return;
+                    }
+                    auto_reload_int = setInterval(function(){
+                        if(!auto_reload_target_elem.isConnected){
+                            dispose_auto_reload();
+                            return;
+                        }
+                        const path_name = auto_reload_target_elem.contentWindow.location.pathname;
+                        if(['/home', '/search'].includes(path_name) || path_name.startsWith('/i/lists')){
+                            if(auto_reload_target_elem.getAttribute("auto_reload_mouse_hover") != "true"){
+                                if (auto_reload_target_elem.opd_auto_reload && is_auto_update()){
+                                    reload_column_content();
+                                }
+                            }
+                        }
+                    }, interval_ms);
+                };
+
+                //手動更新ボタン(カラムごと)
+                if(opd_column_reload_btn != null && mode != "session_set"){
+                    opd_column_reload_btn.addEventListener("click", function(){
+                        const reload_btn_label = this.closest(".dsp_column_btn")?.querySelector(".dsp_column_reload_icon");
+                        if(reload_column_content() && reload_btn_label != null){
+                            reload_btn_label.setAttribute("opd_reloading", "");
+                            setTimeout(() => {
+                                reload_btn_label.removeAttribute("opd_reloading");
+                            }, 600);
+                        }
+                    });
+                }
 
                 //設定パネルイベント
                 if(mode != "session_set"){
@@ -1270,47 +1367,7 @@ function run(settings){
                             break;
                     }
                     //自動更新初期適用
-                    let auto_reload_int = null;//チェックボックスイベントにも再利用
                     if(opd_column_auto_reload_checkbox != null){
-                        const auto_reload_target_elem = this;
-                        const stop_auto_reload = function(){
-                            if(auto_reload_int != null){
-                                clearInterval(auto_reload_int);
-                                auto_reload_int = null;
-                            }
-                        };
-                        const dispose_auto_reload = function(){
-                            stop_auto_reload();
-                            deck_lifecycle.untrack_auto_reload(dispose_auto_reload);
-                            if(auto_reload_target_elem.opd_dispose_auto_reload === dispose_auto_reload){
-                                delete auto_reload_target_elem.opd_dispose_auto_reload;
-                            }
-                        };
-                        const start_auto_reload = function(interval_ms){
-                            stop_auto_reload();
-                            if(!Number.isFinite(interval_ms) || interval_ms < 1000){
-                                return;
-                            }
-                            auto_reload_int = setInterval(function(){
-                                if(!auto_reload_target_elem.isConnected){
-                                    dispose_auto_reload();
-                                    return;
-                                }
-                                const path_name = auto_reload_target_elem.contentWindow.location.pathname;
-                                if(['/home', '/search'].includes(path_name) || path_name.startsWith('/i/lists')){
-                                    if(auto_reload_target_elem.getAttribute("auto_reload_mouse_hover") == "false"){
-                                        if (auto_reload_target_elem.opd_auto_reload && is_auto_update()){
-                                            auto_reload_target_elem.opd_auto_reload.Reload(auto_reload_target_elem.contentWindow);
-                                            setTimeout(() => {
-                                                if(auto_reload_target_elem.isConnected){
-                                                    auto_reload_target_elem.contentWindow.scrollTo({ top: 0, behavior: 'auto' });
-                                                }
-                                            }, 100);
-                                        }
-                                    }
-                                }
-                            }, interval_ms);
-                        };
                         auto_reload_target_elem.opd_dispose_auto_reload = dispose_auto_reload;
                         deck_lifecycle.track_auto_reload(dispose_auto_reload);
                         //Home, Exproleカラムホバー中 自動更新上部遷移停止
@@ -1821,14 +1878,11 @@ function run(settings){
                 const dr_elem = document.getElementById(dt_id);
                 if(dr_elem != null){
                     const timeline_before = ev.opd_custom_tab_remap === true ? null : snapshot_timeline_state();
-                    if(dr_elem?.querySelector("div")?.getAttribute("opd_column_type") == 'explore'){
-                        if(dr_elem.querySelector("div").getAttribute("opd_pinned_path") != ""){
-                            dr_elem.querySelector("div").querySelector("iframe").src = `https://x.com${dr_elem.querySelector("div").getAttribute("opd_pinned_path")}`;
-                        }else{
-                            dr_elem.querySelector("div").querySelector("iframe").src = `https://x.com${dr_elem.querySelector("div").getAttribute("opd_explore_path")}`;
-                        }
+                    const reorder_api = window.opd_custom_column_reorder;
+                    const moved_without_dom_change = reorder_api?.move_before?.(dr_elem, this) === true;
+                    if(!moved_without_dom_change){
+                        this.parentNode.insertBefore(dr_elem, this);
                     }
-                    this.parentNode.insertBefore(dr_elem, this);
                     remap_timeline_state(timeline_before);
                     this.style.borderLeft = '';
                     column_settings_save("", last_load_profile);
@@ -1875,7 +1929,11 @@ function run(settings){
             column_settings:[],
             version:manifest.version
         };
-        for (let index = 0; index < document.querySelectorAll("#opd_main_element div[opd_column_type]").length; index++) {
+        const reorder_api = window.opd_custom_column_reorder;
+        const column_elements = reorder_api?.get_visual_column_elements?.(document)
+            ?? Array.from(document.querySelectorAll("#opd_main_element div[opd_column_type]"));
+        for (let index = 0; index < column_elements.length; index++) {
+            const column_element = column_elements[index];
             let banner_checked = null;
             let top_visible_checked = null;
             let tw_view_type = null;
@@ -1885,48 +1943,48 @@ function run(settings){
             let column_width_value = null;
             let column_auto_reload = null;
             let column_auto_reload_time = 10000;
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_banner")?.checked == true){
+            if(column_element.querySelector(".opd_banner")?.checked == true){
                 banner_checked = true;
             }else{
                 banner_checked = false;
             }
             //トップ検索欄等 
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_top_bar")?.checked == true){
+            if(column_element.querySelector(".opd_top_bar")?.checked == true){
                 top_visible_checked = true;
             }else{
                 top_visible_checked = false;
             }
             //
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_tw_view_mode")?.value != undefined){
-                tw_view_type = document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_tw_view_mode").value;
+            if(column_element.querySelector(".opd_tw_view_mode")?.value != undefined){
+                tw_view_type = column_element.querySelector(".opd_tw_view_mode").value;
             }else{
                 tw_view_type = "0";
             }
             //横幅設定
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_width") != "null"){
+            if(column_element.getAttribute("opd_column_width") != "null"){
                 //console.log(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_width"))
-                column_width_value = document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_width");
+                column_width_value = column_element.getAttribute("opd_column_width");
             }
             //exploreの処理
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_type") == 'explore'){
+            if(column_element.getAttribute("opd_column_type") == 'explore'){
                 //console.log(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_explore_path"));
-                column_open_path = document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_explore_path");
+                column_open_path = column_element.getAttribute("opd_explore_path");
                 //ピン止め
-                column_pinned_save_path = document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_pinned_path");
+                column_pinned_save_path = column_element.getAttribute("opd_pinned_path");
                 //タイトル
-                column_page_title = document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_explore_title");
+                column_page_title = column_element.getAttribute("opd_explore_title");
             }else{
                 column_open_path = "";
                 column_pinned_save_path = "";
             }
             //自動更新
-            if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_type") == 'explore' || document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_type") == 'home'){
-                if(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_a_reload_bar")?.checked == true){
+            if(column_element.getAttribute("opd_column_type") == 'explore' || column_element.getAttribute("opd_column_type") == 'home'){
+                if(column_element.querySelector(".opd_a_reload_bar")?.checked == true){
                     column_auto_reload = true;
                 }else{
                     column_auto_reload = false;
                 }
-                const column_setting_time = Number(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].querySelector(".opd_a_reload_time_setting").value) * 1000;
+                const column_setting_time = Number(column_element.querySelector(".opd_a_reload_time_setting").value) * 1000;
                 //console.log(column_setting_time)
                 if(column_setting_time >= 1000){
                     
@@ -1935,7 +1993,7 @@ function run(settings){
                     column_auto_reload_time = 10000;
                 }
             }
-            settings_array["column_settings"].push({type:document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_type"), banner:banner_checked, top_visible:top_visible_checked, tw_view_mode:tw_view_type, column_save_path:column_open_path, column_save_title:column_page_title, column_pinned_path:column_pinned_save_path, auto_reload:column_auto_reload, auto_reload_time:column_auto_reload_time, column_width:column_width_value});
+            settings_array["column_settings"].push({type:column_element.getAttribute("opd_column_type"), banner:banner_checked, top_visible:top_visible_checked, tw_view_mode:tw_view_type, column_save_path:column_open_path, column_save_title:column_page_title, column_pinned_path:column_pinned_save_path, auto_reload:column_auto_reload, auto_reload_time:column_auto_reload_time, column_width:column_width_value});
         }
         if(mode == "profile_out"){
             return settings_array;
@@ -2063,26 +2121,17 @@ function get_cookie_color_mode() {
 function watch_load_column(column_frames, max_retries = 5){
     const cleanups = [];
     column_frames.forEach(column => {
-        let count = 0;
-
-        const reLoad = () => {
-            if (++count >= max_retries) return;
-            setTimeout(() => { column.src = column.src }, 500);
-        };
-
         const onLoad = () => {
             try {
                 column.contentWindow.document.querySelector('head');
             } catch {
-                reLoad();
+                //遷移途中のloadでアクセスできない場合でも、srcを再代入して送信後の画面を潰さない。
             }
         };
 
         column.addEventListener('load', onLoad);
-        column.addEventListener('error', reLoad);
         cleanups.push(() => {
             column.removeEventListener('load', onLoad);
-            column.removeEventListener('error', reLoad);
         });
     });
 

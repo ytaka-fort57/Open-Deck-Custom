@@ -48,18 +48,27 @@
         return originalFocus.call(this, Object.assign({}, options, { preventScroll: true }));
     };
 
+    //現在描画されているタイムラインから更新関数を取得する
+    //Reactの再描画で以前の関数は無効になるため、更新のたびに取り直す
+    function resolve_reload_func(){
+        try{
+            const section = document.querySelector('section[role="region"]');
+            if(!section) return null;
+            const props = get_props(section, "Props");
+            const refresh = props?.children?.[1]?.props?.children?.[2]?._owner?.memoizedProps?.onRefresh;
+            return typeof refresh === 'function' ? refresh : null;
+        }catch(err){
+            console.warn('resolve_reload_func threw->', err);
+            return null;
+        }
+    }
     // URLで画面の遷移を監視する
     new MutationObserver(function(){
         const path_search = `${location.pathname}${location.search}`;
         if(path_old === path_search){
             return;
         }
-        //sectionの要素を取得する
-        const section = document.querySelector('section[role="region"]');
-        if(!section) return;
-        //Propsを取得する
-        const props = get_props(section, "Props");
-        const refresh = props?.children[1]?.props.children[2]?._owner?.memoizedProps?.onRefresh;
+        const refresh = resolve_reload_func();
         if (!refresh){
             // 関数が存在しない場合、無意味な関数を設定しておく
             reload_func = ()=>{};
@@ -88,11 +97,14 @@
         const detail = JSON.parse(e.detail);
         if(opd_reload_token && opd_reload_token !== detail.token) return;
 
-        if(typeof reload_func !== 'function') return;
+        //描画中のタイムラインから取り直し、取れない場合のみ前回値を使う
+        const refresh = resolve_reload_func() ?? reload_func;
+        if(typeof refresh !== 'function') return;
+        reload_func = refresh;
 
         try {
             isFocusDisabled = true;
-            reload_func();
+            refresh();
         } catch (err) {
             console.warn('reload_func threw->', err);
         }
