@@ -12,7 +12,9 @@
         }, { capture: true, passive: true });
     });
 
-    // 自動更新時にフォーカスされる問題があるので、scrollIntoViewとfocusを一時的に無効化する
+    // 自動更新時にフォーカスされる問題があるので、scrollIntoViewとfocusを制御する。
+    // 通常時の標準動作はできるだけ保持する。
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = function(options) {
         //フォーカス無効化が有効だった場合はフォーカスを無視する
         if (isFocusDisabled) return;
@@ -23,7 +25,9 @@
         while (parent && !/(auto|scroll)/.test(getComputedStyle(parent).overflow)) {
             parent = parent.parentElement;
         }
-        if (!parent) return;
+        if (!parent){
+            return originalScrollIntoView.call(this, options);
+        }
 
         //対象要素とスクロール親の位置差分を取得してスクロールする
         const client_rect = this.getBoundingClientRect();
@@ -45,7 +49,7 @@
         if (isFocusDisabled){
             return;
         }
-        return originalFocus.call(this, Object.assign({}, options, { preventScroll: true }));
+        return originalFocus.call(this, options);
     };
 
     //現在描画されているタイムラインから更新関数を取得する

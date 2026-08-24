@@ -56,16 +56,16 @@
         const current_video_source = video_wrapper_props?.children?.props?.playerState;
 
         //メディアソースの一覧を取得
-        let media_details = root_props?.children[1]?.props?.children[0]?.props?.mediaDetails;
+        let media_details = root_props?.children?.[1]?.props?.children?.[0]?.props?.mediaDetails;
 
         //引用の場合のメディアソースの一覧を取得
-        let media_details_quoted = root_props?.children[2]?.props?.tweet?.extended_entities?.media;
+        let media_details_quoted = root_props?.children?.[2]?.props?.tweet?.extended_entities?.media;
         if(quoted){
-            media_details_quoted = root_props?.children[0]?.[0]?.props?.children[1]?.props?.children[5]?.props?.children?.props?.mediaDetails;
+            media_details_quoted = root_props?.children?.[0]?.[0]?.props?.children?.[1]?.props?.children?.[5]?.props?.children?.props?.mediaDetails;
             
             //小さいサイズ表示になっている引用画像を取得する
             if(!media_details_quoted){
-                media_details_quoted = root_props?.children[0]?.[0]?.props?.children[1]?.props?.children[0]?.props?.children[1]?.props?.children?.props?.mediaDetails;
+                media_details_quoted = root_props?.children?.[0]?.[0]?.props?.children?.[1]?.props?.children?.[0]?.props?.children?.[1]?.props?.children?.props?.mediaDetails;
             }
             media_details = media_details_quoted ?? media_details;
         }else{
@@ -91,7 +91,8 @@
         let is_send = false;
         for (let index = 0; index < media_details.length; index++) {
             const media = media_details[index];
-            if(img?.src?.match(media.media_url_https?.replaceAll(/.jpg|.png/g, ""))){
+            const media_url = media?.media_url_https;
+            if(media_url_matches(img?.src, media_url)){
                 window.parent.document.dispatchEvent(new CustomEvent('opd_send_media_info', {
                     bubbles: true,
                     composed: true,
@@ -125,6 +126,15 @@
         const propsKey = Object.getOwnPropertyNames(elem).find(k => k.includes(`__react${prop_type}$`));
         return propsKey ? elem[propsKey] : null;
     }
+
+    function media_url_matches(image_src, media_url){
+        if(typeof image_src !== "string" || typeof media_url !== "string"){
+            return false;
+        }
+        const media_without_extension = media_url.replace(/\.(?:jpe?g|png|webp)$/i, "");
+        return image_src.includes(media_url) || image_src.includes(media_without_extension);
+    }
+
     //機能動作用のトークンを設定
     document.addEventListener('opd_send_media_info_init', (e)=>{
         const detail = JSON.parse(e.detail);

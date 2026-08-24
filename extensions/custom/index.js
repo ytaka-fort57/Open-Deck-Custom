@@ -195,7 +195,9 @@
         }
         const on_click = function(event){
             const back_button = event.target?.closest?.('button[data-testid="app-bar-back"]');
-            if(back_button == null || !column_history.can_back(iframe)){
+            if(back_button == null
+                || column_history.is_media_route?.(iframe)
+                || !column_history.can_back(iframe)){
                 return;
             }
             event.preventDefault();

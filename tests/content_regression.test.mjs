@@ -29,6 +29,8 @@ test("auto reload controls stay in the handler scope and columns expose a manual
 test("auto reload helper re-resolves the timeline refresh function on every reload", () => {
     assert.match(autoReloadHelper, /function resolve_reload_func\(\)/);
     assert.match(autoReloadHelper, /const refresh = resolve_reload_func\(\) \?\? reload_func/);
+    assert.match(autoReloadHelper, /const originalScrollIntoView = HTMLElement\.prototype\.scrollIntoView/);
+    assert.match(autoReloadHelper, /return originalFocus\.call\(this, options\)/);
 });
 
 test("profile deletion validates a non-negative in-range integer", () => {
@@ -102,6 +104,14 @@ test("column reorder preserves iframe documents and saves visual order", () => {
     assert.match(reorder, /get_visual_column_elements/);
     assert.match(content, /reorder_api\?\.move_before\?\./);
     assert.doesNotMatch(reorder, /Node\.prototype\.insertBefore/);
+    assert.match(reorder, /if\(source_rack !== target_rack\)\{\s*return false;/);
+});
+
+test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
+    assert.match(content, /function get_column_add_target\(\)\{[\s\S]*?empty_column\?\.parentElement[\s\S]*?draggable.*?true[\s\S]*?is_shift_pressed/);
+    assert.match(content, /function insert_new_column_before_target\(add_target_column, new_column_html\)/);
+    assert.match(content, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
+    assert.equal((content.match(/insert_new_column_before_target\(add_target_column, new_column\)/g) ?? []).length, 4);
 });
 
 test("column load recovery does not force a post-column src reload", () => {

@@ -1645,16 +1645,35 @@ function run(settings){
             chrome.runtime.sendMessage({message: "ext_reload"});
         }
     });
+    function get_column_add_target(){
+        const empty_column = document.querySelector(".dsp_column_emptycolumn");
+        const rack = empty_column?.parentElement;
+        const first_column = Array.from(rack?.children ?? []).find(function(element){
+            return element.tagName === "SECTION" && element.getAttribute("draggable") === "true";
+        });
+        return (is_shift_pressed && first_column) ? first_column : empty_column;
+    }
+
+    function insert_new_column_before_target(add_target_column, new_column_html){
+        if(add_target_column == null){
+            return null;
+        }
+        add_target_column.insertAdjacentHTML("beforebegin", new_column_html);
+        const new_column = add_target_column.previousElementSibling;
+        const reorder_api = window.opd_custom_column_reorder;
+        //既存カラムはDOMから動かさず、新規カラムだけを表示順の対象位置へ移す。
+        reorder_api?.move_before?.(new_column, add_target_column);
+        return new_column;
+    }
+
     //ポストカラム追加
     //TODO: カラム追加周りの処理をもっと簡略化すること
     document.getElementById("add_post").addEventListener("click", function(){
-        const empty_column = document.querySelector(".dsp_column_emptycolumn");
-        const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
-        const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
+        const add_target_column = get_column_add_target();
 
         const new_column = default_element["post"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10000");
-        add_target_column.insertAdjacentHTML("beforebegin", new_column);
-        add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
+        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
         column_dd();
@@ -1663,15 +1682,13 @@ function run(settings){
     });
     //タイムラインカラム追加
     document.getElementById("add_timeline").addEventListener("click", function(){
-        const empty_column = document.querySelector(".dsp_column_emptycolumn");
-        const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
-        const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
+        const add_target_column = get_column_add_target();
         const timeline_before = snapshot_timeline_state();
         
         const new_column = default_element["home"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
-        add_target_column.insertAdjacentHTML("beforebegin", new_column);
+        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         remap_timeline_state(timeline_before);
-        add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
+        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
         column_dd();
@@ -1680,13 +1697,11 @@ function run(settings){
     });
     //通知カラム追加
     document.getElementById("add_notify").addEventListener("click", function(){
-        const empty_column = document.querySelector(".dsp_column_emptycolumn");
-        const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
-        const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
+        const add_target_column = get_column_add_target();
         
         const new_column = default_element["notification"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30");
-        add_target_column.insertAdjacentHTML("beforebegin", new_column);
-        add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
+        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
         column_dd();
@@ -1695,13 +1710,11 @@ function run(settings){
     });
     //Explore(ユニバーサル)カラム追加
     document.getElementById("add_explore").addEventListener("click", function(){
-        const empty_column = document.querySelector(".dsp_column_emptycolumn");
-        const first_column = empty_column?.closest('div')?.querySelector('section[draggable="true"]');
-        const add_target_column = (is_shift_pressed && first_column) ? first_column : empty_column;
+        const add_target_column = get_column_add_target();
         
         const new_column = default_element["explore"]["html"].replaceAll("%column_save_path%", "/explore").replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_pinned_save_path%", "").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
-        add_target_column.insertAdjacentHTML("beforebegin", new_column);
-        add_target_column.scrollIntoView({behavior: "smooth",inline: "end"});
+        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
         column_dd();

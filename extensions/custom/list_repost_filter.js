@@ -285,6 +285,10 @@ window.opd_custom_list_repost_filter = (function(){
         if(state.path_timer != null){
             clearInterval(state.path_timer);
         }
+        if(state.refresh_timer != null){
+            clearTimeout(state.refresh_timer);
+            state.refresh_timer = null;
+        }
         clear_hidden(state.doc);
         state.doc.querySelector(`style[${STYLE_ATTR}]`)?.remove();
     }
@@ -318,7 +322,9 @@ window.opd_custom_list_repost_filter = (function(){
             path: "",
             observer: null,
             path_timer: null,
+            refresh_timer: null,
             refresh: null,
+            schedule_refresh: null,
         };
         state.refresh = function(){
             state.path = get_document_path(iframe);
@@ -333,8 +339,19 @@ window.opd_custom_list_repost_filter = (function(){
                 clear_hidden(doc);
             }
         };
+        // Xの描画は短時間に大量のMutationを発生させるため、同一バースト内の
+        // 全再走査を1回へまとめる。1秒周期のURL確認は従来どおり維持する。
+        state.schedule_refresh = function(){
+            if(state.refresh_timer != null){
+                return;
+            }
+            state.refresh_timer = setTimeout(function(){
+                state.refresh_timer = null;
+                state.refresh();
+            }, 50);
+        };
         state.observer = new MutationObserver(function(){
-            state.refresh();
+            state.schedule_refresh();
         });
         if(doc.documentElement != null){
             state.observer.observe(doc.documentElement, {

@@ -143,23 +143,21 @@ window.opd_custom_column_reorder = (function(){
         if(source_rack == null || target_rack == null){
             return false;
         }
+        // CSS order cannot move an element across flex containers. Returning false
+        // lets the existing native drop handler perform the actual DOM move.
+        if(source_rack !== target_rack){
+            return false;
+        }
         const source_sections = get_visual_sections(source_rack).filter(function(item){
             return item !== section;
         });
-        const target_sections = source_rack === target_rack
-            ? source_sections
-            : get_visual_sections(target_rack);
+        const target_sections = source_sections;
         const target_index = target_sections.indexOf(target);
         if(target_index < 0){
             return false;
         }
         target_sections.splice(target_index, 0, section);
-        if(source_rack === target_rack){
-            apply_visual_order(source_rack, target_sections);
-        }else{
-            apply_visual_order(source_rack, source_sections);
-            apply_visual_order(target_rack, target_sections);
-        }
+        apply_visual_order(source_rack, target_sections);
         return true;
     }
 

@@ -57,7 +57,10 @@ window.opd_custom_keyboard = (function(){
         const dialog = find_open_viewer(deck_document);
         if(dialog != null){
             handled = handle_viewer_key(event, dialog);
-        }else if(event.key === "Backspace" && iframe != null && !is_typing(event)){
+        }else if(event.key === "Backspace"
+            && iframe != null
+            && !window.opd_custom_column_history.is_media_route?.(iframe)
+            && !is_typing(event)){
             //ブラウザーの戻るは別のカラムを動かしてしまうため、独自履歴で戻す
             handled = window.opd_custom_column_history.back(iframe);
         }
