@@ -73,12 +73,13 @@ test("remaining audit hardening paths are wired", () => {
     assert.match(settingsImport, /reader\.addEventListener\("error"/);
 });
 
-test("column back buttons use the target frame's independent history", () => {
+test("custom history remains limited to per-column Backspace handling", () => {
     const customIndex = readFileSync("extensions/custom/index.js", "utf8");
-    assert.match(customIndex, /button\[data-testid=["']app-bar-back["']\]/);
-    assert.match(customIndex, /column_history\.can_back\(iframe\)/);
-    assert.match(customIndex, /column_history\.back\(iframe\)/);
-    assert.match(customIndex, /event\.stopImmediatePropagation\(\)/);
+    const keyboardShortcuts = readFileSync("extensions/custom/keyboard_shortcuts.js", "utf8");
+    assert.match(customIndex, /column_history\.track\(iframe\)/);
+    assert.doesNotMatch(customIndex, /app-bar-back/);
+    assert.doesNotMatch(customIndex, /attach_column_back/);
+    assert.match(keyboardShortcuts, /column_history\.back\(iframe\)/);
 });
 
 test("top visibility keeps timeline tabs available", () => {

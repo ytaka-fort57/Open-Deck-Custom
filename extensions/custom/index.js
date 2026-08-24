@@ -174,10 +174,8 @@
             //読み込みのたびに文書が入れ替わるため、その都度仕掛け直す
             iframe.addEventListener("load", function(){
                 keyboard.attach(iframe.contentDocument, document, iframe);
-                attach_column_back(iframe.contentDocument, iframe);
             });
             keyboard.attach(iframe.contentDocument, document, iframe);
-            attach_column_back(iframe.contentDocument, iframe);
         });
     }
 
@@ -185,29 +183,6 @@
         if(list_repost_filter != null){
             list_repost_filter.setup(document, lifecycle);
         }
-    }
-
-    // X標準の戻るボタンはブラウザー全体のjoint session historyを使うため、
-    // 独自履歴がある場合だけ対象カラムの履歴へ置き換える。
-    function attach_column_back(doc, iframe){
-        if(doc == null){
-            return;
-        }
-        const on_click = function(event){
-            const back_button = event.target?.closest?.('button[data-testid="app-bar-back"]');
-            if(back_button == null
-                || column_history.is_media_route?.(iframe)
-                || !column_history.can_back(iframe)){
-                return;
-            }
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            column_history.back(iframe);
-        };
-        doc.addEventListener("click", on_click, true);
-        lifecycle.register_column_resource(iframe, "column-back-button", function(){
-            doc.removeEventListener("click", on_click, true);
-        });
     }
 
     //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
