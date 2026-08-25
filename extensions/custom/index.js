@@ -80,6 +80,21 @@
         }, true);
     }
 
+    //保存したタブを選び直す。
+    //ピン留めしたリストのタブは別URLへのリンクで、押すとそのカラムが遷移する。
+    //自動の遷移はjoint session historyへエントリを積み、ユーザーが操作している
+    //別カラムの戻るを奪うため、復元のための遷移は1カラムにつき1回までとする。
+    function restore_tab(doc, desired, target){
+        if(selectors.navigates(doc, target)){
+            if(desired.navigated){
+                return false;
+            }
+            desired.navigated = true;
+        }
+        selectors.click_tab(target);
+        return true;
+    }
+
     //Xはタブ選択をアカウント単位で共有し、読み込み後もしばらく自前の状態を適用し続ける。
     //一度選び直すだけではX側に上書きされて戻るため、しばらく監視して選び直し続ける。
     //desired.label はユーザーのクリックで更新されるため、ユーザー操作と競合しない。
@@ -101,7 +116,7 @@
             if(target == null || selectors.is_selected(target)){
                 return;
             }
-            selectors.click_tab(target);
+            restore_tab(doc, desired, target);
         }, INTERVAL_MS);
     }
 
@@ -112,7 +127,7 @@
         selectors.wait_for_tabs(doc, 15000, function(){
             const target = selectors.find_tab_by_label(doc, desired.label);
             if(target != null && !selectors.is_selected(target)){
-                selectors.click_tab(target);
+                restore_tab(doc, desired, target);
             }
             enforce_tab(doc, desired);
         });
@@ -166,11 +181,13 @@
         keyboard.attach(document, document, null);
         const iframes = document.querySelectorAll("#opd_main_element div[opd_column_type] iframe");
         iframes.forEach(function(iframe){
+            //ラックをまたぐカラム移動でiframeが一度切断されると追跡が止まる。
+            //trackは追跡中なら何もしないため、毎回呼んで再開できるようにする
+            column_history.track(iframe);
             if(iframe.getAttribute(KEYS_ATTR) != null){
                 return;
             }
             iframe.setAttribute(KEYS_ATTR, "true");
-            column_history.track(iframe);
             //読み込みのたびに文書が入れ替わるため、その都度仕掛け直す
             iframe.addEventListener("load", function(){
                 keyboard.attach(iframe.contentDocument, document, iframe);

@@ -35,6 +35,28 @@ window.opd_custom_selectors = (function(){
         }
     }
 
+    //そのタブが別URLへのリンクか。ピン留めしたリストのタブが該当する
+    function tab_path(tab){
+        const anchor = tab.tagName === "A" ? tab : (tab.querySelector("a") ?? tab.closest("a"));
+        const href = anchor?.getAttribute("href");
+        if(href == null || href === ""){
+            return null;
+        }
+        try{
+            return new URL(href, anchor.baseURI).pathname;
+        }catch(error){
+            return null;
+        }
+    }
+
+    //押すとページ遷移が起きるタブかどうか。
+    //遷移を伴うタブを自動で押すとjoint session historyへエントリが積まれ、
+    //ユーザーが操作している別カラムの戻るを奪ってしまう
+    function navigates(doc, tab){
+        const path = tab_path(tab);
+        return path != null && path !== doc.location.pathname;
+    }
+
     function find_tab_by_label(doc, label){
         return get_tabs(doc).find(function(tab){
             return tab_label(tab) === label;
@@ -64,6 +86,8 @@ window.opd_custom_selectors = (function(){
         tab_label: tab_label,
         is_selected: is_selected,
         click_tab: click_tab,
+        tab_path: tab_path,
+        navigates: navigates,
         find_tab_by_label: find_tab_by_label,
         wait_for_tabs: wait_for_tabs
     };
