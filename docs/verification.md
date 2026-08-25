@@ -56,9 +56,16 @@ joint session historyを1つ戻す。戻る対象は「押したカラム」で�
   増やさない。委譲するとXの復元処理がタイムラインを先頭までスクロールさせる。
   このヘルパーは自動更新の設定と無関係に home / explore の全カラムへ注入される。
 - X標準のapp-bar戻るボタンをフックし直さない。カラム分離はBackspaceだけが担当する。
+- 戻るの成否を、自分が書き換えたURLだけで判定しない。描画の手掛かりと併せて見る。
+  戻れなかった場合に履歴を捨てない。捨てるとそのカラムで以後戻れなくなる。
+- タブ復元などの自動処理でカラムを遷移させる回数を増やさない。遷移を伴うタブは
+  `selectors.navigates()` で見分け、復元のための遷移は1カラム1回までとする。
+- `column_history.track()` を一度きりのガード(`KEYS_ATTR`など)で囲わない。
+  カラム移動でiframeが切断された後に追跡を再開できなくなる。
 
 経緯と機序は[issue-column-back-navigation.md](issue-column-back-navigation.md)を参照。
-`tests/column_history.test.mjs`と`tests/content_regression.test.mjs`が上記を固定する。
+`tests/column_history.test.mjs`、`tests/column_tab_restore.test.mjs`、
+`tests/content_regression.test.mjs`が上記を固定する。
 
 ## Windowsでの必須検証
 
@@ -87,6 +94,7 @@ Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで
 
 - ログイン済みChromiumでの起動、追加、削除、並び替え、プロファイル切り替え
 - Backspaceでの戻る(リプライ詳細→本体、リプライ→リプライ)と、戻った後のスクロール位置
+- ラックをまたいでカラムを移動した後のBackspace、ピン留めリストのタブ復元
 - メディアビューアーの画像・動画・引用投稿
 - 文章校正APIの実通信
 - Firefox Manifest V2での主要操作
