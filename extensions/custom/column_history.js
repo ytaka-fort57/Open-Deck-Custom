@@ -27,6 +27,16 @@ window.opd_custom_column_history = (function(){
         return url;
     }
 
+    //Xのルーターはpopstateで history.state のkeyを見て描画するエントリを決める。
+    //URLと一緒にその時点のstateも控えておき、戻る際に元のエントリのstateへ復元する。
+    function current_state(iframe){
+        try{
+            return iframe.contentWindow.history.state ?? null;
+        }catch(error){
+            return null;
+        }
+    }
+
     //XはSPAのため遷移してもiframeのloadは起きない。URLの変化を監視して記録する
     function track(iframe){
         if(stacks.has(iframe)){
@@ -39,7 +49,7 @@ window.opd_custom_column_history = (function(){
         stacks.set(iframe, state);
         const first_url = current_url(iframe);
         if(first_url != null && !is_media_route_url(first_url)){
-            state.stack.push(first_url);
+            state.stack.push({url: first_url, route_state: current_state(iframe)});
         }
         const timer = setInterval(function(){
             if(!iframe.isConnected){
@@ -59,10 +69,10 @@ window.opd_custom_column_history = (function(){
                 if(url === pending.target_url){
                     pending.confirmations += 1;
                     if(pending.confirmations >= BACK_CONFIRMATION_COUNT){
-                        const target_index = state.stack.lastIndexOf(pending.target_url);
+                        const target_index = last_index_of_url(state.stack, pending.target_url);
                         state.stack = target_index >= 0
                             ? state.stack.slice(0, target_index + 1)
-                            : [pending.target_url];
+                            : [{url: pending.target_url, route_state: pending.route_state}];
                         state.pending_back = null;
                     }
                 }else{
@@ -70,7 +80,7 @@ window.opd_custom_column_history = (function(){
                     if(Date.now() - pending.started_at >= BACK_SETTLE_TIMEOUT_MS){
                         // 目的地へ到達できなかった場合は、壊れたスタックを捨てて
                         // 現在URLだけを基準にする。
-                        state.stack = [url];
+                        state.stack = [{url: url, route_state: current_state(iframe)}];
                         state.pending_back = null;
                     }
                 }
@@ -83,14 +93,26 @@ window.opd_custom_column_history = (function(){
                 return;
             }
 
-            if(state.stack[state.stack.length - 1] === url){
+            const top = state.stack[state.stack.length - 1];
+            if(top != null && top.url === url){
+                //同じ画面のままXがstateを差し替える場合があるため、控えを更新する
+                top.route_state = current_state(iframe);
                 return;
             }
-            state.stack.push(url);
+            state.stack.push({url: url, route_state: current_state(iframe)});
             if(state.stack.length > HISTORY_LIMIT){
                 state.stack.shift();
             }
         }, WATCH_INTERVAL_MS);
+    }
+
+    function last_index_of_url(stack, url){
+        for(let index = stack.length - 1; index >= 0; index--){
+            if(stack[index].url === url){
+                return index;
+            }
+        }
+        return -1;
     }
 
     function can_back(iframe){
@@ -118,19 +140,23 @@ window.opd_custom_column_history = (function(){
             return false;
         }
         const state = stacks.get(iframe);
-        const target_url = state.stack[state.stack.length - 2];
+        const target = state.stack[state.stack.length - 2];
+        const target_url = target.url;
+        //今いる画面のstateを渡すと、Xのルーターが同じエントリと判断して再描画しない。
+        //戻る先を記録した時点のstateへ戻す。控えが無い場合はnullで新しいエントリ扱いにする。
+        const target_state = target.route_state ?? null;
         const column_window = iframe.contentWindow;
         let replaced = false;
         try{
-            const current_state = column_window.history.state;
-            column_window.history.replaceState(current_state, "", target_url);
+            column_window.history.replaceState(target_state, "", target_url);
             replaced = true;
             state.pending_back = {
                 target_url,
+                route_state: target_state,
                 started_at: Date.now(),
                 confirmations: 0,
             };
-            column_window.dispatchEvent(new column_window.PopStateEvent("popstate", {state: current_state}));
+            column_window.dispatchEvent(new column_window.PopStateEvent("popstate", {state: target_state}));
         }catch(error){
             if(!replaced){
                 return false;

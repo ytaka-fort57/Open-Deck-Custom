@@ -50,8 +50,11 @@ function createFrame(initial_url) {
                 events.push(event);
             },
         },
-        set_url(next_url) {
+        set_url(next_url, next_state) {
             href = next_url;
+            if (next_state !== undefined) {
+                frame.contentWindow.history.state = next_state;
+            }
         },
         events,
     };
@@ -89,6 +92,25 @@ test("back waits for the target URL and does not re-record a transient media rou
     assert.equal(history.can_back(frame), false);
     assert.equal(frame.events.length, 1);
     assert.deepEqual(frame.events[0].state, { route: "current" });
+});
+
+test("back restores the history state recorded for the target URL", () => {
+    const { history, tick } = loadHistory();
+    const frame = createFrame("https://x.com/user/status/10");
+    frame.contentWindow.history.state = { key: "parent" };
+    history.track(frame);
+
+    // A reply detail opened from the parent post carries its own router state.
+    frame.set_url("https://x.com/other/status/20", { key: "reply" });
+    tick();
+
+    assert.equal(history.back(frame), true);
+    // Passing the reply state would make the X router treat it as the same
+    // entry and skip the re-render, so the parent state must be restored.
+    assert.deepEqual(frame.contentWindow.history.state, { key: "parent" });
+    assert.equal(frame.contentWindow.location.href, "https://x.com/user/status/10");
+    assert.equal(frame.events.length, 1);
+    assert.deepEqual(frame.events[0].state, { key: "parent" });
 });
 
 test("a second back is ignored while the first back is settling", () => {
