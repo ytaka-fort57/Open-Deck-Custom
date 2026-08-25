@@ -37,6 +37,32 @@ window.opd_custom_column_history = (function(){
         }
     }
 
+    //Xが実際に描画し直したかを見分ける手掛かり。
+    //URLは戻る処理で自分が書き換えるため、成否の判定には使えない。
+    function render_signal(iframe){
+        try{
+            const doc = iframe.contentWindow.document;
+            const primary = doc.querySelector('[data-testid="primaryColumn"]');
+            const article = primary?.querySelector('article a[href*="/status/"]');
+            return [
+                doc.title,
+                primary?.getAttribute("aria-label") ?? "",
+                article?.getAttribute("href") ?? ""
+            ].join("|");
+        }catch(error){
+            return null;
+        }
+    }
+
+    //描画が変わったか。手掛かりを読めない場合は判定できないため、進めた扱いにする
+    function has_rendered(iframe, pending){
+        const signal = render_signal(iframe);
+        if(signal == null || pending.signal_before == null){
+            return true;
+        }
+        return signal !== pending.signal_before;
+    }
+
     //XはSPAのため遷移してもiframeのloadは起きない。URLの変化を監視して記録する
     function track(iframe){
         if(stacks.has(iframe)){
@@ -66,7 +92,8 @@ window.opd_custom_column_history = (function(){
             // メディアURLなどを何度も戻るループが発生するため、完了まで記録しない。
             if(state.pending_back != null){
                 const pending = state.pending_back;
-                if(url === pending.target_url){
+                const timed_out = Date.now() - pending.started_at >= BACK_SETTLE_TIMEOUT_MS;
+                if(url === pending.target_url && has_rendered(iframe, pending)){
                     pending.confirmations += 1;
                     if(pending.confirmations >= BACK_CONFIRMATION_COUNT){
                         const target_index = last_index_of_url(state.stack, pending.target_url);
@@ -75,12 +102,20 @@ window.opd_custom_column_history = (function(){
                             : [{url: pending.target_url, route_state: pending.route_state}];
                         state.pending_back = null;
                     }
-                }else{
+                }else if(url === pending.target_url){
+                    // URLは目的地だが描画が変わっていない。Xが再描画しなかった場合で、
+                    // 履歴を削ると次の戻るが1つ飛ばしになる。URLだけ元へ戻して retry させる。
                     pending.confirmations = 0;
-                    if(Date.now() - pending.started_at >= BACK_SETTLE_TIMEOUT_MS){
-                        // 目的地へ到達できなかった場合は、壊れたスタックを捨てて
-                        // 現在URLだけを基準にする。
-                        state.stack = [{url: url, route_state: current_state(iframe)}];
+                    if(timed_out){
+                        rollback(iframe, pending);
+                        state.pending_back = null;
+                    }
+                }else{
+                    // Xが別のURLへ動いた場合は、その結果へ履歴を合わせる。
+                    // 履歴を捨てると以降そのカラムで戻れなくなるため、繋ぎ直すだけにする。
+                    pending.confirmations = 0;
+                    if(timed_out){
+                        resync(state, url, current_state(iframe));
                         state.pending_back = null;
                     }
                 }
@@ -115,6 +150,31 @@ window.opd_custom_column_history = (function(){
         return -1;
     }
 
+    //戻れなかった場合にURLだけ元へ戻す。描画は動いていないためpopstateは流さない
+    function rollback(iframe, pending){
+        if(pending.origin_url == null){
+            return;
+        }
+        try{
+            iframe.contentWindow.history.replaceState(pending.origin_state, "", pending.origin_url);
+        }catch(error){
+            //参照できない場合は諦める
+        }
+    }
+
+    //現在URLへ履歴を繋ぎ直す。既に持っているURLならそこまで、無ければ末尾へ足す
+    function resync(state, url, route_state){
+        const index = last_index_of_url(state.stack, url);
+        if(index >= 0){
+            state.stack = state.stack.slice(0, index + 1);
+            return;
+        }
+        state.stack.push({url: url, route_state: route_state});
+        if(state.stack.length > HISTORY_LIMIT){
+            state.stack.shift();
+        }
+    }
+
     function can_back(iframe){
         const state = stacks.get(iframe);
         return state != null && state.pending_back == null && state.stack.length >= 2;
@@ -146,6 +206,9 @@ window.opd_custom_column_history = (function(){
         //戻る先を記録した時点のstateへ戻す。控えが無い場合はnullで新しいエントリ扱いにする。
         const target_state = target.route_state ?? null;
         const column_window = iframe.contentWindow;
+        const origin_url = current_url(iframe);
+        const origin_state = current_state(iframe);
+        const signal_before = render_signal(iframe);
         let replaced = false;
         try{
             column_window.history.replaceState(target_state, "", target_url);
@@ -153,6 +216,9 @@ window.opd_custom_column_history = (function(){
             state.pending_back = {
                 target_url,
                 route_state: target_state,
+                origin_url: origin_url,
+                origin_state: origin_state,
+                signal_before: signal_before,
                 started_at: Date.now(),
                 confirmations: 0,
             };

@@ -5,9 +5,11 @@ import vm from "node:vm";
 
 function loadHistory() {
     let timer_callback = null;
+    let now = 1000;
     const context = {
         URL,
         console: { warn: () => {} },
+        Date: { now: () => now },
         setInterval: (callback) => {
             timer_callback = callback;
             return 1;
@@ -20,6 +22,9 @@ function loadHistory() {
     return {
         history: context.window.opd_custom_column_history,
         tick: () => timer_callback?.(),
+        advance: (ms) => {
+            now += ms;
+        },
     };
 }
 
@@ -30,6 +35,10 @@ function createFrame(initial_url) {
     const frame = {
         isConnected: true,
         contentWindow: {
+            document: {
+                title: "",
+                querySelector: () => null,
+            },
             location: {
                 get href() {
                     return href;
@@ -132,4 +141,66 @@ test("media routes are delegated to the native X back behavior", () => {
     assert.equal(history.is_media_route(frame), true);
     frame.set_url("https://x.com/user/status/10");
     assert.equal(history.is_media_route(frame), false);
+});
+
+test("a back that X ignores restores the URL and keeps the stack", () => {
+    const { history, tick, advance } = loadHistory();
+    const frame = createFrame("https://x.com/home");
+    frame.contentWindow.history.state = { key: "home" };
+    frame.contentWindow.document.title = "ホーム";
+    history.track(frame);
+
+    frame.set_url("https://x.com/user/status/10", { key: "post" });
+    frame.contentWindow.document.title = "ポスト";
+    tick();
+
+    assert.equal(history.back(frame), true);
+    // X does not re-render, so the view still shows the post while the URL says home.
+    tick();
+    tick();
+    advance(3000);
+    tick();
+
+    // The URL must go back to what is actually rendered, and the stack must survive
+    // so that the next Backspace retries instead of skipping an entry.
+    assert.equal(frame.contentWindow.location.href, "https://x.com/user/status/10");
+    assert.deepEqual(frame.contentWindow.history.state, { key: "post" });
+    assert.equal(history.can_back(frame), true);
+});
+
+test("a back that lands somewhere else reconnects the stack instead of dropping it", () => {
+    const { history, tick, advance } = loadHistory();
+    const frame = createFrame("https://x.com/home");
+    history.track(frame);
+    frame.set_url("https://x.com/explore");
+    tick();
+    frame.set_url("https://x.com/notifications");
+    tick();
+
+    assert.equal(history.back(frame), true);
+    // X routes the column to an unrelated URL while the back is settling.
+    frame.set_url("https://x.com/messages");
+    tick();
+    advance(3000);
+    tick();
+
+    assert.equal(history.can_back(frame), true);
+});
+
+test("a back is confirmed once the rendered view changes", () => {
+    const { history, tick } = loadHistory();
+    const frame = createFrame("https://x.com/home");
+    frame.contentWindow.document.title = "ホーム";
+    history.track(frame);
+    frame.set_url("https://x.com/user/status/10");
+    frame.contentWindow.document.title = "ポスト";
+    tick();
+
+    assert.equal(history.back(frame), true);
+    frame.contentWindow.document.title = "ホーム";
+    tick();
+    tick();
+
+    assert.equal(history.can_back(frame), false);
+    assert.equal(frame.contentWindow.location.href, "https://x.com/home");
 });
