@@ -29,8 +29,14 @@ test("auto reload controls stay in the handler scope and columns expose a manual
 test("auto reload helper re-resolves the timeline refresh function on every reload", () => {
     assert.match(autoReloadHelper, /function resolve_reload_func\(\)/);
     assert.match(autoReloadHelper, /const refresh = resolve_reload_func\(\) \?\? reload_func/);
-    assert.match(autoReloadHelper, /const originalScrollIntoView = HTMLElement\.prototype\.scrollIntoView/);
-    assert.match(autoReloadHelper, /return originalFocus\.call\(this, options\)/);
+});
+
+test("auto reload helper keeps X from scrolling the timeline to the top", () => {
+    // Delegating to the native scrollIntoView / focus lets X jump the timeline
+    // back to the top while it restores a column after a back navigation.
+    assert.match(autoReloadHelper, /if \(!parent\) return;/);
+    assert.doesNotMatch(autoReloadHelper, /originalScrollIntoView/);
+    assert.match(autoReloadHelper, /originalFocus\.call\(this, Object\.assign\(\{\}, options, \{ preventScroll: true \}\)\)/);
 });
 
 test("profile deletion validates a non-negative in-range integer", () => {
