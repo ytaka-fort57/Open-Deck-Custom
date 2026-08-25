@@ -1,10 +1,11 @@
 # カスタム版の残課題
 
-更新日: 2026-08-15
+更新日: 2026-08-25
 
 対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
 最新監査は [code-audit-2026-08-11.md](code-audit-2026-08-11.md) を参照。
+カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
 
 ## 優先度: 中
 
@@ -21,6 +22,16 @@
 現在の自動更新は、Xの内部更新関数(`onRefresh`)を周期的に呼ぶ方式で、TweetDeck / X Proのように
 新着が上から流れ続ける挙動ではない。実現するには、カラムiframe内のGraphQL応答または新着通知の購読を
 監視し、差分を先頭へ挿入する仕組みが要る。周期更新の安定化を優先し、ここでは見送る。
+
+### 3.5 カラム内の戻るの残り弱点
+
+戻れない原因(router stateの取り違え)と先頭スクロール(スクロール抑止の委譲)は修正済み。
+先頭スクロールは発生条件が不定のため、実機での解消をまだ確定できていない。あわせて次の
+3点が残る。詳細は [issue-column-back-navigation.md](issue-column-back-navigation.md)。
+
+- `back()` の成否判定が、自分で `replaceState` したURLとの一致を見ているため常に成功扱い
+- `enforce_tab` の自動タブクリックが、ピン留めリストのタブでjoint session historyを奪う
+- ラックをまたぐカラム移動でiframeが切断されると `track()` が再登録されない
 
 ## 優先度: 低
 
@@ -61,13 +72,15 @@
 - 属性値escape、同一オリジンpath検証、メディアURLのDOM安全化
 - 自動更新周期の再作成、cross-origin iframe監視の例外防止
 - background sender検証、FileReader失敗表示、storage mutator返り値検証
-- Xの戻るボタンを対象iframeの独自URL履歴へ接続
+- Xの戻るボタンは標準ルーターへ返し、カラム分離はBackspaceの独自履歴だけが担当
 - 動画variantを配列順に依存せず、HTTPSのMP4から最高bitrateを選択
 - column共通disposerを追加し、文章校正observerとイベントを破棄
 - 自動更新の開始・停止関数をハンドラー直下へ移し、`start_auto_reload is not defined`を解消
 - ブロックスコープ外呼び出しの静的検査(`tests/scope_lint.mjs`)と規約を追加
 - 更新関数をReactの現在の描画から毎回取り直し、遷移後に更新が走らない問題を解消
 - カラムごとの手動更新ボタンを追加
+- 戻る先のrouter stateを復元し、リプライ詳細から本体へ戻れない問題を解消
+- `auto_reload_helper`のスクロール抑止を戻し、戻った後の先頭スクロールを抑止
 
 ## 運用判断済み
 

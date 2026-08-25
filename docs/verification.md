@@ -1,6 +1,6 @@
 # Open-Deck Custom 検証手順
 
-更新日: 2026-07-18
+更新日: 2026-08-25
 
 本家更新の移植、リファクタ、不具合修正後は、手作業の確認前に共通回帰テストを実行する。
 
@@ -40,6 +40,26 @@ node tests/run.mjs
 `tests/scope_lint.test.mjs`が、ブロック内で宣言した関数のブロック外呼び出しを
 プロジェクト全体で検査する。追加パッケージは不要。
 
+## カラム内の戻る規約(joint session history)
+
+各カラムは同一オリジンのiframeで、`history.back()` はフレームではなく全フレーム共通の
+joint session historyを1つ戻す。戻る対象は「押したカラム」ではなく「直近に遷移した
+フレーム」になるため、カラム分離は独自履歴(`extensions/custom/column_history.js`)が担う。
+
+規約:
+
+- `column_history.back()` に**現在の `history.state` を渡さない**。Xのルーターはstateの
+  keyで描画エントリを決めるため、同じstateを渡すと再描画されずURLだけが変わる。
+  渡すのは戻り先を記録した時点のstate、無い場合は `null`。
+- スタックの要素は `{url, route_state}` である。URL文字列として比較・検索しない。
+- `auto_reload_helper.js` の `scrollIntoView` / `focus` パッチから標準動作への委譲を
+  増やさない。委譲するとXの復元処理がタイムラインを先頭までスクロールさせる。
+  このヘルパーは自動更新の設定と無関係に home / explore の全カラムへ注入される。
+- X標準のapp-bar戻るボタンをフックし直さない。カラム分離はBackspaceだけが担当する。
+
+経緯と機序は[issue-column-back-navigation.md](issue-column-back-navigation.md)を参照。
+`tests/column_history.test.mjs`と`tests/content_regression.test.mjs`が上記を固定する。
+
 ## Windowsでの必須検証
 
 回帰テストに加え、Chromium / Firefox ZIPを作成して許可リストを検査する。
@@ -66,6 +86,7 @@ Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで
 自動テストはXの現行DOMやログイン状態を再現しない。次は別途確認する。
 
 - ログイン済みChromiumでの起動、追加、削除、並び替え、プロファイル切り替え
+- Backspaceでの戻る(リプライ詳細→本体、リプライ→リプライ)と、戻った後のスクロール位置
 - メディアビューアーの画像・動画・引用投稿
 - 文章校正APIの実通信
 - Firefox Manifest V2での主要操作
