@@ -25,10 +25,13 @@
 
 ### 3.5 カラム内の戻るの実機確認
 
-コードの不具合は5件とも修正済み。実機で次を確認する。詳細は
+コードの不具合は5件とも修正済み。加えて、Xが再描画しない場合に戻り先URLを実際に
+読み込むフォールバックを追加した。実機で次を確認する。詳細は
 [issue-column-back-navigation.md](issue-column-back-navigation.md)。
 
 - 戻った後の先頭スクロールが解消したか(発生条件が不定のため未確定)
+- 通常の戻るでカラムが再読み込みされていないか。再読み込みが起きる場合は
+  擬似popstateが効いておらずフォールバックに落ちている
 - ピン留めリストのタブ復元が1回の遷移で成立するか。Xが繰り返し上書きする場合、
   2回目以降を行わない制限が復元漏れになっていないか
 - ラックをまたいでカラムを移動した後もBackspaceで戻れるか
@@ -73,6 +76,7 @@
 - 自動更新周期の再作成、cross-origin iframe監視の例外防止
 - background sender検証、FileReader失敗表示、storage mutator返り値検証
 - Xの戻るボタンは標準ルーターへ返し、カラム分離はBackspaceの独自履歴だけが担当
+- 擬似popstateでXが再描画しない場合は、戻り先URLを実際に読み込んで確実に戻す
 - 動画variantを配列順に依存せず、HTTPSのMP4から最高bitrateを選択
 - column共通disposerを追加し、文章校正observerとイベントを破棄
 - 自動更新の開始・停止関数をハンドラー直下へ移し、`start_auto_reload is not defined`を解消
