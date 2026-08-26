@@ -28,10 +28,11 @@ function loadHistory() {
     };
 }
 
-function createFrame(initial_url) {
+function createFrame(initial_url, options = {}) {
     let href = initial_url;
     const route_state = { route: "current" };
     const events = [];
+    const navigations = [];
     const frame = {
         isConnected: true,
         contentWindow: {
@@ -42,6 +43,19 @@ function createFrame(initial_url) {
             location: {
                 get href() {
                     return href;
+                },
+                reload() {
+                    if (options.navigation_fails) {
+                        throw new Error("cross origin");
+                    }
+                    navigations.push(href);
+                },
+                replace(next_url) {
+                    if (options.navigation_fails) {
+                        throw new Error("cross origin");
+                    }
+                    navigations.push(next_url);
+                    href = next_url;
                 },
             },
             history: {
@@ -66,6 +80,7 @@ function createFrame(initial_url) {
             }
         },
         events,
+        navigations,
     };
     return frame;
 }
@@ -143,7 +158,7 @@ test("media routes are delegated to the native X back behavior", () => {
     assert.equal(history.is_media_route(frame), false);
 });
 
-test("a back that X ignores restores the URL and keeps the stack", () => {
+test("a back that X ignores falls back to loading the target URL", () => {
     const { history, tick, advance } = loadHistory();
     const frame = createFrame("https://x.com/home");
     frame.contentWindow.history.state = { key: "home" };
@@ -157,14 +172,63 @@ test("a back that X ignores restores the URL and keeps the stack", () => {
     assert.equal(history.back(frame), true);
     // X does not re-render, so the view still shows the post while the URL says home.
     tick();
+    assert.deepEqual(frame.navigations, []);
+    advance(1000);
     tick();
+
+    // The synthetic popstate got nowhere, so the target URL must actually be loaded.
+    assert.deepEqual(frame.navigations, ["https://x.com/home"]);
+    assert.equal(frame.contentWindow.location.href, "https://x.com/home");
+
+    // A real navigation is authoritative: the rendered view can look identical
+    // (same title) and the back must still be confirmed instead of rolling back.
+    tick();
+    tick();
+    assert.equal(frame.navigations.length, 1);
+    assert.equal(frame.contentWindow.location.href, "https://x.com/home");
+    assert.equal(history.can_back(frame), false);
+});
+
+test("a back keeps the URL and the stack when the fallback cannot navigate", () => {
+    const { history, tick, advance } = loadHistory();
+    const frame = createFrame("https://x.com/home", { navigation_fails: true });
+    frame.contentWindow.history.state = { key: "home" };
+    frame.contentWindow.document.title = "ホーム";
+    history.track(frame);
+
+    frame.set_url("https://x.com/user/status/10", { key: "post" });
+    frame.contentWindow.document.title = "ポスト";
+    tick();
+
+    assert.equal(history.back(frame), true);
     advance(3000);
     tick();
 
     // The URL must go back to what is actually rendered, and the stack must survive
     // so that the next Backspace retries instead of skipping an entry.
+    assert.deepEqual(frame.navigations, []);
     assert.equal(frame.contentWindow.location.href, "https://x.com/user/status/10");
     assert.deepEqual(frame.contentWindow.history.state, { key: "post" });
+    assert.equal(history.can_back(frame), true);
+});
+
+test("a column whose document stays unreadable does not stay blocked", () => {
+    const { history, tick, advance } = loadHistory();
+    const frame = createFrame("https://x.com/home");
+    history.track(frame);
+    frame.set_url("https://x.com/user/status/10");
+    tick();
+
+    assert.equal(history.back(frame), true);
+    assert.equal(history.can_back(frame), false);
+
+    // The fallback navigation leaves the column loading, so the URL is unreadable.
+    // The wait must be released, or Backspace stays dead for this column.
+    frame.set_url("about:blank");
+    tick();
+    assert.equal(history.can_back(frame), false);
+    advance(15000);
+    tick();
     assert.equal(history.can_back(frame), true);
 });
 

@@ -6,6 +6,8 @@ window.opd_custom_column_history = (function(){
     const WATCH_INTERVAL_MS = 400;
     const HISTORY_LIMIT = 50;
     const BACK_SETTLE_TIMEOUT_MS = 3000;
+    const BACK_FALLBACK_MS = 800;
+    const BACK_ABANDON_TIMEOUT_MS = 15000;
     const BACK_CONFIRMATION_COUNT = 2;
     const MEDIA_ROUTE_RE = /(?:^|\/)status\/[^/]+\/(?:photo|video)\/\d+\/?$/i;
     const stacks = new WeakMap();
@@ -85,6 +87,13 @@ window.opd_custom_column_history = (function(){
             }
             const url = current_url(iframe);
             if(url == null){
+                //実ナビゲーションでの戻る中は一時的に参照できなくなる。
+                //読み込みが戻ってこない場合に戻る操作を封じたままにしないため、
+                //十分に待っても参照できないときは待ちを解く
+                if(state.pending_back != null
+                    && Date.now() - state.pending_back.started_at >= BACK_ABANDON_TIMEOUT_MS){
+                    state.pending_back = null;
+                }
                 return;
             }
 
@@ -92,8 +101,11 @@ window.opd_custom_column_history = (function(){
             // メディアURLなどを何度も戻るループが発生するため、完了まで記録しない。
             if(state.pending_back != null){
                 const pending = state.pending_back;
-                const timed_out = Date.now() - pending.started_at >= BACK_SETTLE_TIMEOUT_MS;
-                if(url === pending.target_url && has_rendered(iframe, pending)){
+                const elapsed = Date.now() - pending.started_at;
+                const timed_out = elapsed >= BACK_SETTLE_TIMEOUT_MS;
+                //実ナビゲーションで戻した場合、描画はそのURLの読み込み結果そのものなので
+                //手掛かりの比較は要らない
+                if(url === pending.target_url && (pending.navigated || has_rendered(iframe, pending))){
                     pending.confirmations += 1;
                     if(pending.confirmations >= BACK_CONFIRMATION_COUNT){
                         const target_index = last_index_of_url(state.stack, pending.target_url);
@@ -103,10 +115,15 @@ window.opd_custom_column_history = (function(){
                         state.pending_back = null;
                     }
                 }else if(url === pending.target_url){
-                    // URLは目的地だが描画が変わっていない。Xが再描画しなかった場合で、
-                    // 履歴を削ると次の戻るが1つ飛ばしになる。URLだけ元へ戻して retry させる。
+                    // URLは目的地だが描画が変わっていない。擬似popstateでは戻せない
+                    // ケースなので、戻り先URLを実際に読み込ませて確実に戻す。
                     pending.confirmations = 0;
-                    if(timed_out){
+                    if(!pending.navigated && elapsed >= BACK_FALLBACK_MS){
+                        pending.navigated = navigate_to_target(iframe, pending);
+                    }
+                    // 文書を参照できない場合は実ナビゲーションもできない。履歴を削ると
+                    // 次の戻るが1つ飛ばしになるため、URLだけ元へ戻して retry させる。
+                    if(!pending.navigated && timed_out){
                         rollback(iframe, pending);
                         state.pending_back = null;
                     }
@@ -148,6 +165,27 @@ window.opd_custom_column_history = (function(){
             }
         }
         return -1;
+    }
+
+    //擬似popstateをXが無視した場合の最終手段。戻り先URLを実際に読み込ませる。
+    //back()でURLは既に戻り先へ書き換えてあるため、通常はreloadで足りる。
+    //location.assign()は使わない。joint session historyへエントリが積まれ、
+    //そのカラムが「直近に遷移したフレーム」になってX標準の戻るを狂わせる。
+    //reload / replace はどちらも現在のエントリを置き換えるため、その心配がない。
+    //再読み込みを伴うためスクロール位置は失われるが、戻れないより良い。
+    function navigate_to_target(iframe, pending){
+        try{
+            const column_window = iframe.contentWindow;
+            if(column_window.location.href !== pending.target_url){
+                column_window.location.replace(pending.target_url);
+            }else{
+                column_window.location.reload();
+            }
+            return true;
+        }catch(error){
+            //参照できない場合は諦める
+            return false;
+        }
     }
 
     //戻れなかった場合にURLだけ元へ戻す。描画は動いていないためpopstateは流さない
@@ -221,6 +259,7 @@ window.opd_custom_column_history = (function(){
                 signal_before: signal_before,
                 started_at: Date.now(),
                 confirmations: 0,
+                navigated: false,
             };
             column_window.dispatchEvent(new column_window.PopStateEvent("popstate", {state: target_state}));
         }catch(error){
