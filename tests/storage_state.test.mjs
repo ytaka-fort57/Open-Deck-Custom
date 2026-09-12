@@ -22,7 +22,9 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     const context = { window: {}, URL };
     loadScript("extensions/custom/safe_values.js", context);
     loadScript("extensions/custom/settings_codec.js", context);
+    loadScript("extensions/custom/column_settings.js", context);
     const codec = context.window.opd_custom_settings_codec;
+    const columnSettings = context.window.opd_custom_column_settings;
 
     const decoded = codec.decode({
         format: codec.FORMAT,
@@ -36,6 +38,45 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     assert.equal(JSON.parse(items.opd_custom_column_state)["0:0"], "Following");
     assert.equal(codec.create_export(items).schema_version, 1);
     assert.equal(codec.decode({ row_settings: profileStore[0].profile }).profile_store[0].name, "default");
+
+    const legacy_profile_store = [{
+        name: "legacy",
+        profile: [{
+            type: "explore",
+            column_save_path: "/explore",
+            column_save_title: null,
+            column_width: 42,
+            future_option: "keep-me",
+        }],
+    }];
+    const legacy_decoded = codec.decode(legacy_profile_store);
+    const legacy_column = legacy_decoded.profile_store[0].profile[0];
+    assert.equal(legacy_column.column_save_title, "");
+    assert.equal(legacy_column.column_width, "42");
+    assert.equal(legacy_column.future_option, "keep-me");
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(columnSettings.normalize(legacy_column))),
+        {
+            type: "explore",
+            banner: false,
+            top_visible: false,
+            tw_view_mode: "0",
+            column_save_path: "/explore",
+            column_save_title: "",
+            column_pinned_path: "",
+            auto_reload: false,
+            auto_reload_time: 10000,
+            column_width: "42",
+        }
+    );
+    const exported_legacy = codec.create_export({
+        opd_profile_store: JSON.stringify(legacy_profile_store),
+        opd_settings: null,
+        opd_custom_column_state: null,
+    });
+    assert.equal(exported_legacy.opd_profile_store[0].profile[0].column_save_title, "");
+    assert.equal(exported_legacy.opd_profile_store[0].profile[0].column_width, "42");
+    assert.equal(exported_legacy.opd_profile_store[0].profile[0].future_option, "keep-me");
 
     assert.throws(() => codec.decode({ opd_profile_store: "{broken" }));
     assert.throws(() => codec.decode([{ name: "bad", profile: [{ type: "unknown" }] }]));

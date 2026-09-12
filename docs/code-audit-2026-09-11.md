@@ -26,6 +26,8 @@
 - R-8の第二段階として、カラム再構築時の直接・入れ子iframe資源破棄と、新しいiframeへの
   独立した資源registry再登録をDOM fixtureで実行検証した。カラム追加・削除・並び替え・iframe
   loadを含むcontent.js全体の実DOM fixtureは次段階として残る。
+- R-2の第三段階として、settings codecで旧形式の省略値を正規化し、未知の設定項目を保持したまま
+  `column_settings`のcanonical modelへ渡せるimport/export round-tripを検証した。
 
 ## 検証結果
 
@@ -39,7 +41,7 @@
 | ID | 優先度 | 対象 | コード上の事実 | 推奨する分割・対応 |
 | --- | --- | --- | --- | --- |
 | R-1 | 高 | `content.js`のアプリシェル | `run()`が約1,800行あり、画面生成、CSS、プロフィール、カラム操作、保存、DnD、自動更新、observerを内包する | `bootstrap`、`deck_renderer`、`column_controller`、`profile_controller`へ段階分割する。既存のグローバルAPIとscript順は当面維持する |
-| R-2 | 高 | 設定モデルとDOM変換 | 設定からHTMLを作る処理と、DOMから設定を保存する処理が離れており、4種類のカラム追加処理も同じplaceholder置換を重複している | `column_settings.js`へDOM読み取り、正規化、renderer、template値を集約し、初期描画・追加処理とround-tripテストを接続済み。残りは設定codecとの境界およびcontent.js全体のround-trip検証 |
+| R-2 | 高 | 設定モデルとDOM変換 | 設定からHTMLを作る処理と、DOMから設定を保存する処理が離れており、4種類のカラム追加処理も同じplaceholder置換を重複している | `column_settings.js`へDOM読み取り、正規化、renderer、template値を集約し、初期描画・追加処理、settings codec境界、round-tripテストを接続済み。残りはcontent.js全体のround-trip検証 |
 | R-3 | 高 | 履歴・戻るController | `index.js`、`keyboard_shortcuts.js`、`column_history.js`に、Backspace、app-bar戻る、メディア例外、Xへの遷移が分散している | 「入力中」「メディア」「履歴あり」「履歴なし」の判定表をテストで固定し、UIイベントと履歴状態機械を分離する |
 | R-4 | 高 | ページlifecycle | `lifecycle.js`がカラム資源、自動更新、メディアtoken、ページイベント、observer、タイトル/faviconをまとめて管理する | `column_resource_registry`、`page_event_lifecycle`、`page_observer_lifecycle`へ分離する。各observerがdisposerを返す形に揃える |
 | R-5 | 中 | DOM変更監視 | `custom/index.js`のMutationObserverが、DOM変更ごとにタブ、キー、リストフィルタ、並び替えの全体処理を呼ぶ | microtaskまたは短いdebounceで更新を集約し、追加・削除されたカラムだけを対象にする |
@@ -52,7 +54,7 @@
 ## 着手順
 
 1. R-8の設定境界とlifecycle資源fixtureを追加済み。次はcontent.jsのカラム追加・削除・再構築・並び替え・iframe loadを実行検証する。
-2. R-2の正規化・renderer・round-tripを追加済み。次は設定codecとの境界とcontent.js全体のround-tripを検証する。
+2. R-2の正規化・renderer・settings codec境界・round-tripを追加済み。次はcontent.js全体のround-tripを検証する。
 3. R-1を、挙動を変えない小さな責務単位で分割する。
 4. R-3とR-4を、現在の未コミット変更と実ブラウザー確認が落ち着いた後に分割する。
 5. 負荷計測が必要なR-5・R-6、移行を伴うR-9、配布整理のR-10へ進む。

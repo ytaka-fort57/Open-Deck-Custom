@@ -16,7 +16,10 @@
   初期描画と4種類のカラム追加処理を共通化した。
 - R-8の第二段階として、カラム再構築時の直接・入れ子iframe資源破棄と、新しいiframeの独立した
   資源registryをDOM fixtureで検証した。ローカル回帰テストは68/68成功。
-- 残るR-8はcontent.js全体のカラム追加・削除・再構築・並び替え・iframe load fixtureである。
+- R-2の第三段階として、settings codecの旧形式正規化、未知項目保持、`column_settings`との
+  import/export round-trip境界を検証した。
+- 残るR-8はcontent.js全体のカラム追加・削除・再構築・並び替え・iframe load fixture、R-2は
+  content.js全体のround-trip検証である。
 - 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
 
 ## 優先度: 中

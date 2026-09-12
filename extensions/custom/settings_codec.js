@@ -85,6 +85,33 @@ window.opd_custom_settings_codec = (function(){
         });
     }
 
+    //旧形式の省略値を画面側の設定モデルへ揃える。未知の項目は将来互換のため保持する。
+    function normalize_column(column){
+        return Object.assign({}, column, {
+            banner: column.banner === true,
+            top_visible: column.top_visible === true,
+            tw_view_mode: column.tw_view_mode == null ? "0" : String(column.tw_view_mode),
+            column_save_path: column.column_save_path == null ? "" : String(column.column_save_path),
+            column_save_title: column.column_save_title == null ? "" : String(column.column_save_title),
+            column_pinned_path: column.column_pinned_path == null ? "" : String(column.column_pinned_path),
+            auto_reload: column.auto_reload === true,
+            auto_reload_time: column.auto_reload_time == null
+                ? 10000
+                : Number(column.auto_reload_time),
+            column_width: column.column_width == null || column.column_width === "null"
+                ? null
+                : String(column.column_width),
+        });
+    }
+
+    function normalize_profile_store(profile_store){
+        return profile_store.map(function(profile){
+            return Object.assign({}, profile, {
+                profile: profile.profile.map(normalize_column),
+            });
+        });
+    }
+
     function validate_settings(settings){
         if(settings == null){
             return true;
@@ -159,7 +186,9 @@ window.opd_custom_settings_codec = (function(){
         if(!validate_column_state(normalized.column_state)){
             throw new Error("カラムごとのタブ状態の形式が不正です");
         }
-        return normalized;
+        return Object.assign({}, normalized, {
+            profile_store: normalize_profile_store(normalized.profile_store),
+        });
     }
 
     function current_settings_or_default(stored_settings, manifest_version){
