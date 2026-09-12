@@ -846,14 +846,11 @@ function run(settings){
                     column_width_init = settings.column_settings[index].column_width;
                 }
                 const column_template = default_element[Object.keys(default_element)[default_index]]["html"];
-                const column_replacements = column_settings.render_values(
+                const rendered_column_html = column_settings.render(
+                    column_template,
                     settings.column_settings[index],
                     create_random_id(),
                     column_width_init
-                );
-                const rendered_column_html = deck_safe_values.render_attribute_template(
-                    column_template,
-                    column_replacements
                 );
                 //一段目終了検出にもかかわらず設定が存在していた場合2段目の変数に保存
                 if(first_column_end == true){
@@ -1550,9 +1547,10 @@ function run(settings){
             document.querySelector("#second_rack_element").style.height = "50vh";
             //console.log(default_element.second_empty_column)
             //const second_rack_empty_html = `<section draggable="false" id="column_%column_num%" class="dsp_column dsp_column_second_emptycolumn"><div opd_column_type="second_empty_column" style="height: calc(100% - 20px);min-width: 30rem;display: flex;align-items: center;justify-content: center;"><p>2段目<br>${i18n_message("ui_second_empty_column_message")}</p></div></section>`;
-            const second_rack_default_html = deck_safe_values.render_attribute_template(
+            const second_rack_default_html = column_settings.render(
                 default_element.second_empty_column.html,
-                column_settings.new_column_values("second_empty_column", create_random_id())
+                column_settings.new_column_setting("second_empty_column"),
+                create_random_id()
             );
             document.querySelector("#second_rack_element").insertAdjacentHTML("beforeend", second_rack_default_html);
             /*for (let index = 0; index < document.querySelectorAll('.dsp_column[draggable="true"]').length; index++) {
@@ -1632,9 +1630,10 @@ function run(settings){
     document.getElementById("add_post").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
 
-        const new_column = deck_safe_values.render_attribute_template(
+        const new_column = column_settings.render(
             default_element.post.html,
-            column_settings.new_column_values("post", create_random_id())
+            column_settings.new_column_setting("post"),
+            create_random_id()
         );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
@@ -1649,9 +1648,10 @@ function run(settings){
         const add_target_column = get_column_add_target();
         const timeline_before = snapshot_timeline_state();
         
-        const new_column = deck_safe_values.render_attribute_template(
+        const new_column = column_settings.render(
             default_element.home.html,
-            column_settings.new_column_values("home", create_random_id())
+            column_settings.new_column_setting("home"),
+            create_random_id()
         );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         remap_timeline_state(timeline_before);
@@ -1666,9 +1666,10 @@ function run(settings){
     document.getElementById("add_notify").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
         
-        const new_column = deck_safe_values.render_attribute_template(
+        const new_column = column_settings.render(
             default_element.notification.html,
-            column_settings.new_column_values("notification", create_random_id())
+            column_settings.new_column_setting("notification"),
+            create_random_id()
         );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
@@ -1682,9 +1683,10 @@ function run(settings){
     document.getElementById("add_explore").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
         
-        const new_column = deck_safe_values.render_attribute_template(
+        const new_column = column_settings.render(
             default_element.explore.html,
-            column_settings.new_column_values("explore", create_random_id())
+            column_settings.new_column_setting("explore"),
+            create_random_id()
         );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});

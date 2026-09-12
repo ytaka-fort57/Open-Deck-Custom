@@ -1,7 +1,9 @@
 //カラム設定のDOM境界をまとめる
 //content.jsの保存形式は変えず、DOMからの読み取りとtemplate値の組み立てだけを担当する
 window.opd_custom_column_settings = (function(){
+    const safe_values = window.opd_custom_safe_values;
     const AUTO_RELOAD_TYPES = new Set(["home", "explore"]);
+    const VIEW_MODES = new Set(["0", "1", "2"]);
 
     function is_auto_reload_type(type){
         return AUTO_RELOAD_TYPES.has(type);
@@ -11,28 +13,57 @@ window.opd_custom_column_settings = (function(){
         return column.querySelector?.(selector)?.checked === true;
     }
 
+    function string_value(value, fallback = ""){
+        return typeof value === "string" ? value : fallback;
+    }
+
+    function normalize(input = {}, fallback = {}){
+        const source = Object.assign({}, fallback, input ?? {});
+        const type = string_value(source.type, "empty_column");
+        const raw_view_mode = String(source.tw_view_mode ?? "0");
+        const raw_width = source.column_width;
+        const raw_interval = Number(source.auto_reload_time);
+
+        return {
+            type: type,
+            banner: source.banner === true,
+            top_visible: source.top_visible === true,
+            tw_view_mode: VIEW_MODES.has(raw_view_mode) ? raw_view_mode : "0",
+            column_save_path: string_value(source.column_save_path),
+            column_save_title: string_value(source.column_save_title),
+            column_pinned_path: string_value(source.column_pinned_path),
+            auto_reload: is_auto_reload_type(type) ? source.auto_reload === true : null,
+            auto_reload_time: Number.isFinite(raw_interval) && raw_interval >= 1000
+                ? raw_interval
+                : 10000,
+            column_width: raw_width == null || raw_width === "null"
+                ? null
+                : String(raw_width),
+        };
+    }
+
     function read(column){
         const type = column.getAttribute("opd_column_type");
         const view_mode = column.querySelector?.(".opd_tw_view_mode")?.value;
-        const settings = {
+        const settings = normalize({
             type: type,
             banner: is_checked(column, ".opd_banner"),
             top_visible: is_checked(column, ".opd_top_bar"),
             tw_view_mode: view_mode == undefined ? "0" : view_mode,
-            column_save_path: "",
-            column_save_title: null,
-            column_pinned_path: "",
-            auto_reload: null,
-            auto_reload_time: 10000,
             column_width: column.getAttribute("opd_column_width") === "null"
                 ? null
                 : column.getAttribute("opd_column_width"),
-        };
+        });
 
         if(type === "explore"){
-            settings.column_save_path = column.getAttribute("opd_explore_path");
-            settings.column_pinned_path = column.getAttribute("opd_pinned_path");
-            settings.column_save_title = column.getAttribute("opd_explore_title");
+            return normalize({
+                ...settings,
+                column_save_path: column.getAttribute("opd_explore_path"),
+                column_pinned_path: column.getAttribute("opd_pinned_path"),
+                column_save_title: column.getAttribute("opd_explore_title"),
+                auto_reload: is_checked(column, ".opd_a_reload_bar"),
+                auto_reload_time: Number(column.querySelector?.(".opd_a_reload_time_setting")?.value) * 1000,
+            });
         }
 
         if(is_auto_reload_type(type)){
@@ -43,10 +74,11 @@ window.opd_custom_column_settings = (function(){
                 : 10000;
         }
 
-        return settings;
+        return normalize(settings);
     }
 
     function render_values(setting, column_id, fallback_width = "30"){
+        setting = normalize(setting);
         const type = setting?.type;
         const pinned_path = type === "explore" && setting.column_pinned_path != null
             ? setting.column_pinned_path
@@ -77,25 +109,35 @@ window.opd_custom_column_settings = (function(){
         };
     }
 
-    function new_column_values(type, column_id){
-        const defaults = {
+    function render(template, setting, column_id, fallback_width = "30"){
+        if(safe_values?.render_attribute_template == null){
+            throw new Error("Open-Deckの安全なtemplate rendererがありません");
+        }
+        return safe_values.render_attribute_template(
+            template,
+            render_values(setting, column_id, fallback_width)
+        );
+    }
+
+    function new_column_setting(type){
+        return normalize({
             type: type,
-            banner: false,
             top_visible: true,
-            tw_view_mode: "0",
             column_save_path: type === "explore" ? "/explore" : "",
-            column_save_title: "",
-            column_pinned_path: "",
-            auto_reload: false,
-            auto_reload_time: 10000,
             column_width: "30",
-        };
-        return render_values(defaults, column_id, "30");
+        });
+    }
+
+    function new_column_values(type, column_id){
+        return render_values(new_column_setting(type), column_id, "30");
     }
 
     return {
+        normalize: normalize,
         read: read,
+        render: render,
         render_values: render_values,
+        new_column_setting: new_column_setting,
         new_column_values: new_column_values,
     };
 })();

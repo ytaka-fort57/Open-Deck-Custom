@@ -12,7 +12,11 @@
 
 - R-8の第一段階として、カラム設定DOMのfixtureと4種類のカラム設定テストを追加した。
 - R-2の第一段階として、`extensions/custom/column_settings.js`へDOM読み取りと新規カラムの
-  template値を集約した。次は正規化・renderer・round-tripと、カラムライフサイクルのfixtureを進める。
+  template値を集約した。第二段階として正規化モデル、renderer、設定値のround-tripを追加し、
+  初期描画と4種類のカラム追加処理を共通化した。
+- R-8の第二段階として、カラム再構築時の直接・入れ子iframe資源破棄と、新しいiframeの独立した
+  資源registryをDOM fixtureで検証した。ローカル回帰テストは68/68成功。
+- 残るR-8はcontent.js全体のカラム追加・削除・再構築・並び替え・iframe load fixtureである。
 - 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
 
 ## 優先度: 中

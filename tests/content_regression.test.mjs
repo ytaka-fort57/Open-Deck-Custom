@@ -14,8 +14,9 @@ const columnSettings = readFileSync("extensions/custom/column_settings.js", "utf
 
 test("new auto-reload columns use seconds in the UI", () => {
     assert.match(columnSettings, /"%column_auto_reload_time%"/);
-    assert.match(content, /column_settings\.new_column_values\("home"/);
-    assert.match(content, /column_settings\.new_column_values\("explore"/);
+    assert.match(columnSettings, /function new_column_setting\(type\)/);
+    assert.match(content, /column_settings\.new_column_setting\("home"/);
+    assert.match(content, /column_settings\.new_column_setting\("explore"/);
     assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
 });
 
@@ -70,7 +71,8 @@ test("settings and profiles use the shared storage repository", () => {
 });
 
 test("untrusted values cross explicit safe DOM and URL boundaries", () => {
-    assert.match(content, /deck_safe_values\.render_attribute_template/);
+    assert.match(columnSettings, /safe_values\.render_attribute_template/);
+    assert.match(content, /column_settings\.render/);
     assert.doesNotMatch(mediaViewer, /src="\$\{/);
     assert.doesNotMatch(mediaViewer, /wrapper\.innerHTML/);
     assert.match(mediaViewer, /normalize_https_url/);
