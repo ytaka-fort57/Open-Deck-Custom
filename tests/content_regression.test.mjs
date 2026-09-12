@@ -10,10 +10,13 @@ const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
 const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8");
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
+const columnSettings = readFileSync("extensions/custom/column_settings.js", "utf8");
 
 test("new auto-reload columns use seconds in the UI", () => {
-    const tenSecondTemplates = content.match(/replaceAll\("%column_auto_reload_time%", "10"\)/g) ?? [];
-    assert.ok(tenSecondTemplates.length >= 2);
+    assert.match(columnSettings, /"%column_auto_reload_time%"/);
+    assert.match(content, /column_settings\.new_column_values\("home"/);
+    assert.match(content, /column_settings\.new_column_values\("explore"/);
+    assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
 });
 
 test("auto reload controls stay in the handler scope and columns expose a manual refresh", () => {

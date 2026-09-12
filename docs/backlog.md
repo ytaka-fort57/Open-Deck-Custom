@@ -8,6 +8,13 @@
 リファクタ候補の一覧と着手順は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) に記載する。
 カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
 
+## リファクタ進捗（2026-09-12）
+
+- R-8の第一段階として、カラム設定DOMのfixtureと4種類のカラム設定テストを追加した。
+- R-2の第一段階として、`extensions/custom/column_settings.js`へDOM読み取りと新規カラムの
+  template値を集約した。次は正規化・renderer・round-tripと、カラムライフサイクルのfixtureを進める。
+- 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
+
 ## 優先度: 中
 
 ### 1. 引用付きメディアの選択境界

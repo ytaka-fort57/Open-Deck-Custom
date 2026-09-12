@@ -20,6 +20,7 @@ let is_removed_default_style = false;
 const deck_lifecycle = window.opd_custom_lifecycle;
 const deck_storage = window.opd_custom_storage;
 const deck_safe_values = window.opd_custom_safe_values;
+const column_settings = window.opd_custom_column_settings;
 let shared_media_viewer = null;
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
@@ -840,59 +841,16 @@ function run(settings){
             //console.log(settings.column_settings[index].type+"-"+Object.keys(default_element))
             if(settings.column_settings[index].type == Object.keys(default_element)[default_index]){
                 //console.log(default_element[Object.keys(default_element)[default_index]]["html"])
-                let banner_checked = "";
-                let init_top_visible_checked = "";
-                let init_pinned_checked = "";
-                let init_pinned_path = "";
-                let init_auto_reload_checked = "";
-                let init_column_save_path = settings.column_settings[index].column_save_path;
-                let init_column_save_title = settings.column_settings[index].column_save_title;
-                let tw_view_type = settings.column_settings[index].tw_view_mode;
-                let auto_reload_time = settings.column_settings[index].auto_reload_time / 1000;
-                if(settings.column_settings[index].banner == true){
-                    banner_checked = "checked";
-                }
-                //トップ検索など
-                if(settings.column_settings[index].top_visible == true){
-                    init_top_visible_checked = "checked";
-                }
                 //カラム横幅
                 if(settings.column_settings[index].column_width != null){
                     column_width_init = settings.column_settings[index].column_width;
                 }
-                //Exproleピン止め
-                if(settings.column_settings[index].type == "explore"){
-                    if(settings.column_settings[index].column_pinned_path != ""){
-                        init_pinned_checked = "checked";
-                        init_pinned_path = settings.column_settings[index].column_pinned_path;
-                        init_column_save_path = settings.column_settings[index].column_pinned_path;
-                        //%column_pinned_ch%
-                    }else{
-                        init_column_save_path = settings.column_settings[index].column_save_path;
-                    }
-                }
-                //自動更新
-                if(settings.column_settings[index].type == "explore" || settings.column_settings[index].type == "home"){
-                    if(settings.column_settings[index].auto_reload){
-                        init_auto_reload_checked = "checked";
-                        //%column_pinned_ch%
-                    }else{
-                    }
-                }
                 const column_template = default_element[Object.keys(default_element)[default_index]]["html"];
-                const column_replacements = {
-                    "%column_save_path%": init_column_save_path,
-                    "%column_num%": create_random_id(),
-                    "%column_banner_ch%": banner_checked,
-                    "%column_top_bar_ch%": init_top_visible_checked,
-                    "%column_tw_view_mode%": tw_view_type,
-                    "%column_pinned_ch%": init_pinned_checked,
-                    "%column_pinned_save_path%": init_pinned_path,
-                    "%column_save_title%": init_column_save_title,
-                    "%column_width_num%": column_width_init,
-                    "%column_auto_reload_ch%": init_auto_reload_checked,
-                    "%column_auto_reload_time%": auto_reload_time,
-                };
+                const column_replacements = column_settings.render_values(
+                    settings.column_settings[index],
+                    create_random_id(),
+                    column_width_init
+                );
                 const rendered_column_html = deck_safe_values.render_attribute_template(
                     column_template,
                     column_replacements
@@ -1592,7 +1550,10 @@ function run(settings){
             document.querySelector("#second_rack_element").style.height = "50vh";
             //console.log(default_element.second_empty_column)
             //const second_rack_empty_html = `<section draggable="false" id="column_%column_num%" class="dsp_column dsp_column_second_emptycolumn"><div opd_column_type="second_empty_column" style="height: calc(100% - 20px);min-width: 30rem;display: flex;align-items: center;justify-content: center;"><p>2段目<br>${i18n_message("ui_second_empty_column_message")}</p></div></section>`;
-            const second_rack_default_html = default_element.second_empty_column.html.replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_tw_view_mode%", "0");
+            const second_rack_default_html = deck_safe_values.render_attribute_template(
+                default_element.second_empty_column.html,
+                column_settings.new_column_values("second_empty_column", create_random_id())
+            );
             document.querySelector("#second_rack_element").insertAdjacentHTML("beforeend", second_rack_default_html);
             /*for (let index = 0; index < document.querySelectorAll('.dsp_column[draggable="true"]').length; index++) {
                 document.querySelectorAll('.dsp_column[draggable="true"]')[index].style.height = "calc(100% - 25px)";
@@ -1671,7 +1632,10 @@ function run(settings){
     document.getElementById("add_post").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
 
-        const new_column = default_element["post"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10000");
+        const new_column = deck_safe_values.render_attribute_template(
+            default_element.post.html,
+            column_settings.new_column_values("post", create_random_id())
+        );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
@@ -1685,7 +1649,10 @@ function run(settings){
         const add_target_column = get_column_add_target();
         const timeline_before = snapshot_timeline_state();
         
-        const new_column = default_element["home"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
+        const new_column = deck_safe_values.render_attribute_template(
+            default_element.home.html,
+            column_settings.new_column_values("home", create_random_id())
+        );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         remap_timeline_state(timeline_before);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
@@ -1699,7 +1666,10 @@ function run(settings){
     document.getElementById("add_notify").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
         
-        const new_column = default_element["notification"]["html"].replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_width_num%", "30");
+        const new_column = deck_safe_values.render_attribute_template(
+            default_element.notification.html,
+            column_settings.new_column_values("notification", create_random_id())
+        );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
@@ -1712,7 +1682,10 @@ function run(settings){
     document.getElementById("add_explore").addEventListener("click", function(){
         const add_target_column = get_column_add_target();
         
-        const new_column = default_element["explore"]["html"].replaceAll("%column_save_path%", "/explore").replaceAll("%column_num%", create_random_id()).replace("%column_banner_ch%", "").replace("%column_top_bar_ch%", "checked").replace("%column_tw_view_mode%", "0").replaceAll("%column_pinned_save_path%", "").replaceAll("%column_width_num%", "30").replaceAll("%column_auto_reload_ch%", "").replaceAll("%column_auto_reload_time%", "10");
+        const new_column = deck_safe_values.render_attribute_template(
+            default_element.explore.html,
+            column_settings.new_column_values("explore", create_random_id())
+        );
         const new_column_element = insert_new_column_before_target(add_target_column, new_column);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
@@ -1947,66 +1920,7 @@ function run(settings){
             ?? Array.from(document.querySelectorAll("#opd_main_element div[opd_column_type]"));
         for (let index = 0; index < column_elements.length; index++) {
             const column_element = column_elements[index];
-            let banner_checked = null;
-            let top_visible_checked = null;
-            let tw_view_type = null;
-            let column_open_path = null;
-            let column_pinned_save_path = null;
-            let column_page_title = null;
-            let column_width_value = null;
-            let column_auto_reload = null;
-            let column_auto_reload_time = 10000;
-            if(column_element.querySelector(".opd_banner")?.checked == true){
-                banner_checked = true;
-            }else{
-                banner_checked = false;
-            }
-            //トップ検索欄等 
-            if(column_element.querySelector(".opd_top_bar")?.checked == true){
-                top_visible_checked = true;
-            }else{
-                top_visible_checked = false;
-            }
-            //
-            if(column_element.querySelector(".opd_tw_view_mode")?.value != undefined){
-                tw_view_type = column_element.querySelector(".opd_tw_view_mode").value;
-            }else{
-                tw_view_type = "0";
-            }
-            //横幅設定
-            if(column_element.getAttribute("opd_column_width") != "null"){
-                //console.log(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_column_width"))
-                column_width_value = column_element.getAttribute("opd_column_width");
-            }
-            //exploreの処理
-            if(column_element.getAttribute("opd_column_type") == 'explore'){
-                //console.log(document.querySelectorAll("#opd_main_element div[opd_column_type]")[index].getAttribute("opd_explore_path"));
-                column_open_path = column_element.getAttribute("opd_explore_path");
-                //ピン止め
-                column_pinned_save_path = column_element.getAttribute("opd_pinned_path");
-                //タイトル
-                column_page_title = column_element.getAttribute("opd_explore_title");
-            }else{
-                column_open_path = "";
-                column_pinned_save_path = "";
-            }
-            //自動更新
-            if(column_element.getAttribute("opd_column_type") == 'explore' || column_element.getAttribute("opd_column_type") == 'home'){
-                if(column_element.querySelector(".opd_a_reload_bar")?.checked == true){
-                    column_auto_reload = true;
-                }else{
-                    column_auto_reload = false;
-                }
-                const column_setting_time = Number(column_element.querySelector(".opd_a_reload_time_setting").value) * 1000;
-                //console.log(column_setting_time)
-                if(column_setting_time >= 1000){
-                    
-                    column_auto_reload_time = column_setting_time;
-                }else{
-                    column_auto_reload_time = 10000;
-                }
-            }
-            settings_array["column_settings"].push({type:column_element.getAttribute("opd_column_type"), banner:banner_checked, top_visible:top_visible_checked, tw_view_mode:tw_view_type, column_save_path:column_open_path, column_save_title:column_page_title, column_pinned_path:column_pinned_save_path, auto_reload:column_auto_reload, auto_reload_time:column_auto_reload_time, column_width:column_width_value});
+            settings_array["column_settings"].push(column_settings.read(column_element));
         }
         if(mode == "profile_out"){
             return settings_array;
