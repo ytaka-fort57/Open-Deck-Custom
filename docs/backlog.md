@@ -15,11 +15,13 @@
   template値を集約した。第二段階として正規化モデル、renderer、設定値のround-tripを追加し、
   初期描画と4種類のカラム追加処理を共通化した。
 - R-8の第二段階として、カラム再構築時の直接・入れ子iframe資源破棄と、新しいiframeの独立した
-  資源registryをDOM fixtureで検証した。ローカル回帰テストは68/68成功。
+  資源registryをDOM fixtureで検証した。
+- R-8の第三段階として、追加対象の選択、DOM挿入とreorder委譲、resource dispose前の削除、iframe
+  load監視を`extensions/custom/column_dom.js`へ切り出し、ローカル回帰テスト71/71成功を確認した。
 - R-2の第三段階として、settings codecの旧形式正規化、未知項目保持、`column_settings`との
   import/export round-trip境界を検証した。
-- 残るR-8はcontent.js全体のカラム追加・削除・再構築・並び替え・iframe load fixture、R-2は
-  content.js全体のround-trip検証である。
+- 残るR-8はcontent.js全体の初期化とカラム追加・削除・再構築・並び替えを同一fixtureで実行すること、
+  R-2はcontent.js全体のround-trip検証である。
 - 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
 
 ## 優先度: 中

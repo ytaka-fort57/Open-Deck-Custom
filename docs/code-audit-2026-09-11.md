@@ -28,10 +28,12 @@
   loadを含むcontent.js全体の実DOM fixtureは次段階として残る。
 - R-2の第三段階として、settings codecで旧形式の省略値を正規化し、未知の設定項目を保持したまま
   `column_settings`のcanonical modelへ渡せるimport/export round-tripを検証した。
+- R-8の第三段階として、追加対象の選択、DOM挿入とreorder委譲、resource dispose前の削除、iframe
+  load監視を`extensions/custom/column_dom.js`へ切り出し、実行fixtureで検証した。
 
 ## 検証結果
 
-- `node tests/run.mjs`: 68/68 成功
+- `node tests/run.mjs`: 71/71 成功
 - 全JavaScriptの構文、manifest、locale、安全値、storage、observer、履歴、リストフィルタの回帰検査: 成功
 - 作業ツリーは未コミット変更を含む。今回の監査では既存変更を上書きしていない
 - ログイン済みXの操作、Firefox Manifest V2の実機操作: 未実施
@@ -47,13 +49,13 @@
 | R-5 | 中 | DOM変更監視 | `custom/index.js`のMutationObserverが、DOM変更ごとにタブ、キー、リストフィルタ、並び替えの全体処理を呼ぶ | microtaskまたは短いdebounceで更新を集約し、追加・削除されたカラムだけを対象にする |
 | R-6 | 中 | リストフィルタ | 投稿分類、全投稿走査、MutationObserver、URL確認、タイマー、破棄処理が1ファイルにある | 投稿分類器を純粋関数として残し、差分走査を行うcontrollerと分ける。大量フィードでCPU・Mutation回数を計測してから最適化する |
 | R-7 | 中 | プロフィール操作 | プロフィール一覧HTMLの生成とイベント再接続が保存・追加・削除の複数箇所に重複している | `profile_controller`に一覧描画、切替、追加、削除、保存後の再接続を集約する |
-| R-8 | 中 | 実DOMテスト | `content.js`の回帰検査は配線やソース文字列の検査が中心で、巨大なDOM初期化を直接実行していない | 設定境界とlifecycle資源破棄のDOM fixtureを追加済み。次にカラム追加・削除・再構築・並び替え・iframe loadをcontent.js上で実行検証し、分割作業の前提にする |
+| R-8 | 中 | 実DOMテスト | `content.js`の回帰検査は配線やソース文字列の検査が中心で、巨大なDOM初期化を直接実行していない | 設定境界、lifecycle資源破棄、追加・削除・挿入・iframe load監視のDOM fixtureを追加済み。残りはcontent.js全体の初期化と、実際のカラム追加・再構築・並び替えを同一fixtureで実行すること |
 | R-9 | 低 | カラムの安定識別子 | タブ状態が`profile_index:column_index`をキーにしており、並び替え・削除時のremapが必要 | 全プロファイル移行、旧データ互換、失敗時rollbackを設計してからstable IDへ移行する。短期対応では現行remapを維持する |
 | R-10 | 低 | 配布定義とデバッグコード | Chrome/Firefox manifestとpackageスクリプトに重複があり、`content.js`にはprototype/testmode/debug UIが同居する | 配布対象・content script一覧の生成元を一本化する。デバッグ機能は開発用scriptまたは明示的なbuild設定へ移す |
 
 ## 着手順
 
-1. R-8の設定境界とlifecycle資源fixtureを追加済み。次はcontent.jsのカラム追加・削除・再構築・並び替え・iframe loadを実行検証する。
+1. R-8の設定境界、lifecycle資源、カラムDOM境界fixtureを追加済み。次はcontent.js全体の初期化とカラム追加・削除・再構築・並び替えを同一fixtureで実行検証する。
 2. R-2の正規化・renderer・settings codec境界・round-tripを追加済み。次はcontent.js全体のround-tripを検証する。
 3. R-1を、挙動を変えない小さな責務単位で分割する。
 4. R-3とR-4を、現在の未コミット変更と実ブラウザー確認が落ち着いた後に分割する。

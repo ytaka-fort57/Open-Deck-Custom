@@ -69,6 +69,7 @@ test("manifests and locale files are valid and complete", () => {
         assert.ok(scripts.indexOf("extensions/custom/safe_values.js") < scripts.indexOf("content.js"));
         assert.ok(scripts.indexOf("extensions/custom/storage_repository.js") < scripts.indexOf("content.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_settings.js") < scripts.indexOf("content.js"));
+        assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("content.js"));
     }
 
     const upstreamBase = readFileSync(join(root, ".github/upstream-base"), "utf8").trim();

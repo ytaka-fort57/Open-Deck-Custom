@@ -7,6 +7,7 @@ const background = readFileSync("background.js", "utf8");
 const textReview = readFileSync("extensions/text_review.js", "utf8");
 const textReviewHelper = readFileSync("extensions/text_review_helper.js", "utf8");
 const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
+const columnDom = readFileSync("extensions/custom/column_dom.js", "utf8");
 const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8");
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
@@ -58,6 +59,9 @@ test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
     assert.match(content, /deck_lifecycle\.initialize_page_observers/);
     assert.match(content, /deck_lifecycle\.dispose_column_resources_in/);
     assert.match(lifecycle, /register_column_resource/);
+    assert.match(columnDom, /function watch_load_column/);
+    assert.match(content, /column_dom\.watch_load_column/);
+    assert.match(content, /column_dom\.dispose_and_remove/);
     assert.doesNotMatch(content, /function observe_when_ready/);
     assert.doesNotMatch(content, /function set_title_favicon/);
     assert.doesNotMatch(content, /media_viewer_token\.push/);
@@ -123,9 +127,10 @@ test("column reorder preserves iframe documents and saves visual order", () => {
 });
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
-    assert.match(content, /function get_column_add_target\(\)\{[\s\S]*?empty_column\?\.parentElement[\s\S]*?draggable.*?true[\s\S]*?is_shift_pressed/);
+    assert.match(columnDom, /function get_add_target\(doc, is_shift_pressed\)/);
+    assert.match(content, /function get_column_add_target\(\)\{[\s\S]*?column_dom\.get_add_target\(document, is_shift_pressed\)/);
     assert.match(content, /function insert_new_column_before_target\(add_target_column, new_column_html\)/);
-    assert.match(content, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
+    assert.match(columnDom, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
     assert.equal((content.match(/insert_new_column_before_target\(add_target_column, new_column\)/g) ?? []).length, 4);
 });
 

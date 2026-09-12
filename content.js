@@ -21,6 +21,7 @@ const deck_lifecycle = window.opd_custom_lifecycle;
 const deck_storage = window.opd_custom_storage;
 const deck_safe_values = window.opd_custom_safe_values;
 const column_settings = window.opd_custom_column_settings;
+const column_dom = window.opd_custom_column_dom;
 let shared_media_viewer = null;
 const column_auto_update_state = {
     text_focus: {date: 0, active: false},
@@ -1006,7 +1007,7 @@ function run(settings){
         }
 
         //カラム読み込み失敗検出
-        watch_load_column(column_object);
+        column_dom.watch_load_column(column_object);
 
         for (let index = 0; index < column_object.length; index++) {
             column_object[index].removeAttribute("opd_init_webview");
@@ -1605,24 +1606,15 @@ function run(settings){
         }
     });
     function get_column_add_target(){
-        const empty_column = document.querySelector(".dsp_column_emptycolumn");
-        const rack = empty_column?.parentElement;
-        const first_column = Array.from(rack?.children ?? []).find(function(element){
-            return element.tagName === "SECTION" && element.getAttribute("draggable") === "true";
-        });
-        return (is_shift_pressed && first_column) ? first_column : empty_column;
+        return column_dom.get_add_target(document, is_shift_pressed);
     }
 
     function insert_new_column_before_target(add_target_column, new_column_html){
-        if(add_target_column == null){
-            return null;
-        }
-        add_target_column.insertAdjacentHTML("beforebegin", new_column_html);
-        const new_column = add_target_column.previousElementSibling;
-        const reorder_api = window.opd_custom_column_reorder;
-        //既存カラムはDOMから動かさず、新規カラムだけを表示順の対象位置へ移す。
-        reorder_api?.move_before?.(new_column, add_target_column);
-        return new_column;
+        return column_dom.insert_before_target(
+            add_target_column,
+            new_column_html,
+            window.opd_custom_column_reorder
+        );
     }
 
     //ポストカラム追加
@@ -1892,8 +1884,7 @@ function run(settings){
                 if(pin_checkbox == false || pin_checkbox == undefined){
                     const timeline_before = snapshot_timeline_state();
                     const column = this.closest(".dsp_column");
-                    deck_lifecycle.dispose_column_resources_in(column);
-                    column.remove();
+                    column_dom.dispose_and_remove(column, deck_lifecycle);
                     remap_timeline_state(timeline_before);
                     append_object_css();
                     column_settings_save("", last_load_profile);
@@ -1901,8 +1892,7 @@ function run(settings){
                     if(confirm(i18n_message("msg_pinned_column_close_confirm"))){
                         const timeline_before = snapshot_timeline_state();
                         const column = this.closest(".dsp_column");
-                        deck_lifecycle.dispose_column_resources_in(column);
-                        column.remove();
+                        column_dom.dispose_and_remove(column, deck_lifecycle);
                         remap_timeline_state(timeline_before);
                         append_object_css();
                         column_settings_save("", last_load_profile);
@@ -2045,26 +2035,6 @@ function get_cookie_color_mode() {
 
     //カラーモードが 1 以上の場合は dark を返す
     return "dark";
-}
-//カラム読み込み失敗検出
-function watch_load_column(column_frames, max_retries = 5){
-    const cleanups = [];
-    column_frames.forEach(column => {
-        const onLoad = () => {
-            try {
-                column.contentWindow.document.querySelector('head');
-            } catch {
-                //遷移途中のloadでアクセスできない場合でも、srcを再代入して送信後の画面を潰さない。
-            }
-        };
-
-        column.addEventListener('load', onLoad);
-        cleanups.push(() => {
-            column.removeEventListener('load', onLoad);
-        });
-    });
-
-    setTimeout(() => cleanups.forEach(fn => fn()), max_retries * 500 + 1000);
 }
 //設定初期化
 function settings_init(){
