@@ -55,20 +55,24 @@ joint session historyを1つ戻す。戻る対象は「押したカラム」で�
 - `auto_reload_helper.js` の `scrollIntoView` / `focus` パッチから標準動作への委譲を
   増やさない。委譲するとXの復元処理がタイムラインを先頭までスクロールさせる。
   このヘルパーは自動更新の設定と無関係に home / explore の全カラムへ注入される。
-- X標準のapp-bar戻るボタンをフックし直さない。カラム分離はBackspaceだけが担当する。
+- X標準のapp-bar戻るボタンは、メディア以外では独自履歴へ置き換える。独自履歴が
+  無くても `history.back()` に落とさない。落とすと別カラムが動く。
+- Backspaceも同様に、独自履歴の成否に関わらずブラウザ戻るへ落とさない。
+  メディア画面と文字入力中だけは標準動作のままにする。
 - 戻るの成否を、自分が書き換えたURLだけで判定しない。描画の手掛かりと併せて見る。
   戻れなかった場合に履歴を捨てない。捨てるとそのカラムで以後戻れなくなる。
 - 擬似popstateでXが動かない場合は、戻り先URLを実際に読み込んで戻す。その際
   `location.assign()` は使わない。joint session historyへエントリが積まれ、
   X標準の戻るが別のカラムを動かす。`reload` / `replace` を使う。
 - タブ復元などの自動処理でカラムを遷移させる回数を増やさない。遷移を伴うタブは
-  `selectors.navigates()` で見分け、復元のための遷移は1カラム1回までとする。
+  `selectors.navigates()` で見分け、復元は `location.replace` で行い、回数制限は
+  iframe属性で load をまたいで1カラム1回までとする。クリック（`pushState`）は使わない。
 - `column_history.track()` を一度きりのガード(`KEYS_ATTR`など)で囲わない。
   カラム移動でiframeが切断された後に追跡を再開できなくなる。
 
 経緯と機序は[issue-column-back-navigation.md](issue-column-back-navigation.md)を参照。
 `tests/column_history.test.mjs`、`tests/column_tab_restore.test.mjs`、
-`tests/content_regression.test.mjs`が上記を固定する。
+`tests/content_regression.test.mjs`、`tests/keyboard_shortcuts.test.mjs`が上記を固定する。
 
 ## Windowsでの必須検証
 
@@ -96,7 +100,8 @@ Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで
 自動テストはXの現行DOMやログイン状態を再現しない。次は別途確認する。
 
 - ログイン済みChromiumでの起動、追加、削除、並び替え、プロファイル切り替え
-- Backspaceでの戻る(リプライ詳細→本体、リプライ→リプライ)と、戻った後のスクロール位置
+- Backspaceと画面上の戻る(リプライ詳細→本体、リプライ→リプライ)と、戻った後のスクロール位置
+- 戻る際に別カラムのタブや画面が動かないか
 - 戻る際にカラムが再読み込みされていないか(擬似popstateで戻れていれば再読み込みは起きない)
 - ラックをまたいでカラムを移動した後のBackspace、ピン留めリストのタブ復元
 - メディアビューアーの画像・動画・引用投稿

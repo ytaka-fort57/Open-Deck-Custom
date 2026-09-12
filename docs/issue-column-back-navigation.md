@@ -1,6 +1,6 @@
 # カラム内の「戻る」が効かない / 戻ると先頭までスクロールする
 
-記録日: 2026-08-25
+記録日: 2026-08-25（2026-09-08に再発分を追記）
 状態: コード修正済み。実機確認は「戻れない」側のみ完了
 対象: Open-Deck Custom（本家 Release `aae4fdb` 相当）
 
@@ -11,9 +11,9 @@
 「押したカラム」ではなく「直近に遷移したフレーム」になる。フレームを指定して戻る
 標準APIは存在しない。
 
-このためカスタム版は、カラムごとのURL履歴を自前で持ち、Backspaceでそのカラムだけを
-前のURLへ戻す（`extensions/custom/column_history.js`）。X標準のapp-bar戻るボタンは
-標準ルーターへ処理を返している（`ee226f0`）。
+このためカスタム版は、カラムごとのURL履歴を自前で持ち、Backspaceとそのカラムの
+app-bar戻るボタンで前のURLへ戻す（`extensions/custom/column_history.js`）。
+メディア画面だけはX標準のjoint historyへ返す。
 
 ## 症状
 
@@ -96,10 +96,13 @@ Xによる自動スクロールを握り潰す。`a5e0679` は「通常時は標
 積まれる。すると「直近に遷移したフレーム」がユーザーの操作していないカラムになり、
 X標準の戻るが別のカラムを動かす。
 
-修正: `selectors.navigates()` で遷移を伴うタブを見分け、復元のための遷移は
-1カラムにつき1回までとする(`restore_tab`)。遷移を伴わない「おすすめ / フォロー中」の
-選び直しは、Xによる上書きへ対抗するため従来どおり続ける。ユーザー自身のタブ操作は
-`watch_tab_click` が拾うだけで、この制限の対象外である。
+修正: `selectors.navigates()` で遷移を伴うタブを見分け、復元は `location.replace`
+で行う(`restore_without_history`)。クリックは `pushState` 相当になるため使わない。
+回数制限は iframe 属性(`opd_custom_tab_navigated`)で load をまたいで1カラム1回まで
+とする。自動更新で `desired` が作り直されても、同じカラムで二度遷移しない。
+遷移を伴わない「おすすめ / フォロー中」の選び直しは、Xによる上書きへ対抗するため
+従来どおり続ける。ユーザー自身のタブ操作は `watch_tab_click` が拾うだけで、
+この制限の対象外である。
 
 ### 5. カラム移動後に追跡が復活しなかった
 
@@ -110,6 +113,24 @@ X標準の戻るが別のカラムを動かす。
 
 修正: `column_history.track()` を `KEYS_ATTR` のガードより前へ移す。`track()` は追跡中なら
 何もしないため、毎回呼んでも二重に監視しない。
+
+### 6. Xの戻るボタンを外したあと、別カラムが再び反応した
+
+`ee226f0` は詳細画面の標準戻るを優先するため、`attach_column_back` を外した。
+画面上の戻るは joint session history の `history.back()` に戻り、押したカラムではなく
+直近に遷移したフレームが動く症状が再発した。
+
+同時に、次の2点が別カラムを「直近の遷移」にして症状を出していた。
+
+- タブ復元の1回制限は `desired` 上にあり、iframe の load（自動更新を含む）で消えていた
+- Backspace は `back()` が false のとき `preventDefault` せず、ブラウザ戻るに落ちていた
+
+修正:
+
+- `attach_column_back` を戻す。メディア以外は独自履歴へ置き換える。独自履歴が無くても
+  `history.back()` には落とさない
+- 遷移を伴うタブ復元は `location.replace` にし、制限を iframe 属性で load をまたいで保持する
+- Backspace は独自履歴の成否に関わらずブラウザ戻るへ落とさない（メディア・入力中を除く）
 
 ## 戻れなかった場合の最終手段: 戻り先URLを実際に読み込む
 
@@ -148,11 +169,16 @@ X標準の戻るが別のカラムを動かす。
   増やさない**。スクロール親が無い場合は何もしないのが正しい。
 - `column_history` のスタック要素は `{url, route_state}` である。URL文字列として
   比較・検索しない（`last_index_of_url` を使う）。
-- X標準のapp-bar戻るボタンをフックし直さない。カラム分離はBackspaceだけが担当する。
+- X標準のapp-bar戻るボタンは、メディア以外では独自履歴へ置き換える。独自履歴が
+  無くても `history.back()` に落とさない。落とすと別カラムが動く。
+- Backspaceも同様に、独自履歴の成否に関わらずブラウザ戻るへ落とさない。
+  メディア画面と文字入力中だけは標準動作のままにする。
 - 戻るの成否を**自分が書き換えたURLだけで判定しない**。描画の手掛かりと併せて見る。
 - 戻れなかった場合に履歴を捨てない。捨てるとそのカラムで以後戻れなくなる。
 - タブ復元など**自動処理でカラムを遷移させる回数を増やさない**。joint session history
   の「直近に遷移したフレーム」を奪い、ユーザーが操作中のカラムの戻るを壊す。
+  遷移を伴う復元は `location.replace` を使い、回数制限は iframe 属性で load を
+  またいで保持する。クリック（`pushState`）は使わない。
 - `column_history.track()` を `KEYS_ATTR` のような一度きりのガードで囲わない。
 - 実ナビゲーションでの戻るに `location.assign()` を使わない。joint session historyへ
   エントリが積まれ、X標準の戻るが別のカラムを動かす。`reload` / `replace` を使う。
@@ -171,8 +197,14 @@ X標準の戻るが別のカラムを動かす。
   Xが無視した場合のURL巻き戻しと履歴保持、別URLへ動いた場合の繋ぎ直し、
   描画が変わって初めて確定することを固定する
 - `tests/column_tab_restore.test.mjs`
-  遷移を伴うタブの判定、復元の遷移が1回までであること、
-  `track()` が `KEYS_ATTR` に囲われていないことを固定する
+  遷移を伴うタブの判定、復元が `location.replace` であること、
+  回数制限が load をまたぐこと、`track()` が `KEYS_ATTR` に囲われていないことを固定する
+- `tests/content_regression.test.mjs`
+  「custom history intercepts the X back button and Backspace」…
+  app-bar戻るの再フックと、Backspaceが `back()` 失敗時も preventDefault することを固定する
+- `tests/keyboard_shortcuts.test.mjs`
+  Backspaceが独自履歴を作れないときもブラウザ戻るへ落とさないこと、
+  メディア画面では標準動作のままであることを固定する
 - `tests/column_history.test.mjs`
   「a back that X ignores falls back to loading the target URL」…
   Xが再描画しない場合に戻り先URLを実際に読み込み、描画が同じでも確定することを固定する。
@@ -187,4 +219,5 @@ X標準の戻るが別のカラムを動かす。
   戻れていない扱いとなり、実ナビゲーションでの再読み込みが走る。戻り先は正しく
   表示されるが、そのカラムのスクロール位置は失われる。
 - 原因4の制限により、ピン留めリストのタブをXが繰り返し上書きするカラムでは、
-  2回目以降の復元が行われない。実機でそのような上書きが起きるかは未確認。
+  2回目以降の復元が行われない。`location.replace` により1回目は joint history を
+  積まないが、上書き後に選び直せない点は残る。実機でそのような上書きが起きるかは未確認。

@@ -10,6 +10,7 @@
     const CUSTOM_MENU_ID = "opd_custom_settings_import";
     const APPLIED_ATTR = "opd_custom_tab_applied";
     const KEYS_ATTR = "opd_custom_keys_attached";
+    const NAVIGATED_ATTR = "opd_custom_tab_navigated";
     const selectors = window.opd_custom_selectors;
     const column_state = window.opd_custom_column_state;
     const keyboard = window.opd_custom_keyboard;
@@ -82,14 +83,30 @@
 
     //保存したタブを選び直す。
     //ピン留めしたリストのタブは別URLへのリンクで、押すとそのカラムが遷移する。
-    //自動の遷移はjoint session historyへエントリを積み、ユーザーが操作している
-    //別カラムの戻るを奪うため、復元のための遷移は1カラムにつき1回までとする。
-    function restore_tab(doc, desired, target){
+    //クリックはjoint session historyへエントリを積み、ユーザーが操作している
+    //別カラムの戻るを奪うため、遷移は location.replace で行い、回数は
+    //iframe属性で load をまたいで1カラム1回までとする。
+    function has_restored_navigation(iframe, desired){
+        return desired.navigated || iframe.getAttribute(NAVIGATED_ATTR) != null;
+    }
+
+    function mark_restored_navigation(iframe, desired){
+        desired.navigated = true;
+        iframe.setAttribute(NAVIGATED_ATTR, "true");
+    }
+
+    function restore_tab(doc, desired, target, iframe){
         if(selectors.navigates(doc, target)){
-            if(desired.navigated){
+            if(has_restored_navigation(iframe, desired)){
                 return false;
             }
-            desired.navigated = true;
+            mark_restored_navigation(iframe, desired);
+            if(selectors.restore_without_history(doc, target)){
+                return true;
+            }
+            //href が取れない場合だけクリックする。1回制限済み。
+            selectors.click_tab(target);
+            return true;
         }
         selectors.click_tab(target);
         return true;
@@ -98,7 +115,7 @@
     //Xはタブ選択をアカウント単位で共有し、読み込み後もしばらく自前の状態を適用し続ける。
     //一度選び直すだけではX側に上書きされて戻るため、しばらく監視して選び直し続ける。
     //desired.label はユーザーのクリックで更新されるため、ユーザー操作と競合しない。
-    function enforce_tab(doc, desired){
+    function enforce_tab(doc, desired, iframe){
         const ENFORCE_MS = 20000;
         const INTERVAL_MS = 1000;
         let elapsed_ms = 0;
@@ -116,20 +133,20 @@
             if(target == null || selectors.is_selected(target)){
                 return;
             }
-            restore_tab(doc, desired, target);
+            restore_tab(doc, desired, target, iframe);
         }, INTERVAL_MS);
     }
 
-    function apply_saved_tab(doc, desired){
+    function apply_saved_tab(doc, desired, iframe){
         if(desired.label == undefined){
             return;
         }
         selectors.wait_for_tabs(doc, 15000, function(){
             const target = selectors.find_tab_by_label(doc, desired.label);
             if(target != null && !selectors.is_selected(target)){
-                restore_tab(doc, desired, target);
+                restore_tab(doc, desired, target, iframe);
             }
-            enforce_tab(doc, desired);
+            enforce_tab(doc, desired, iframe);
         });
     }
 
@@ -146,7 +163,7 @@
         column_state.get_tab(profile_index, column_index, function(saved_label){
             const desired = {label: saved_label};
             watch_tab_click(doc, profile_index, iframe, desired);
-            apply_saved_tab(doc, desired);
+            apply_saved_tab(doc, desired, iframe);
         });
     }
 
@@ -191,8 +208,35 @@
             //読み込みのたびに文書が入れ替わるため、その都度仕掛け直す
             iframe.addEventListener("load", function(){
                 keyboard.attach(iframe.contentDocument, document, iframe);
+                attach_column_back(iframe.contentDocument, iframe);
             });
             keyboard.attach(iframe.contentDocument, document, iframe);
+            attach_column_back(iframe.contentDocument, iframe);
+        });
+    }
+
+    // X標準の戻るボタンは joint session history を使うため、
+    // メディア以外では対象カラムの独自履歴へ置き換える。
+    // 独自履歴が無くても history.back() には落とさない。
+    // 落とすと直近に遷移した別カラムが戻ってしまう。
+    function attach_column_back(doc, iframe){
+        if(doc == null){
+            return;
+        }
+        const on_click = function(event){
+            const back_button = event.target?.closest?.('button[data-testid="app-bar-back"]');
+            if(back_button == null || column_history.is_media_route?.(iframe)){
+                return;
+            }
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if(column_history.can_back(iframe)){
+                column_history.back(iframe);
+            }
+        };
+        doc.addEventListener("click", on_click, true);
+        lifecycle.register_column_resource(iframe, "column-back-button", function(){
+            doc.removeEventListener("click", on_click, true);
         });
     }
 

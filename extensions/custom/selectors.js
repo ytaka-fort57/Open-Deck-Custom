@@ -36,17 +36,35 @@ window.opd_custom_selectors = (function(){
     }
 
     //そのタブが別URLへのリンクか。ピン留めしたリストのタブが該当する
-    function tab_path(tab){
-        const anchor = tab.tagName === "A" ? tab : (tab.querySelector("a") ?? tab.closest("a"));
-        const href = anchor?.getAttribute("href");
+    //role="tab" の内側、または外側のアンカーに href が付く場合がある
+    function tab_href_element(tab){
+        if(tab.tagName === "A"){
+            return tab;
+        }
+        return tab.querySelector?.("a[href]")
+            ?? tab.querySelector?.("[href]")
+            ?? tab.closest?.("a");
+    }
+
+    function tab_resolved_url(tab){
+        const anchor = tab_href_element(tab);
+        const href = anchor?.getAttribute?.("href");
         if(href == null || href === ""){
             return null;
         }
         try{
-            return new URL(href, anchor.baseURI).pathname;
+            return new URL(href, anchor.baseURI || undefined);
         }catch(error){
             return null;
         }
+    }
+
+    function tab_path(tab){
+        return tab_resolved_url(tab)?.pathname ?? null;
+    }
+
+    function tab_url(tab){
+        return tab_resolved_url(tab)?.href ?? null;
     }
 
     //押すとページ遷移が起きるタブかどうか。
@@ -55,6 +73,21 @@ window.opd_custom_selectors = (function(){
     function navigates(doc, tab){
         const path = tab_path(tab);
         return path != null && path !== doc.location.pathname;
+    }
+
+    //クリックは pushState 相当になるため使わない。
+    //現在の履歴エントリを置き換えて、別カラムの戻るを奪わない
+    function restore_without_history(doc, tab){
+        const url = tab_url(tab);
+        if(url == null || doc.defaultView == null){
+            return false;
+        }
+        try{
+            doc.defaultView.location.replace(url);
+            return true;
+        }catch(error){
+            return false;
+        }
     }
 
     function find_tab_by_label(doc, label){
@@ -87,7 +120,9 @@ window.opd_custom_selectors = (function(){
         is_selected: is_selected,
         click_tab: click_tab,
         tab_path: tab_path,
+        tab_url: tab_url,
         navigates: navigates,
+        restore_without_history: restore_without_history,
         find_tab_by_label: find_tab_by_label,
         wait_for_tabs: wait_for_tabs
     };

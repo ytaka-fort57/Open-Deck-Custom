@@ -1,10 +1,11 @@
 # カスタム版の残課題
 
-更新日: 2026-08-25
+更新日: 2026-09-11
 
 対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
-最新監査は [code-audit-2026-08-11.md](code-audit-2026-08-11.md) を参照。
+最新監査は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) を参照。
+リファクタ候補の一覧と着手順は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) に記載する。
 カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
 
 ## 優先度: 中
@@ -32,8 +33,9 @@
 - 戻った後の先頭スクロールが解消したか(発生条件が不定のため未確定)
 - 通常の戻るでカラムが再読み込みされていないか。再読み込みが起きる場合は
   擬似popstateが効いておらずフォールバックに落ちている
-- ピン留めリストのタブ復元が1回の遷移で成立するか。Xが繰り返し上書きする場合、
-  2回目以降を行わない制限が復元漏れになっていないか
+- ピン留めリストのタブ復元が `location.replace` 1回で成立するか。Xが繰り返し
+  上書きする場合、2回目以降を行わない制限が復元漏れになっていないか
+- 画面上の戻るを押したとき、押したカラムだけが戻り、別カラムのタブが動かないか
 - ラックをまたいでカラムを移動した後もBackspaceで戻れるか
 
 ## 優先度: 低
@@ -75,7 +77,8 @@
 - 属性値escape、同一オリジンpath検証、メディアURLのDOM安全化
 - 自動更新周期の再作成、cross-origin iframe監視の例外防止
 - background sender検証、FileReader失敗表示、storage mutator返り値検証
-- Xの戻るボタンは標準ルーターへ返し、カラム分離はBackspaceの独自履歴だけが担当
+- Xの戻るボタンとBackspaceを独自履歴へ置き換え、履歴が無くてもブラウザ戻るに落とさない
+- タブ復元の遷移を `location.replace` にし、回数制限を iframe の load をまたいで保持する
 - 擬似popstateでXが再描画しない場合は、戻り先URLを実際に読み込んで確実に戻す
 - 動画variantを配列順に依存せず、HTTPSのMP4から最高bitrateを選択
 - column共通disposerを追加し、文章校正observerとイベントを破棄
@@ -86,7 +89,7 @@
 - 戻る先のrouter stateを復元し、リプライ詳細から本体へ戻れない問題を解消
 - `auto_reload_helper`のスクロール抑止を戻し、戻った後の先頭スクロールを抑止
 - 戻るの成否を描画の変化で判定し、失敗時はURLを戻して履歴を保つよう変更
-- タブ復元の自動遷移を1カラム1回までに制限し、joint session historyの奪取を抑止
+- タブ復元の自動遷移を1カラム1回までに制限し、joint session historyの奪取を抑止（のち load 跨ぎと replace へ強化）
 - カラム移動でiframeが切断された後も履歴追跡を再開するよう変更
 
 ## 運用判断済み
@@ -102,6 +105,10 @@
 - 新しい独自処理は可能な限り`extensions/custom/`へ置く
 - 本家差分を読む際に変更意図を追えるよう、責務とテストの対応を明確にする
 - 検証コードは`tests/`などの新規領域へ追加し、本家ファイルとの競合を避ける
+
+今回の構造監査では、`content.js`の責務集中、設定のDOM変換重複、履歴・lifecycleの境界、
+MutationObserverの全体走査を主な候補として整理した。優先度と分割順は
+[code-audit-2026-09-11.md](code-audit-2026-09-11.md)のR-1〜R-10を正とする。
 
 ## 既知の制約（対応しない）
 

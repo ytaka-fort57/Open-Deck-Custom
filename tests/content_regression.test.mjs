@@ -79,13 +79,16 @@ test("remaining audit hardening paths are wired", () => {
     assert.match(settingsImport, /reader\.addEventListener\("error"/);
 });
 
-test("custom history remains limited to per-column Backspace handling", () => {
+test("custom history intercepts the X back button and Backspace", () => {
     const customIndex = readFileSync("extensions/custom/index.js", "utf8");
     const keyboardShortcuts = readFileSync("extensions/custom/keyboard_shortcuts.js", "utf8");
     assert.match(customIndex, /column_history\.track\(iframe\)/);
-    assert.doesNotMatch(customIndex, /app-bar-back/);
-    assert.doesNotMatch(customIndex, /attach_column_back/);
+    assert.match(customIndex, /function attach_column_back\(doc, iframe\)/);
+    assert.match(customIndex, /app-bar-back/);
+    assert.match(customIndex, /stopImmediatePropagation/);
     assert.match(keyboardShortcuts, /column_history\.back\(iframe\)/);
+    // back() が false でも preventDefault し、ブラウザ戻るに落とさない
+    assert.match(keyboardShortcuts, /window\.opd_custom_column_history\.back\(iframe\);\s*\n\s*handled = true;/);
 });
 
 test("top visibility keeps timeline tabs available", () => {

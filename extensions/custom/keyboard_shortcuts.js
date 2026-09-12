@@ -61,8 +61,11 @@ window.opd_custom_keyboard = (function(){
             && iframe != null
             && !window.opd_custom_column_history.is_media_route?.(iframe)
             && !is_typing(event)){
-            //ブラウザーの戻るは別のカラムを動かしてしまうため、独自履歴で戻す
-            handled = window.opd_custom_column_history.back(iframe);
+            //ブラウザーの戻るは別のカラムを動かしてしまうため、独自履歴で戻す。
+            //履歴が無くても preventDefault する。落とすと joint history の
+            //直近フレーム（別カラム）が戻ってしまう。
+            window.opd_custom_column_history.back(iframe);
+            handled = true;
         }
         if(handled){
             //X側のスクロールなどを起こさせない

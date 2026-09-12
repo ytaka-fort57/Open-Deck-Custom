@@ -37,6 +37,7 @@ test("only tabs that change the URL are treated as navigating", () => {
     // A pinned list tab navigates the column and adds a joint session history entry.
     assert.equal(selectors.navigates(doc, createTab("/i/lists/12345")), true);
     assert.equal(selectors.tab_path(createTab("/i/lists/12345")), "/i/lists/12345");
+    assert.equal(selectors.tab_url(createTab("/i/lists/12345")), "https://x.com/i/lists/12345");
 });
 
 test("a nested anchor inside the tab is still detected", () => {
@@ -46,13 +47,52 @@ test("a nested anchor inside the tab is still detected", () => {
     assert.equal(selectors.navigates(createDoc("/home"), tab), true);
 });
 
-test("tab restore spends at most one navigation per column", () => {
+test("a href on a nested non-anchor is still detected", () => {
+    const selectors = loadSelectors();
+    const href_el = {
+        tagName: "DIV",
+        baseURI: "https://x.com/home",
+        getAttribute: (name) => (name === "href" ? "/i/lists/42" : null),
+    };
+    const tab = {
+        tagName: "DIV",
+        querySelector: (sel) => (sel === "a[href]" ? null : href_el),
+        closest: () => null,
+    };
+    assert.equal(selectors.navigates(createDoc("/home"), tab), true);
+    assert.equal(selectors.tab_url(tab), "https://x.com/i/lists/42");
+});
+
+test("navigating restore replaces the current history entry", () => {
+    const selectors = loadSelectors();
+    const replaced = [];
+    const tab = createTab("/i/lists/12345");
+    const doc = {
+        location: { pathname: "/home" },
+        defaultView: {
+            location: {
+                replace(url) {
+                    replaced.push(url);
+                },
+                assign() {
+                    throw new Error("assign would steal the joint session history");
+                },
+            },
+        },
+    };
+    assert.equal(selectors.restore_without_history(doc, tab), true);
+    assert.deepEqual(replaced, ["https://x.com/i/lists/12345"]);
+});
+
+test("tab restore spends at most one navigation per column across reloads", () => {
     const customIndex = readFileSync("extensions/custom/index.js", "utf8");
     // Repeating a navigating restore would keep stealing the joint session history
-    // from whichever column the user is actually reading.
-    assert.match(customIndex, /function restore_tab\(doc, desired, target\)/);
-    assert.match(customIndex, /if\(desired\.navigated\)\{\s*\n\s*return false;/);
-    assert.match(customIndex, /desired\.navigated = true;/);
+    // from whichever column the user is actually reading. The limit must survive
+    // iframe load, because auto-reload recreates `desired`.
+    assert.match(customIndex, /function restore_tab\(doc, desired, target, iframe\)/);
+    assert.match(customIndex, /opd_custom_tab_navigated/);
+    assert.match(customIndex, /restore_without_history/);
+    assert.match(customIndex, /if\(has_restored_navigation\(iframe, desired\)\)\{\s*\n\s*return false;/);
     assert.doesNotMatch(customIndex, /selectors\.click_tab\(target\);\s*\n\s*\}, INTERVAL_MS\);/);
 });
 
