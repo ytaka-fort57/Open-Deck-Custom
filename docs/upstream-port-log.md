@@ -14,6 +14,7 @@
 | 確認日 | 範囲 | 判断 | 実装・検証 |
 | --- | --- | --- | --- |
 | 2026-07-18 | 初期基準 `aae4fdb6b5e619f47cbad3606dd6538f5692824a` | カスタム版の作成元として確認済み | 以後の更新を週次workflowで検知する |
+| 2026-09-19 | R-14 の死コード整理 | 対応不要: 到達不能なtestmode/Brave分岐、未使用のothersns・iframe幅判定・空CSS、無効なrack `.value`代入、stale判定、コメントアウト旧コード、デバッグ出力。ロード失敗検出を実装しないため `watch_load_column` と無動作テストも削除 | `content.js` / `extensions/custom/column_dom.js` / `extensions/utils_helper.js`、Node回帰テストで不在を確認 |
 
 ## 追記テンプレート
 

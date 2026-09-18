@@ -41,38 +41,10 @@ window.opd_custom_column_dom = (function(){
         return true;
     }
 
-    function watch_load_column(column_frames, max_retries = 5, schedule = setTimeout){
-        const cleanups = [];
-        const cleanup = function(){
-            cleanups.splice(0).forEach(function(dispose){
-                dispose();
-            });
-        };
-
-        Array.from(column_frames ?? []).forEach(function(column){
-            const onLoad = function(){
-                try{
-                    column.contentWindow.document.querySelector("head");
-                }catch(error){
-                    //遷移途中のloadでもsrcを再代入せず、送信後の画面を保持する
-                }
-            };
-
-            column.addEventListener("load", onLoad);
-            cleanups.push(function(){
-                column.removeEventListener("load", onLoad);
-            });
-        });
-
-        schedule(cleanup, max_retries * 500 + 1000);
-        return cleanup;
-    }
-
     return {
         add_column,
         dispose_and_remove,
         get_add_target,
         insert_before_target,
-        watch_load_column,
     };
 })();

@@ -3,37 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
-class FrameFixture {
-    constructor() {
-        this.listeners = new Map();
-        this.src = "https://x.com/home";
-        this.contentWindow = {
-            document: {
-                querySelector: () => {
-                    throw new Error("cross-origin during navigation");
-                },
-            },
-        };
-    }
-
-    addEventListener(name, callback) {
-        const callbacks = this.listeners.get(name) ?? [];
-        callbacks.push(callback);
-        this.listeners.set(name, callbacks);
-    }
-
-    removeEventListener(name, callback) {
-        const callbacks = this.listeners.get(name) ?? [];
-        this.listeners.set(name, callbacks.filter((item) => item !== callback));
-    }
-
-    dispatch(name) {
-        for (const callback of this.listeners.get(name) ?? []) {
-            callback();
-        }
-    }
-}
-
 function loadColumnDom() {
     const context = {
         window: {},
@@ -113,23 +82,4 @@ test("column removal disposes resources before removing the DOM node", () => {
     assert.equal(columnDom.dispose_and_remove(column, lifecycle), true);
     assert.deepEqual(events, ["dispose", "remove"]);
     assert.equal(columnDom.dispose_and_remove(null, lifecycle), false);
-});
-
-test("iframe load monitoring removes listeners without rewriting a navigating src", () => {
-    const columnDom = loadColumnDom();
-    const frame = new FrameFixture();
-    const scheduled = [];
-    const cleanup = columnDom.watch_load_column([frame], 2, (callback, delay) => {
-        scheduled.push({ callback, delay });
-    });
-
-    assert.equal(frame.listeners.get("load").length, 1);
-    frame.dispatch("load");
-    assert.equal(frame.src, "https://x.com/home");
-    assert.equal(scheduled[0].delay, 2000);
-
-    cleanup();
-    assert.equal(frame.listeners.get("load").length, 0);
-    scheduled[0].callback();
-    assert.equal(frame.listeners.get("load").length, 0);
 });
