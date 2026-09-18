@@ -1258,11 +1258,6 @@ function run(settings){
             dispose_url_observer();
         });
     }
-    //独自の左右・表示順コントロールはDOMを差し替えずstyle.orderだけを変える。
-    //並び替え完了通知を本家の保存境界へ接続する。
-    document.addEventListener("opd_custom_column_reordered", function(){
-        column_settings_save("", last_load_profile);
-    });
     //メインバーイベント
     document.getElementById("init_settings").addEventListener("click", function(){
         deck_storage.remove(deck_storage.KEYS.SETTINGS, function(){
@@ -1603,29 +1598,6 @@ function run(settings){
             })
         }
     }
-    //カラム構成保存
-    function column_settings_save(mode, profile_num){
-        let settings_array = {
-            column_settings:[],
-            version:manifest.version
-        };
-        settings_array["column_settings"] = column_settings.read_profile(
-            document,
-            window.opd_custom_column_reorder
-        );
-        if(mode == "profile_out"){
-            return settings_array;
-        }else{
-            //console.log(settings_array);
-            const save_object = {name:"user_profile", profile:settings_array.column_settings};
-            //profile_store.push(save_object);
-            Object.assign(profile_store[profile_num], save_object);
-            //console.log(profile_store);
-            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
-                //console.log(settings_array);
-            });
-        }
-    }
     //自動更新許可を取得する関数
     function is_auto_update(stale_check = false){
         //テキスト入力フォーカス中
@@ -1654,6 +1626,35 @@ function run(settings){
         return Math.random().toString(32).substring(2);
     }
 }
+//カラム構成保存(run() の外に置き、プロファイル切替で run() が再実行されても関数は1つのまま)
+function column_settings_save(mode, profile_num){
+    let settings_array = {
+        column_settings:[],
+        version:manifest.version
+    };
+    settings_array["column_settings"] = column_settings.read_profile(
+        document,
+        window.opd_custom_column_reorder
+    );
+    if(mode == "profile_out"){
+        return settings_array;
+    }else{
+        //console.log(settings_array);
+        const save_object = {name:"user_profile", profile:settings_array.column_settings};
+        //profile_store.push(save_object);
+        Object.assign(profile_store[profile_num], save_object);
+        //console.log(profile_store);
+        deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
+            //console.log(settings_array);
+        });
+    }
+}
+//独自の左右・表示順コントロールはDOMを差し替えずstyle.orderだけを変える。
+//並び替え完了通知を本家の保存境界へ接続する。run() 内で登録するとプロファイル切替の
+//たびにリスナーが増え、並び替え1回で保存が切替回数ぶん走るため、ここで1回だけ登録する。
+document.addEventListener("opd_custom_column_reordered", function(){
+    column_settings_save("", last_load_profile);
+});
 
 //カラー・CSS周りを設定する
 function head_observer_callback(head_elem){

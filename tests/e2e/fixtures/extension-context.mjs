@@ -60,6 +60,22 @@ export const test = base.extend({
                     await page.close();
                 }
             },
+            //keyへの書き込み回数を storage.onChanged で数える。ページを開いたままにして観測を続ける
+            async watch(key) {
+                const page = await storagePage(context, extensionId);
+                await page.evaluate((watchedKey) => {
+                    window.__opdStorageChanges = [];
+                    chrome.storage.onChanged.addListener((changes, namespace) => {
+                        if (namespace === "local" && changes[watchedKey] !== undefined) {
+                            window.__opdStorageChanges.push(changes[watchedKey].newValue);
+                        }
+                    });
+                }, key);
+                return {
+                    count: () => page.evaluate(() => window.__opdStorageChanges.length),
+                    close: () => page.close(),
+                };
+            },
         };
 
         try {

@@ -33,11 +33,23 @@ test("switching profiles rebuilds the deck without corrupting the other profile"
     await expect(page.locator('#first_rack_element div[opd_column_type="explore"]')).toHaveAttribute("opd_explore_path", "/i/lists/42");
     await expect(page.locator('#first_rack_element div[opd_column_type="home"] .opd_a_reload_time_setting')).toHaveValue("15");
 
-    //再読み込み後も最後に開いたプロファイルが復元される
+    //並び替えの保存リスナーは run() ごとに増えない。切替を2回行った後の並び替え1回で
+    //opd_profile_store の書き込みが1回だけであることを storage.onChanged で見る
+    const profileStoreWrites = await storage.watch("opd_profile_store");
+    await page.locator('div[opd_column_type="home"] .opd_custom_move_right').click();
+    await expect.poll(() => visualTypes(page)).toEqual(["explore", "home", "empty_column"]);
+    await expect.poll(async () => (await savedProfiles(storage))[0].profile.map((item) => item.type))
+        .toEqual(["main_bar_empty_column", "explore", "home", "empty_column"]);
+    //直列化された保存が追加で走るなら、この待ちの間に2回目の onChanged が届く
+    await page.waitForTimeout(500);
+    expect(await profileStoreWrites.count(), "opd_profile_store writes per reorder").toBe(1);
+    await profileStoreWrites.close();
+
+    //再読み込み後も最後に開いたプロファイルが、並び替え後の順で復元される
     await page.reload();
     await expect(page.locator("#opd_main_element")).toBeVisible();
     await expect(page.locator(".profile_val_now")).toHaveText("0");
-    await expect.poll(() => visualTypes(page)).toEqual(["home", "explore", "empty_column"]);
+    await expect.poll(() => visualTypes(page)).toEqual(["explore", "home", "empty_column"]);
 
     expect(blockedRequests, "fixture外network request").toEqual([]);
     expect(errors, "console/page errors").toEqual([]);

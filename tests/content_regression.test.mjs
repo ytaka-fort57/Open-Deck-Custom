@@ -155,6 +155,10 @@ test("column reorder preserves iframe documents and saves visual order", () => {
     assert.match(reorder, /if\(source_rack !== target_rack\)\{\s*return false;/);
     assert.match(reorder, /dispatchEvent\(new CustomEvent\("opd_custom_column_reordered"\)\)/);
     assert.match(content, /addEventListener\("opd_custom_column_reordered"[\s\S]*?column_settings_save\("", last_load_profile\)/);
+    //並び替え保存リスナーは run() の外で1回だけ登録する。run() 内だとプロファイル切替ごとに増える(R-13)
+    assert.equal((content.match(/addEventListener\("opd_custom_column_reordered"/g) ?? []).length, 1);
+    assert.match(content, /^document\.addEventListener\("opd_custom_column_reordered"/m);
+    assert.match(content, /^function column_settings_save\(mode, profile_num\)/m);
 });
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
