@@ -62,6 +62,17 @@ test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
     assert.match(lifecycle, /register_column_resource/);
     assert.match(columnDom, /function watch_load_column/);
     assert.match(content, /column_dom\.watch_load_column/);
+    //iframe単位の load リスナーは lifecycle 経由で1回だけ登録し、削除時に外す(R-12)
+    for (const key of ["load-watch", "frame-css", "frame-init"]) {
+        assert.ok(content.includes(`deck_lifecycle.register_column_resource(column_frame, "${key}"`), `missing ${key}`);
+    }
+    assert.match(content, /deck_lifecycle\.register_column_resource\(exp_object, "explore-url"/);
+    assert.doesNotMatch(content, /opd_column_ui_loader_added/);
+    assert.doesNotMatch(content, /session_set/);
+    //引数なしの全iframe再走査は残さない(削除時の再初期化は行わない)
+    assert.doesNotMatch(content, /^\s*append_object_css\(\);/m);
+    assert.match(content, /append_object_css\(document\.querySelectorAll\('#main_rack_element iframe\[opd_init_webview\]'\)\);/);
+    assert.equal((content.match(/append_object_css\(all_webview\);/g) ?? []).length, 4);
     assert.match(content, /column_dom\.dispose_and_remove/);
     assert.doesNotMatch(content, /function observe_when_ready/);
     assert.doesNotMatch(content, /function set_title_favicon/);
