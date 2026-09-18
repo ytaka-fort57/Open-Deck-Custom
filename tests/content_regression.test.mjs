@@ -12,6 +12,7 @@ const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8"
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
 const columnSettings = readFileSync("extensions/custom/column_settings.js", "utf8");
+const columnFrameCss = readFileSync("extensions/custom/column_frame_css.js", "utf8");
 
 test("new auto-reload columns use seconds in the UI", () => {
     assert.match(columnSettings, /"%column_auto_reload_time%"/);
@@ -101,20 +102,37 @@ test("custom history intercepts the X back button and Backspace", () => {
 });
 
 test("top visibility keeps timeline tabs available", () => {
-    assert.match(content, /function get_top_visible_css\(column_type, legacy_mode = false\)/);
-    assert.match(content, /:not\(:has\(\[role="tab"\]\)\)/);
-    assert.ok((content.match(/get_top_visible_css\(/g) ?? []).length >= 4);
-    assert.doesNotMatch(content, />div:nth-child\(1\)\{visibility: hidden;/);
-    assert.doesNotMatch(content, />div:nth-child\(1\)\{display:none;/);
+    assert.match(columnFrameCss, /function top_visible_css\(column_type, visible, legacy_mode = false\)/);
+    assert.match(columnFrameCss, /:not\(:has\(\[role="tab"\]\)\)/);
+    assert.ok((content.match(/column_frame_css\.top_visible_css\(/g) ?? []).length >= 3);
+    assert.doesNotMatch(content, /function get_top_visible_css/);
+    assert.doesNotMatch(columnFrameCss, />div:nth-child\(1\)\{visibility: hidden;/);
+    assert.doesNotMatch(columnFrameCss, />div:nth-child\(1\)\{display:none;/);
 });
 
 test("post top visibility hides only the composer and keeps back navigation", () => {
-    assert.match(content, /if\(column_type == "post"\)/);
-    assert.match(content, /tweetTextarea_0/);
-    assert.match(content, /tweetTextarea_0.*display:block !important/);
-    assert.match(content, /app-bar-back.*display:block/);
+    assert.match(columnFrameCss, /if\(column_type == "post"\)/);
+    assert.match(columnFrameCss, /tweetTextarea_0/);
+    assert.match(columnFrameCss, /tweetTextarea_0.*display:block !important/);
+    assert.match(columnFrameCss, /app-bar-back.*display:block/);
     assert.match(textReviewHelper, /back_button\.style\.display = "block"/);
     assert.doesNotMatch(textReviewHelper, /back_button\.style\.display = "none"/);
+});
+
+test("iframe CSS is applied only through column_frame_css", () => {
+    //CSS本文の複製が content.js に戻らないこと(R-11)
+    assert.doesNotMatch(content, /header\[role="banner"\]\{/);
+    assert.doesNotMatch(content, /cellInnerDiv"\]:has\(div\[aria-labelledby\]\)/);
+    assert.doesNotMatch(content, /<style opd_(banner|top_visible|tw_view_mode|main)_css/);
+    assert.doesNotMatch(content, /style\[opd_(banner|top_visible|tw_view_mode)_css\]/);
+    assert.match(content, /const column_frame_css = window\.opd_custom_column_frame_css;/);
+    for (const attr of ["opd_main_css", "opd_banner_css", "opd_top_visible_css", "opd_tw_view_mode_css"]) {
+        assert.ok(content.includes(`column_frame_css.apply(frame_doc, "${attr}"`), `load path: ${attr}`);
+    }
+    //change リスナーは load をまたぐため、documentをイベント時に取り直す
+    assert.match(content, /column_frame_css\.apply\(banner_mode_target_object\.contentWindow\.document, "opd_banner_css"/);
+    assert.match(content, /column_frame_css\.apply\(topvisible_mode_target_object\.contentWindow\.document, "opd_top_visible_css"/);
+    assert.match(content, /column_frame_css\.apply\(tw_view_mode_target_object\.contentWindow\.document, "opd_tw_view_mode_css"/);
 });
 
 test("column reorder preserves iframe documents and saves visual order", () => {

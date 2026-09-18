@@ -29,6 +29,16 @@ export async function savedTabState(storage) {
     return value.opd_custom_column_state == null ? {} : JSON.parse(value.opd_custom_column_state);
 }
 
+//カラムiframeのheadにある拡張のstyleを属性ごとに集める。1本ずつであることと本文を同時に見る
+export function frameStyleTexts(frame) {
+    return frame.evaluate(() => Object.fromEntries(
+        ["opd_main_css", "opd_banner_css", "opd_top_visible_css", "opd_tw_view_mode_css"].map((attr) => [
+            attr,
+            Array.from(document.head.querySelectorAll(`style[${attr}]`)).map((style) => style.textContent),
+        ])
+    ));
+}
+
 //sectionの物理DOM順と、flexのorderで決まる表示順を分けて観測する
 export function rackSections(page, rackSelector = "#first_rack_element") {
     return page.locator(`${rackSelector} > section`).evaluateAll((sections) => sections.map((section) => ({
