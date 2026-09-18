@@ -162,3 +162,9 @@ test("column width preset mapping lives in the settings boundary", () => {
     assert.doesNotMatch(content, /case '15':/);
     assert.doesNotMatch(content, /case 15:/);
 });
+
+test("settings initialization takes the default profile from the settings boundary", () => {
+    assert.match(columnSettings, /function default_profile\(\)/);
+    assert.match(content, /const profile_store_default = column_settings\.default_profile\(\);/);
+    assert.doesNotMatch(content, /const profile_store_default = \[\{type:"main_bar_empty_column"/);
+});

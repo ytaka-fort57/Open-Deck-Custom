@@ -223,3 +223,33 @@ test("column width presets round-trip between rem values and select indexes", ()
         assert.equal(settings.width_from_preset(settings.width_preset_index(String(width))), width);
     }
 });
+
+test("default profile matches the former hand-written settings_init array", () => {
+    const context = { window: {}, URL };
+    vm.createContext(context);
+    for (const file of ["extensions/custom/safe_values.js", "extensions/custom/column_settings.js", "extensions/custom/settings_codec.js"]) {
+        vm.runInContext(readFileSync(file, "utf8"), context);
+    }
+    const settings = context.window.opd_custom_column_settings;
+    const codec = context.window.opd_custom_settings_codec;
+
+    // content.js settings_init に手書きされていた配列(exp_type は未使用のため落とす)
+    const expected = [
+        {type:"main_bar_empty_column", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"home", banner:true, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"notification", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", auto_reload:false, auto_reload_time:10000, column_pinned_path:"", column_save_title:"", column_width:null},
+        {type:"explore", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"/explore", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"empty_column", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+    ];
+
+    const actual = settings.default_profile();
+    assert.equal(actual.length, expected.length);
+    for (const [index, column] of expected.entries()) {
+        assert.deepEqual(Object.keys(actual[index]).sort(), Object.keys(column).sort(), `column ${index} keys`);
+        for (const [key, value] of Object.entries(column)) {
+            assert.strictEqual(actual[index][key], value, `column ${index} (${column.type}) key ${key}`);
+        }
+    }
+    assert.notEqual(settings.default_profile()[1], actual[1], "each call builds fresh objects");
+    assert.equal(codec.validate_profile_store([{ name: "default", profile: settings.default_profile() }]), true);
+});

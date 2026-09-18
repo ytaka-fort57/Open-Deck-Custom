@@ -143,6 +143,19 @@ window.opd_custom_column_settings = (function(){
         });
     }
 
+    //初期化時の既定プロファイル(1段目: タイムライン・通知・Explore)。
+    //new_column_setting と同じ既定値から組み立て、home だけバナー表示にする。
+    //column_width は null(描画時に既定幅を継承)、auto_reload は本家の初期値どおり false のまま保存する
+    function default_profile(){
+        return ["main_bar_empty_column", "home", "notification", "explore", "empty_column"].map(function(type){
+            return Object.assign(new_column_setting(type), {
+                banner: type === "home",
+                auto_reload: false,
+                column_width: null,
+            });
+        });
+    }
+
     function new_column_values(type, column_id){
         return render_values(new_column_setting(type), column_id, "30");
     }
@@ -207,6 +220,7 @@ window.opd_custom_column_settings = (function(){
         render_values: render_values,
         new_column_setting: new_column_setting,
         new_column_values: new_column_values,
+        default_profile: default_profile,
         WIDTH_PRESETS: WIDTH_PRESETS,
         width_preset_index: width_preset_index,
         width_from_preset: width_from_preset,
