@@ -5,7 +5,14 @@
     "test:unit": "node tests/run.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "backlog:add": "node scripts/backlog.mjs add",
+    "backlog:list": "node scripts/backlog.mjs list",
+    "backlog:update": "node scripts/backlog.mjs update",
+    "backlog:verify": "node scripts/backlog.mjs verify",
+    "backlog:suppress": "node scripts/backlog.mjs suppress",
+    "backlog:report": "node scripts/backlog.mjs report",
+    "backlog:validate": "node scripts/backlog.mjs validate"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

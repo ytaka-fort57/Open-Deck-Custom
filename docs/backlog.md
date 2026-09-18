@@ -1,11 +1,13 @@
 # カスタム版の残課題
 
-更新日: 2026-09-11
+更新日: 2026-09-18
 
 対応済みの経緯は [issue-column-timeline-restore.md](archive/issue-column-timeline-restore.md) を参照。
 運用手順は [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md) が正。
-最新監査は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) を参照。
-リファクタ候補の一覧と着手順は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) に記載する。
+最新監査は [code-audit-2026-09-18.md](code-audit-2026-09-18.md) を参照。
+リファクタ候補の定義は [code-audit-2026-09-18.md](code-audit-2026-09-18.md)
+(R-1〜R-10は [archive/code-audit-2026-09-11.md](archive/code-audit-2026-09-11.md))、
+着手状況は [backlog/report.md](backlog/report.md) が正。
 カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
 実DOM E2E基盤の方針は [browser-e2e-test-design.md](browser-e2e-test-design.md) を参照。
 
@@ -34,65 +36,15 @@
   奪っていた。Phase 3のCI導入は安定を確認してから行う。
 - 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
 
-## 優先度: 中
+## 残課題の管理
 
-### 1. 引用付きメディアの選択境界
+個別の残課題は [backlog/findings.jsonl](backlog/findings.jsonl) を正本とし、
+[backlog/report.md](backlog/report.md) で一覧する(`npm run backlog:list` / `npm run backlog:report`)。
+運用は [backlog/README.md](backlog/README.md)、項目定義は [backlog/schema.md](backlog/schema.md)。
+このファイルには個別の残課題を書き足さない。
 
-引用コンテナを特定できた場合に引用側のメディア情報を優先するコード修正と回帰テストを追加済み。決定的E2E(`tests/e2e/media-viewer.spec.mjs`)で、helper注入・token・ビューアー表示・キー操作までの経路も確認できるようにした。残るのは、Xの現行DOMとReact propsそのものを使った実ブラウザーでの選択結果確認。
-
-### 2. `misskey` / `bsky`カラム対応（保留）
-
-現行deckには描画templateがなく利用予定もないため、`settings_codec`だけで受理する変更は行わない。必要になった時点で、描画・保存・import・移行testをまとめて実装する。
-
-### 3. タイムラインのリアルタイム流し込み（X Pro相当）
-
-現在の自動更新は、Xの内部更新関数(`onRefresh`)を周期的に呼ぶ方式で、TweetDeck / X Proのように
-新着が上から流れ続ける挙動ではない。実現するには、カラムiframe内のGraphQL応答または新着通知の購読を
-監視し、差分を先頭へ挿入する仕組みが要る。周期更新の安定化を優先し、ここでは見送る。
-
-### 3.5 カラム内の戻るの実機確認
-
-コードの不具合は5件とも修正済み。加えて、Xが再描画しない場合に戻り先URLを実際に
-読み込むフォールバックを追加した。実機で次を確認する。詳細は
-[issue-column-back-navigation.md](issue-column-back-navigation.md)。
-
-- 戻った後の先頭スクロールが解消したか(発生条件が不定のため未確定)
-- 通常の戻るでカラムが再読み込みされていないか。再読み込みが起きる場合は
-  擬似popstateが効いておらずフォールバックに落ちている
-- ピン留めリストのタブ復元が `location.replace` 1回で成立するか。Xが繰り返し
-  上書きする場合、2回目以降を行わない制限が復元漏れになっていないか
-- 画面上の戻るを押したとき、押したカラムだけが戻り、別カラムのタブが動かないか
-- ラックをまたいでカラムを移動した後もBackspaceで戻れるか
-
-最後の2点は決定的E2Eで機序を固定した。
-実Xのルーターとjoint session historyでの確認は引き続き必要。
-(`column-back.spec.mjs` / `column-cross-rack.spec.mjs`)
-
-## 優先度: 低
-
-### 4. 本家レビューworkflowの初回動作確認
-
-`.github/workflows/sync-upstream.yml`は直接mergeせず、`.github/upstream-base`以降の差分をGitHub Issueへまとめる方式に変更済み。GitHub上で手動dispatchし、更新なしではIssueを作らず、更新ありでは同じレビューIssueを作成・更新することをまだ確認していない。
-
-### 5. Firefox（Manifest V2）実機未検証
-
-マニフェストには独自コードを登録済みだが、現時点で使用予定がないため優先度を下げる。
-
-### 6. `content.js`のDOM実行テスト拡大
-
-安全値、background sender、storageは実行テスト化済み。残る巨大なDOM処理は、責務を純粋関数・controllerへ分離するタイミングで文字列検査から置き換える。
-
-### 7. ハッシュタグ保存先の分離
-
-文章校正ヘルパーのハッシュタグはXページの`localStorage`へ保存される。Open-Deckのプロファイル単位で保持・削除する必要が生じた場合は、共有storage repositoryとの境界を設計する。
-
-### 8. リストフィルタの監視負荷計測
-
-リスト候補のiframeごとにMutationObserverと1秒周期のURL確認を動かし、更新のたびに投稿全体を走査する。大量フィードで負荷が確認された場合に、対象領域・イベント・差分走査を見直す。
-
-### 9. タブ状態を位置キーから安定IDへ移行（設計保留）
-
-現在の追加・削除・並べ替え・プロファイル操作は位置の再配置で保護済み。安定ID化は全プロファイルの移行と旧データ互換を伴うため、実ブラウザーfixtureを整える段階まで保留する。
+2026-09-18 に、ここにあった残課題 1〜9 と監査 R-1〜R-24 の未着手分を BL-001〜BL-030 として移行した。
+実機確認待ち(引用付きメディア、カラム内の戻る)は `verificationRequired: manual` の項目として残っている。
 
 ## 対応済み
 
@@ -136,9 +88,11 @@
 - 本家差分を読む際に変更意図を追えるよう、責務とテストの対応を明確にする
 - 検証コードは`tests/`などの新規領域へ追加し、本家ファイルとの競合を避ける
 
-今回の構造監査では、`content.js`の責務集中、設定のDOM変換重複、履歴・lifecycleの境界、
-MutationObserverの全体走査を主な候補として整理した。優先度と分割順は
-[code-audit-2026-09-11.md](code-audit-2026-09-11.md)のR-1〜R-10を正とする。
+2026-09-11の監査では、`content.js`の責務集中、設定のDOM変換重複、履歴・lifecycleの境界、
+MutationObserverの全体走査を主な候補として整理した(R-1〜R-10)。2026-09-18の再監査で、
+iframe内CSS適用の三重複、`load`リスナーと保存リスナーの蓄積、死コード、i18n取りこぼし、
+デッキCSSの分離などをR-11〜R-24として追加した。優先度と分割順は
+[code-audit-2026-09-18.md](code-audit-2026-09-18.md)を正とする。
 
 ## 既知の制約（対応しない）
 
