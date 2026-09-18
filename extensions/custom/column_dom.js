@@ -19,6 +19,19 @@ window.opd_custom_column_dom = (function(){
         return new_column;
     }
 
+    function add_column(doc, type, template, settings_api, create_id, reorder_api, is_shift_pressed = false){
+        const add_target_column = get_add_target(doc, is_shift_pressed);
+        if(add_target_column == null){
+            return null;
+        }
+        const html = settings_api.render(
+            template,
+            settings_api.new_column_setting(type),
+            create_id()
+        );
+        return insert_before_target(add_target_column, html, reorder_api);
+    }
+
     function dispose_and_remove(column, lifecycle){
         if(column == null){
             return false;
@@ -56,6 +69,7 @@ window.opd_custom_column_dom = (function(){
     }
 
     return {
+        add_column,
         dispose_and_remove,
         get_add_target,
         insert_before_target,

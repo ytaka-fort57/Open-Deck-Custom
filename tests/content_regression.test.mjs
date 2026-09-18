@@ -16,8 +16,8 @@ const columnSettings = readFileSync("extensions/custom/column_settings.js", "utf
 test("new auto-reload columns use seconds in the UI", () => {
     assert.match(columnSettings, /"%column_auto_reload_time%"/);
     assert.match(columnSettings, /function new_column_setting\(type\)/);
-    assert.match(content, /column_settings\.new_column_setting\("home"/);
-    assert.match(content, /column_settings\.new_column_setting\("explore"/);
+    assert.match(content, /add_new_column\("home"\)/);
+    assert.match(content, /add_new_column\("explore"\)/);
     assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
 });
 
@@ -124,14 +124,23 @@ test("column reorder preserves iframe documents and saves visual order", () => {
     assert.match(content, /reorder_api\?\.move_before\?\./);
     assert.doesNotMatch(reorder, /Node\.prototype\.insertBefore/);
     assert.match(reorder, /if\(source_rack !== target_rack\)\{\s*return false;/);
+    assert.match(reorder, /dispatchEvent\(new CustomEvent\("opd_custom_column_reordered"\)\)/);
+    assert.match(content, /addEventListener\("opd_custom_column_reordered"[\s\S]*?column_settings_save\("", last_load_profile\)/);
 });
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
     assert.match(columnDom, /function get_add_target\(doc, is_shift_pressed\)/);
-    assert.match(content, /function get_column_add_target\(\)\{[\s\S]*?column_dom\.get_add_target\(document, is_shift_pressed\)/);
-    assert.match(content, /function insert_new_column_before_target\(add_target_column, new_column_html\)/);
+    assert.match(columnDom, /function add_column\(doc, type, template, settings_api/);
+    assert.match(content, /function add_new_column\(type\)\{[\s\S]*?column_dom\.add_column\(/);
     assert.match(columnDom, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
-    assert.equal((content.match(/insert_new_column_before_target\(add_target_column, new_column\)/g) ?? []).length, 4);
+    assert.equal((content.match(/add_new_column\("(?:post|home|notification|explore)"\)/g) ?? []).length, 4);
+});
+
+test("profile initialization and saving share the settings boundary", () => {
+    assert.match(content, /column_settings\.render_profile\(\s*settings\.column_settings/);
+    assert.match(content, /rendered_profile\.first_rack_html/);
+    assert.match(content, /rendered_profile\.second_rack_html/);
+    assert.match(content, /column_settings\.read_profile\(\s*document,/);
 });
 
 test("column load recovery does not force a post-column src reload", () => {

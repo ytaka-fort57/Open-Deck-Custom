@@ -824,52 +824,20 @@ function run(settings){
     ins_html.style = "position: fixed;z-index: 999999;top:0;width: 100%;height: 100%;background: white;display: flex;flex-direction: row;overflow: hidden;";
     let side_bar = `<section class="dsp_column" style="position:fixed;z-index:999;height:98%;"><div draggable="false" class="dsp_column_draggable_false" opd_column_type="dsp_column" opd_column_width="%column_width_num%" style="height:100%;min-width: 60px;max-width: 60px;text-align: center;background-color: white;"><div class="main_bar_functions"><div class="opd_ui_logo_parent" title="${i18n_message("ui_sidebar_logo_title", [manifest.version])}"><div class="opd_ui_logo"></div><span class="opd_version_span">${manifest.version}</span></div><hr><p class="opd_debug_menu">${i18n_message("ui_debug_menu_label")}<br><input type="button" id="init_settings" value="${i18n_message("ui_button_init_settings")}" /><br><input type="button" id="profile_load_save" value="${i18n_message("ui_button_profile_loader")}" /><br><input type="button" id="dnr_reload" value="${i18n_message("ui_button_dnr_reload")}" /><br><input type="button" id="ext_reload" value="${i18n_message("ui_button_ext_reload")}" /><br><div id="api_limit_status">${i18n_message("ui_button_api_label")}</div><hr><div class="dsp_btn_parent" id="add_post" title="${i18n_message("ui_add_post_column_title")}"><div class="dsp_btn_add_post_img"></div></div><hr><div class="dsp_btn_parent" id="add_timeline" title="${i18n_message("ui_add_timeline_column_title")}"><div class="dsp_btn_add_tl_img"></div></div><div class="dsp_btn_parent" id="add_notify" title="${i18n_message("ui_add_notification_column_title")}"><div class="dsp_btn_add_ntfc_img"></div></div><div class="dsp_btn_parent" id="add_explore" title="${i18n_message("ui_add_explore_column_title")}"><div class="dsp_btn_add_explr_img"></div></div><hr><div class="dsp_btn_parent" title="${i18n_message("ui_toggle_second_rack_title")}" id="second_rack"><div class="dsp_btn_second_rack_img"></div></div><hr><div class="dsp_btn_parent" title="${i18n_message("ui_profile_save_title")}" id="profile_save"><div class="dsp_btn_profile_add_img"></div></div><div class="dsp_btn_parent" title="${i18n_message("ui_profile_delete_title")}" id="profile_delete"><div class="dsp_btn_profile_delete_img"></div></div>${profile_list_html}</p></div></div></section><section draggable="false" class="dsp_column_draggable_false dsp_column"><div opd_column_type="main_bar_empty_column" id="main_bar_empty_column" style="height:100%;min-width: 60px;max-width: 60px;"></div></section>`;
     //let side_bar = `<section class="dsp_column" style="position:fixed;z-index:999;height:98%;"><div draggable="false" opd_column_type="dsp_column" opd_column_width="%column_width_num%" style="height:100%;min-width: 100px;text-align: center;background-color: white;"><div><p style="margin-top:0;padding-top:1em;">Open-Deck<br>Prototype<br>v${manifest.version}</p><hr><p>Debug<br><input type="button" id="init_settings" value="init settings"/><br><input type="button" id="profile_load_save" value="Profile Load"/><br><input type="button" id="dnr_reload" value="dNR_Reload"/><br><input type="button" id="ext_reload" value="Ext_Reload"/></p><hr><p><input type="button" id="add_timeline" value="Add TimeLine"/> <div class="dsp_btn_parent"><div class="dsp_btn_add_tl_img"></div></div><div class="dsp_btn_parent"><div class="dsp_btn_add_ntfc_img"></div></div><div class="dsp_btn_parent"><div class="dsp_btn_add_explr_img"></div></div> </p><p><input type="button" id="add_notify" value="Add Notification"/></p><p><input type="button" id="add_explore" value="Add Explore"/><hr><input type="button" id="second_rack" value="Second Rack"/><hr><input type="button" id="profile_save" value="Profile_Save"/><br><input type="button" id="profile_delete" value="Profile_Delete"/><br>${profile_list_html}</p></div></div></section><section draggable="false" class="dsp_column"><div opd_column_type="main_bar_empty_column" id="main_bar_empty_column" style="height:100%;min-width: 110px;"></div></section>`;
-    let main_column_html = ``;
-    let second_column_html = ``;
-    //設定2段
-    let first_column_end = false;
-    let second_column_end = false;
+    const rendered_profile = column_settings.render_profile(
+        settings.column_settings,
+        default_element,
+        create_random_id,
+        "30"
+    );
+    const main_column_html = rendered_profile.first_rack_html;
+    const second_column_html = rendered_profile.second_rack_html;
+    const first_column_end = rendered_profile.first_rack_ended;
+    const second_column_end = rendered_profile.second_rack_ended;
     let second_rack_mode = false;
-    //カラム横幅
-    let column_width_init = "30";
     //スクロール検出用
     let scroll_block = true;
     //
-    //console.log(settings.column_settings.length)
-    for (let index = 0; index < settings.column_settings.length; index++) {
-        //console.log(default_element)
-        for (let default_index = 0; default_index < Object.keys(default_element).length; default_index++) {
-            //console.log(settings.column_settings[index].type+"-"+Object.keys(default_element))
-            if(settings.column_settings[index].type == Object.keys(default_element)[default_index]){
-                //console.log(default_element[Object.keys(default_element)[default_index]]["html"])
-                //カラム横幅
-                if(settings.column_settings[index].column_width != null){
-                    column_width_init = settings.column_settings[index].column_width;
-                }
-                const column_template = default_element[Object.keys(default_element)[default_index]]["html"];
-                const rendered_column_html = column_settings.render(
-                    column_template,
-                    settings.column_settings[index],
-                    create_random_id(),
-                    column_width_init
-                );
-                //一段目終了検出にもかかわらず設定が存在していた場合2段目の変数に保存
-                if(first_column_end == true){
-                    second_column_html += rendered_column_html;
-                }else{
-                    main_column_html += rendered_column_html;
-                }
-                //一段目読込終了検出
-                if(first_column_end == false && settings.column_settings[index].type == "empty_column"){
-                    first_column_end = true;
-                }
-                //二段目読込終了検出
-                if(second_column_end == false && settings.column_settings[index].type == "second_empty_column"){
-                    second_column_end = true;
-                }
-            }
-        }
-    }
     //初期挿入HTML作成
     ins_html.innerHTML = `${side_bar}<div id="main_rack_element" style=""><div id="first_rack_element" style="height: 100%;display:flex;flex-direction:row;">${main_column_html}</div><div id="second_rack_element" style="display:flex;flex-direction:row;">${second_column_html}</div></div>`;
     //HTML挿入
@@ -1530,6 +1498,11 @@ function run(settings){
             exp_observer.observe(initial_state.document, {childList: true, subtree: true});
         })
     }
+    //独自の左右・表示順コントロールはDOMを差し替えずstyle.orderだけを変える。
+    //並び替え完了通知を本家の保存境界へ接続する。
+    document.addEventListener("opd_custom_column_reordered", function(){
+        column_settings_save("", last_load_profile);
+    });
     //メインバーイベント
     document.getElementById("init_settings").addEventListener("click", function(){
         deck_storage.remove(deck_storage.KEYS.SETTINGS, function(){
@@ -1605,29 +1578,21 @@ function run(settings){
             chrome.runtime.sendMessage({message: "ext_reload"});
         }
     });
-    function get_column_add_target(){
-        return column_dom.get_add_target(document, is_shift_pressed);
-    }
-
-    function insert_new_column_before_target(add_target_column, new_column_html){
-        return column_dom.insert_before_target(
-            add_target_column,
-            new_column_html,
-            window.opd_custom_column_reorder
+    function add_new_column(type){
+        return column_dom.add_column(
+            document,
+            type,
+            default_element[type].html,
+            column_settings,
+            create_random_id,
+            window.opd_custom_column_reorder,
+            is_shift_pressed
         );
     }
 
     //ポストカラム追加
-    //TODO: カラム追加周りの処理をもっと簡略化すること
     document.getElementById("add_post").addEventListener("click", function(){
-        const add_target_column = get_column_add_target();
-
-        const new_column = column_settings.render(
-            default_element.post.html,
-            column_settings.new_column_setting("post"),
-            create_random_id()
-        );
-        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        const new_column_element = add_new_column("post");
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
@@ -1637,15 +1602,8 @@ function run(settings){
     });
     //タイムラインカラム追加
     document.getElementById("add_timeline").addEventListener("click", function(){
-        const add_target_column = get_column_add_target();
         const timeline_before = snapshot_timeline_state();
-        
-        const new_column = column_settings.render(
-            default_element.home.html,
-            column_settings.new_column_setting("home"),
-            create_random_id()
-        );
-        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        const new_column_element = add_new_column("home");
         remap_timeline_state(timeline_before);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
@@ -1656,14 +1614,7 @@ function run(settings){
     });
     //通知カラム追加
     document.getElementById("add_notify").addEventListener("click", function(){
-        const add_target_column = get_column_add_target();
-        
-        const new_column = column_settings.render(
-            default_element.notification.html,
-            column_settings.new_column_setting("notification"),
-            create_random_id()
-        );
-        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        const new_column_element = add_new_column("notification");
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
@@ -1673,14 +1624,7 @@ function run(settings){
     });
     //Explore(ユニバーサル)カラム追加
     document.getElementById("add_explore").addEventListener("click", function(){
-        const add_target_column = get_column_add_target();
-        
-        const new_column = column_settings.render(
-            default_element.explore.html,
-            column_settings.new_column_setting("explore"),
-            create_random_id()
-        );
-        const new_column_element = insert_new_column_before_target(add_target_column, new_column);
+        const new_column_element = add_new_column("explore");
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css("add_column", all_webview);
@@ -1907,13 +1851,10 @@ function run(settings){
             column_settings:[],
             version:manifest.version
         };
-        const reorder_api = window.opd_custom_column_reorder;
-        const column_elements = reorder_api?.get_visual_column_elements?.(document)
-            ?? Array.from(document.querySelectorAll("#opd_main_element div[opd_column_type]"));
-        for (let index = 0; index < column_elements.length; index++) {
-            const column_element = column_elements[index];
-            settings_array["column_settings"].push(column_settings.read(column_element));
-        }
+        settings_array["column_settings"] = column_settings.read_profile(
+            document,
+            window.opd_custom_column_reorder
+        );
         if(mode == "profile_out"){
             return settings_array;
         }else{

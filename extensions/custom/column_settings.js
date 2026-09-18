@@ -132,10 +132,63 @@ window.opd_custom_column_settings = (function(){
         return render_values(new_column_setting(type), column_id, "30");
     }
 
+    function render_profile(profile, templates, create_id, fallback_width = "30"){
+        let first_rack_html = "";
+        let second_rack_html = "";
+        let first_rack_ended = false;
+        let second_rack_ended = false;
+        let inherited_width = fallback_width;
+
+        Array.from(profile ?? []).forEach(function(raw_setting){
+            const setting = normalize(raw_setting);
+            const template_entry = templates?.[setting.type];
+            const template = typeof template_entry === "string"
+                ? template_entry
+                : template_entry?.html;
+            if(typeof template !== "string"){
+                return;
+            }
+            if(setting.column_width != null){
+                inherited_width = setting.column_width;
+            }
+            const html = render(template, setting, create_id(), inherited_width);
+            if(first_rack_ended){
+                second_rack_html += html;
+            }else{
+                first_rack_html += html;
+            }
+            if(!first_rack_ended && setting.type === "empty_column"){
+                first_rack_ended = true;
+            }
+            if(!second_rack_ended && setting.type === "second_empty_column"){
+                second_rack_ended = true;
+            }
+        });
+
+        return {
+            first_rack_html: first_rack_html,
+            second_rack_html: second_rack_html,
+            first_rack_ended: first_rack_ended,
+            second_rack_ended: second_rack_ended,
+        };
+    }
+
+    function read_profile(doc, reorder_api){
+        const column_elements = reorder_api?.get_visual_column_elements?.(doc)
+            ?? Array.from(doc?.querySelectorAll?.("#opd_main_element div[opd_column_type]") ?? []);
+        return column_elements
+            .filter(function(column){
+                return column.getAttribute?.("opd_column_type") !== "dsp_column";
+            })
+            .map(read);
+    }
+
     return {
         normalize: normalize,
         read: read,
+        read_profile: read_profile,
         render: render,
+        render_profile: render_profile,
         render_values: render_values,
         new_column_setting: new_column_setting,
         new_column_values: new_column_values,

@@ -247,6 +247,7 @@ window.opd_custom_column_reorder = (function(){
         visual_sections.splice(insert_index, 0, section);
         apply_visual_order(section.parentElement, visual_sections);
         remap_tab_state(timeline_before, get_timeline_sections(section.ownerDocument));
+        section.ownerDocument.dispatchEvent(new CustomEvent("opd_custom_column_reordered"));
         //移動でどのカラムの位置も変わる。監視任せにすると、続けて押したときに
         //古い状態のボタンが押せないままになる
         get_columns(section).forEach(refresh);

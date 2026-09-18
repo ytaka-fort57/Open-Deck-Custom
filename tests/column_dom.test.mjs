@@ -79,6 +79,29 @@ test("column DOM boundary chooses an insertion target and delegates visual reord
         ["beforebegin", "<section></section>"],
         ["move_before", newColumn, target],
     ]);
+
+    const settings = {
+        new_column_setting: (type) => ({ type, top_visible: true }),
+        render: (template, setting, id) => `${template}:${setting.type}:${id}`,
+    };
+    target.parentElement = { children: [regularColumn, target] };
+    const addDocument = { querySelector: () => target };
+    assert.equal(
+        columnDom.add_column(
+            addDocument,
+            "home",
+            "<home></home>",
+            settings,
+            () => "column-1",
+            reorder,
+            false
+        ),
+        newColumn
+    );
+    assert.deepEqual(calls.slice(2), [
+        ["beforebegin", "<home></home>:home:column-1"],
+        ["move_before", newColumn, target],
+    ]);
 });
 
 test("column removal disposes resources before removing the DOM node", () => {

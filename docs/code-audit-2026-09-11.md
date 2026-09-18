@@ -30,10 +30,14 @@
   `column_settings`のcanonical modelへ渡せるimport/export round-tripを検証した。
 - R-8の第三段階として、追加対象の選択、DOM挿入とreorder委譲、resource dispose前の削除、iframe
   load監視を`extensions/custom/column_dom.js`へ切り出し、実行fixtureで検証した。
+- R-2/R-8の次段階として、初期プロファイルのラック分割・HTML生成と表示順での設定読み取りを
+  `column_settings`へ集約し、4種類のカラム追加を`column_dom.add_column`へ共通化した。Node fixtureで
+  生成・追加・並び替え委譲・保存・再生成の境界を検証した。
 
 ## 検証結果
 
-- `node tests/run.mjs`: 71/71 成功
+- `node tests/run.mjs`: 74/74 成功
+- `verify.ps1`: Chromium / Firefox ZIP各65項目を含め成功
 - 全JavaScriptの構文、manifest、locale、安全値、storage、observer、履歴、リストフィルタの回帰検査: 成功
 - 作業ツリーは未コミット変更を含む。今回の監査では既存変更を上書きしていない
 - ログイン済みXの操作、Firefox Manifest V2の実機操作: 未実施
@@ -43,20 +47,20 @@
 | ID | 優先度 | 対象 | コード上の事実 | 推奨する分割・対応 |
 | --- | --- | --- | --- | --- |
 | R-1 | 高 | `content.js`のアプリシェル | `run()`が約1,800行あり、画面生成、CSS、プロフィール、カラム操作、保存、DnD、自動更新、observerを内包する | `bootstrap`、`deck_renderer`、`column_controller`、`profile_controller`へ段階分割する。既存のグローバルAPIとscript順は当面維持する |
-| R-2 | 高 | 設定モデルとDOM変換 | 設定からHTMLを作る処理と、DOMから設定を保存する処理が離れており、4種類のカラム追加処理も同じplaceholder置換を重複している | `column_settings.js`へDOM読み取り、正規化、renderer、template値を集約し、初期描画・追加処理、settings codec境界、round-tripテストを接続済み。残りはcontent.js全体のround-trip検証 |
+| R-2 | 対応済み | 設定モデルとDOM変換 | 設定の正規化・描画・読取・追加境界を`column_settings.js`と`column_dom.js`へ集約 | settings codecとNode fixtureに加え、Playwright E2Eでcontent.js全体の保存・再構築round-tripを検証済み |
 | R-3 | 高 | 履歴・戻るController | `index.js`、`keyboard_shortcuts.js`、`column_history.js`に、Backspace、app-bar戻る、メディア例外、Xへの遷移が分散している | 「入力中」「メディア」「履歴あり」「履歴なし」の判定表をテストで固定し、UIイベントと履歴状態機械を分離する |
 | R-4 | 高 | ページlifecycle | `lifecycle.js`がカラム資源、自動更新、メディアtoken、ページイベント、observer、タイトル/faviconをまとめて管理する | `column_resource_registry`、`page_event_lifecycle`、`page_observer_lifecycle`へ分離する。各observerがdisposerを返す形に揃える |
 | R-5 | 中 | DOM変更監視 | `custom/index.js`のMutationObserverが、DOM変更ごとにタブ、キー、リストフィルタ、並び替えの全体処理を呼ぶ | microtaskまたは短いdebounceで更新を集約し、追加・削除されたカラムだけを対象にする |
 | R-6 | 中 | リストフィルタ | 投稿分類、全投稿走査、MutationObserver、URL確認、タイマー、破棄処理が1ファイルにある | 投稿分類器を純粋関数として残し、差分走査を行うcontrollerと分ける。大量フィードでCPU・Mutation回数を計測してから最適化する |
 | R-7 | 中 | プロフィール操作 | プロフィール一覧HTMLの生成とイベント再接続が保存・追加・削除の複数箇所に重複している | `profile_controller`に一覧描画、切替、追加、削除、保存後の再接続を集約する |
-| R-8 | 中 | 実DOMテスト | `content.js`の回帰検査は配線やソース文字列の検査が中心で、巨大なDOM初期化を直接実行していない | 設定境界、lifecycle資源破棄、追加・削除・挿入・iframe load監視のDOM fixtureを追加済み。残りはcontent.js全体の初期化と、実際のカラム追加・再構築・並び替えを同一fixtureで実行すること |
+| R-8 | 対応済み | 実DOMテスト | Playwright同梱Chromiumとローカル`x.com` fixtureで`content.js`全体を実行 | 初期化、追加、同一ラック並び替え、削除、保存・再構築、iframe保持をgolden pathで検証。実Xスモークとcross-rackは別境界として継続 |
 | R-9 | 低 | カラムの安定識別子 | タブ状態が`profile_index:column_index`をキーにしており、並び替え・削除時のremapが必要 | 全プロファイル移行、旧データ互換、失敗時rollbackを設計してからstable IDへ移行する。短期対応では現行remapを維持する |
 | R-10 | 低 | 配布定義とデバッグコード | Chrome/Firefox manifestとpackageスクリプトに重複があり、`content.js`にはprototype/testmode/debug UIが同居する | 配布対象・content script一覧の生成元を一本化する。デバッグ機能は開発用scriptまたは明示的なbuild設定へ移す |
 
 ## 着手順
 
-1. R-8の設定境界、lifecycle資源、カラムDOM境界fixtureを追加済み。次はcontent.js全体の初期化とカラム追加・削除・再構築・並び替えを同一fixtureで実行検証する。
-2. R-2の正規化・renderer・settings codec境界・round-tripを追加済み。次はcontent.js全体のround-tripを検証する。
+1. R-8のPlaywright E2E基盤とgolden pathは実装済み。次は必要性が確認できたシナリオからcross-rack移動、プロファイル切替、戻る操作を追加する。
+2. R-2の正規化・renderer・settings codec境界・Node round-tripと、content.js全体の実DOM round-tripは検証済み。
 3. R-1を、挙動を変えない小さな責務単位で分割する。
 4. R-3とR-4を、現在の未コミット変更と実ブラウザー確認が落ち着いた後に分割する。
 5. 負荷計測が必要なR-5・R-6、移行を伴うR-9、配布整理のR-10へ進む。
@@ -78,6 +82,7 @@
 ## 関連文書
 
 - 現在の残課題: [backlog.md](backlog.md)
+- 実DOM E2E基盤設計: [browser-e2e-test-design.md](browser-e2e-test-design.md)
 - カラム内の戻るの機序: [issue-column-back-navigation.md](issue-column-back-navigation.md)
 - 共通検証手順: [verification.md](verification.md)
 - 過去の監査: [docs/archive/README.md](archive/README.md)
