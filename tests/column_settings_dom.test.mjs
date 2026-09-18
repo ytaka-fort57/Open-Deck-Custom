@@ -253,3 +253,34 @@ test("default profile matches the former hand-written settings_init array", () =
     assert.notEqual(settings.default_profile()[1], actual[1], "each call builds fresh objects");
     assert.equal(codec.validate_profile_store([{ name: "default", profile: settings.default_profile() }]), true);
 });
+
+test("profile summary picks one i18n line per visible column and numbers each row", () => {
+    const settings = loadColumnSettings();
+    const i18n = (key, substitutions) => substitutions == null ? key : `${key}(${substitutions.join(",")})`;
+
+    const summary = settings.profile_summary([
+        { type: "dsp_column" },
+        { type: "main_bar_empty_column" },
+        { type: "post" },
+        { type: "home" },
+        { type: "notification" },
+        { type: "explore", column_save_title: "List 42" },
+        { type: "empty_column" },
+        { type: "misskey" },
+        { type: "bsky" },
+        { type: "home" },
+        { type: "second_empty_column" },
+    ], i18n);
+
+    assert.deepEqual(Array.from(summary), [
+        "msg_profile_desc_post_column(1)",
+        "msg_profile_desc_timeline_column(2)",
+        "msg_profile_desc_notification_column(3)",
+        "msg_profile_desc_explore_column(4,List 42)",
+        "msg_profile_desc_first_row_end",
+        "msg_profile_desc_timeline_column(1)",
+        "msg_profile_desc_second_row_end",
+    ]);
+    assert.deepEqual(Array.from(settings.profile_summary([], i18n)), []);
+    assert.deepEqual(Array.from(settings.profile_summary(undefined, i18n)), []);
+});

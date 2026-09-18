@@ -168,3 +168,11 @@ test("settings initialization takes the default profile from the settings bounda
     assert.match(content, /const profile_store_default = column_settings\.default_profile\(\);/);
     assert.doesNotMatch(content, /const profile_store_default = \[\{type:"main_bar_empty_column"/);
 });
+
+test("profile switch confirmation builds its summary in the settings boundary", () => {
+    assert.match(columnSettings, /function profile_summary\(profile, i18n_message\)/);
+    assert.match(content, /const preload_desc_array = column_settings\.profile_summary\(profile_store\[index\]\.profile, i18n_message\);/);
+    assert.ok(content.includes('preload_desc_array.join("\\r\\n")'));
+    assert.doesNotMatch(content, /msg_profile_desc_misskey_column/);
+    assert.doesNotMatch(content, /preload_desc_count/);
+});

@@ -904,49 +904,7 @@ function run(settings){
         for (let index = 0; index < profile_store.length; index++) {
             document.querySelector(`#userProfile-${index}`).addEventListener("click",function(){
                 //console.log(profile_store[index].profile)
-                const preload_array = profile_store[index].profile;
-                let preload_desc_array = new Array(); 
-                let preload_desc_count = 0;
-                for (let preload_index = 0; preload_index < preload_array.length; preload_index++) {
-                    switch (preload_array[preload_index].type) {
-                        case "dsp_column":
-                            preload_desc_count = 0;
-                            break;
-                        case "main_bar_empty_column":
-                            preload_desc_count = 0;
-                            break;
-                        case "empty_column":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_first_row_end"));
-                            preload_desc_count = 0;
-                            break;
-                        case "second_empty_column":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_second_row_end"));
-                            preload_desc_count = 0;
-                            break;
-                        case "post":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_post_column", [preload_desc_count]));
-                            break;
-                        case "home":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_timeline_column", [preload_desc_count]));
-                            break;
-                        case "notification":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_notification_column", [preload_desc_count]));
-                            break;
-                        case "explore":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_explore_column", [preload_desc_count, preload_array[preload_index].column_save_title]));
-                            break;
-                        case "misskey":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_misskey_column"));
-                            break;
-                        case "bsky":
-                            preload_desc_array.push(i18n_message("msg_profile_desc_bluesky_column"));
-                            break;
-                        default:
-                            preload_desc_count = 0;
-                            break;
-                    }
-                    preload_desc_count += 1;
-                }
+                const preload_desc_array = column_settings.profile_summary(profile_store[index].profile, i18n_message);
                 //console.log(preload_desc_array)
                 if(confirm(`${i18n_message("msg_profile_load_confirm", [index, preload_desc_array.join("\r\n")])}`)){
                     deck_lifecycle.dispose_column_resources_in(document.querySelector("#opd_main_element"));

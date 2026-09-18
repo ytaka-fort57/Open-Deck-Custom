@@ -201,6 +201,42 @@ window.opd_custom_column_settings = (function(){
         };
     }
 
+    //プロファイル切替の確認ダイアログに出す説明文。カラム型ごとに i18n キーを選び、
+    //段の区切り(empty_column / second_empty_column)と区切り以外の未知の型で連番を戻す
+    function profile_summary(profile, i18n_message){
+        const lines = [];
+        let count = 0;
+        Array.from(profile ?? []).forEach(function(column){
+            switch (column?.type) {
+                case "empty_column":
+                    lines.push(i18n_message("msg_profile_desc_first_row_end"));
+                    count = 0;
+                    break;
+                case "second_empty_column":
+                    lines.push(i18n_message("msg_profile_desc_second_row_end"));
+                    count = 0;
+                    break;
+                case "post":
+                    lines.push(i18n_message("msg_profile_desc_post_column", [count]));
+                    break;
+                case "home":
+                    lines.push(i18n_message("msg_profile_desc_timeline_column", [count]));
+                    break;
+                case "notification":
+                    lines.push(i18n_message("msg_profile_desc_notification_column", [count]));
+                    break;
+                case "explore":
+                    lines.push(i18n_message("msg_profile_desc_explore_column", [count, column.column_save_title]));
+                    break;
+                default:
+                    count = 0;
+                    break;
+            }
+            count += 1;
+        });
+        return lines;
+    }
+
     function read_profile(doc, reorder_api){
         const column_elements = reorder_api?.get_visual_column_elements?.(doc)
             ?? Array.from(doc?.querySelectorAll?.("#opd_main_element div[opd_column_type]") ?? []);
@@ -215,6 +251,7 @@ window.opd_custom_column_settings = (function(){
         normalize: normalize,
         read: read,
         read_profile: read_profile,
+        profile_summary: profile_summary,
         render: render,
         render_profile: render_profile,
         render_values: render_values,
