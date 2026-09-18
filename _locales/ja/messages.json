@@ -241,5 +241,20 @@
   },
   "label_api_search": {
     "message": "検索:"
+  },
+  "ui_custom_move_left_title": {
+    "message": "左へ移動"
+  },
+  "ui_custom_move_order_title": {
+    "message": "表示順"
+  },
+  "ui_custom_move_right_title": {
+    "message": "右へ移動"
+  },
+  "ui_custom_settings_import_button": {
+    "message": "設定インポート"
+  },
+  "ui_custom_settings_import_title": {
+    "message": "本家Open-Deckから書き出した設定を取り込みます"
   }
 }

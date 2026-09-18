@@ -241,5 +241,20 @@
   },
   "label_api_search": {
     "message": "Search:"
+  },
+  "ui_custom_move_left_title": {
+    "message": "Move left"
+  },
+  "ui_custom_move_order_title": {
+    "message": "Display order"
+  },
+  "ui_custom_move_right_title": {
+    "message": "Move right"
+  },
+  "ui_custom_settings_import_button": {
+    "message": "Import settings"
+  },
+  "ui_custom_settings_import_title": {
+    "message": "Import settings exported from the original Open-Deck"
   }
 }

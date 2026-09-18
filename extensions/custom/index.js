@@ -31,8 +31,8 @@
         const import_btn = document.createElement("input");
         import_btn.type = "button";
         import_btn.id = CUSTOM_MENU_ID;
-        import_btn.value = "設定インポート";
-        import_btn.title = "本家Open-Deckから書き出した設定を取り込みます";
+        import_btn.value = chrome.i18n.getMessage("ui_custom_settings_import_button");
+        import_btn.title = chrome.i18n.getMessage("ui_custom_settings_import_title");
         import_btn.addEventListener("click", open_settings_import);
         profile_loader_btn.insertAdjacentElement("afterend", import_btn);
         profile_loader_btn.insertAdjacentHTML("afterend", "<br>");

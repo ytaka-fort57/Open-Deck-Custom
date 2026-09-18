@@ -79,3 +79,29 @@ test("manifests and locale files are valid and complete", () => {
     assert.match(upstreamWorkflow, /gh issue (create|edit)/);
     assert.doesNotMatch(upstreamWorkflow, /\bgit merge(?:\s|$)|\bgit push(?:\s|$)|\bgh pr(?:\s|$)/m);
 });
+
+test("content.js column templates take their labels from _locales", () => {
+    const content = readFileSync(join(root, "content.js"), "utf8");
+    const start = content.indexOf("let default_element = {");
+    const end = content.indexOf("};", start);
+    assert.ok(start > 0 && end > start);
+    const templates = content.slice(start, end);
+    assert.doesNotMatch(templates, /[぀-ゟ゠-ヿ一-鿿]/);
+    for (const key of [
+        "ui_column_close_title", "ui_column_pin_toggle_title", "ui_column_post_title",
+        "ui_column_timeline_title", "ui_column_notifications_title", "ui_column_explore_title",
+        "ui_empty_column_message", "ui_second_empty_column_message"
+    ]) {
+        assert.ok(templates.includes(`i18n_message("${key}")`), `content.js: missing ${key}`);
+    }
+
+    const ja = JSON.parse(readFileSync(join(root, "_locales/ja/messages.json"), "utf8"));
+    for (const file of ["extensions/custom/column_reorder.js", "extensions/custom/index.js"]) {
+        const source = readFileSync(join(root, file), "utf8");
+        const keys = [...source.matchAll(/chrome\.i18n\.getMessage\("([^"]+)"\)/g)].map((m) => m[1]);
+        assert.ok(keys.length > 0, `${file}: no i18n keys`);
+        for (const key of keys) {
+            assert.ok(key in ja, `${file}: missing locale key ${key}`);
+        }
+    }
+});

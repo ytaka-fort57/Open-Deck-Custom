@@ -296,9 +296,9 @@ window.opd_custom_column_reorder = (function(){
 
         const wrap = section.ownerDocument.createElement("span");
         wrap.className = CONTROL_CLASS;
-        wrap.innerHTML = '<input type="button" class="opd_custom_move_left" value="◀" title="左へ移動">'
-            + '<select class="opd_custom_move_select" title="表示順"></select>'
-            + '<input type="button" class="opd_custom_move_right" value="▶" title="右へ移動">';
+        wrap.innerHTML = '<input type="button" class="opd_custom_move_left" value="◀" title="' + chrome.i18n.getMessage("ui_custom_move_left_title") + '">'
+            + '<select class="opd_custom_move_select" title="' + chrome.i18n.getMessage("ui_custom_move_order_title") + '"></select>'
+            + '<input type="button" class="opd_custom_move_right" value="▶" title="' + chrome.i18n.getMessage("ui_custom_move_right_title") + '">';
         if(anchor.classList.contains("dsp_column_empty_area")){
             anchor.insertAdjacentElement("beforebegin", wrap);
         }else{
