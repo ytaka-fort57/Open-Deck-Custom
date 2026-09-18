@@ -38,6 +38,14 @@ function manifestReferences(manifest) {
     return references.filter(Boolean);
 }
 
+// Chromium (MV3) は [{matches, resources}]、Firefox (MV2) は文字列配列で宣言するため、
+// 両形式を resources の平坦な配列へ揃える。
+function webAccessibleResources(manifest) {
+    return (manifest.web_accessible_resources ?? []).flatMap((resource) => (
+        typeof resource === "string" ? [resource] : (resource.resources ?? [])
+    ));
+}
+
 test("all project JavaScript files pass node --check", () => {
     const files = walk(root).filter((path) => path.endsWith(".js") || path.endsWith(".mjs"));
     for (const file of files) {
@@ -104,4 +112,24 @@ test("content.js column templates take their labels from _locales", () => {
             assert.ok(key in ja, `${file}: missing locale key ${key}`);
         }
     }
+});
+
+test("content scripts and web accessible resources match between manifests", () => {
+    const chromium = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
+    const firefox = JSON.parse(readFileSync(join(root, "manifest_firefox.json"), "utf8"));
+
+    // content script は読み込み順に依存するため、集合ではなく順序込みで比較する。
+    assert.deepEqual(
+        firefox.content_scripts[0].js,
+        chromium.content_scripts[0].js,
+        "manifest_firefox.json: content_scripts[0].js differs from manifest.json"
+    );
+
+    const chromiumResources = webAccessibleResources(chromium);
+    const firefoxResources = webAccessibleResources(firefox);
+    assert.deepEqual(
+        [...new Set(firefoxResources)].sort(),
+        [...new Set(chromiumResources)].sort(),
+        "manifest_firefox.json: web_accessible_resources differs from manifest.json"
+    );
 });
