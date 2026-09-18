@@ -1,7 +1,7 @@
 # Open-Deck Custom ブラウザーE2E基盤設計
 
 作成日: 2026-09-18  
-状態: Phase 1・2・4実装済み。Phase 3(CI)は未実施
+状態: Phase 1・2・4実装済み。Phase 3(CI)はworkflow追加済み、GitHub上での初回成功は未確認
 
 ## 1. 結論
 
@@ -309,12 +309,25 @@ npx playwright install --no-shell chromium
 - 5回連続成功を確認
 - [verification.md](verification.md)へ実行手順を追加
 
-### Phase 3: CI
+### Phase 3: CI（workflow追加済み。GitHub上での初回成功は未確認）
 
-- GitHub ActionsでChromiumをcacheせず、`npx playwright install --with-deps chromium`を使う
-- Node回帰とE2Eを別jobにする
-- E2E失敗時にtrace / screenshotをartifact化する
-- 安定後もRelease packagingの必須検証とは分離する
+`.github/workflows/e2e.yml`を追加した。`custom`へのpush / pull_requestと
+`workflow_dispatch`で、ubuntu-latest上で次を順に実行する。
+
+1. `npm ci`
+2. `npx playwright install --with-deps chromium`（Chromiumはcacheしない）
+3. `node tests/run.mjs`
+4. `npm run test:e2e`
+
+失敗時は`playwright-report/`と`test-results/`（trace / screenshot）をartifactとして
+保存する。同一ブランチの重複実行は`concurrency`で取り消し、`permissions`は
+`contents: read`のみとする。
+
+設計時はNode回帰とE2Eを別jobにする案だったが、Node回帰は数秒で終わるため
+同一job内でE2Eの前に実行し、Node回帰が壊れている状態でChromiumを取得しない
+形にした。Release packaging（`release.yml`の`verify.sh`）とは引き続き分離している。
+
+GitHub Actions上での初回成功はまだ確認していない。確認後にこの記述を更新する。
 
 ### Phase 4: 拡張（実装済み）
 
