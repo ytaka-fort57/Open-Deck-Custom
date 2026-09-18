@@ -81,8 +81,8 @@
 
 ## 関連文書
 
-- 現在の残課題: [backlog.md](backlog.md)
-- 実DOM E2E基盤設計: [browser-e2e-test-design.md](browser-e2e-test-design.md)
-- カラム内の戻るの機序: [issue-column-back-navigation.md](issue-column-back-navigation.md)
-- 共通検証手順: [verification.md](verification.md)
-- 過去の監査: [docs/archive/README.md](archive/README.md)
+- 現在の残課題: [backlog.md](../backlog.md)
+- 実DOM E2E基盤設計: [browser-e2e-test-design.md](../browser-e2e-test-design.md)
+- カラム内の戻るの機序: [issue-column-back-navigation.md](../issue-column-back-navigation.md)
+- 共通検証手順: [verification.md](../verification.md)
+- 過去の監査: [archive/README.md](README.md)
