@@ -1169,37 +1169,10 @@ function run(settings){
                 }
                 //設定パネルカラム幅設定
                 if(opd_column_width_select != null){
-                    switch (opd_column_div.getAttribute("opd_column_width")){
-                        case '15':
-                            opd_column_width_select.value = 0;
-                            break;
-                        case '20':
-                            opd_column_width_select.value = 1;
-                                break;
-                        case '30':
-                            opd_column_width_select.value = 2;
-                            break;
-                        default:
-                            opd_column_width_select.value = 3;
-                            break;
-                    }
+                    opd_column_width_select.value = column_settings.width_preset_index(opd_column_div.getAttribute("opd_column_width"));
                     if(mode != "session_set"){
                         opd_column_width_select.addEventListener("change", function(){
-                            let preset_rem = null;
-                            switch (this.value){
-                                case '0':
-                                    preset_rem = 15;
-                                    break;
-                                case '1':
-                                    preset_rem = 20;
-                                    break;
-                                case '2':
-                                    preset_rem = 30;
-                                    break;
-                                default:
-                                    preset_rem = 30;
-                                    break;
-                            }
+                            let preset_rem = column_settings.width_from_preset(this.value);
                             this.closest("div[opd_column_type]").setAttribute("opd_column_width", preset_rem);
                             this.closest("div[opd_column_type]").style.width = `${preset_rem}rem`;
                             column_settings_save("", last_load_profile);
@@ -1219,20 +1192,7 @@ function run(settings){
                                 this.closest("div[opd_column_type]").setAttribute("opd_column_width", setting_width_num);
                                 this.closest("div[opd_column_type]").style.width = `${setting_width_num}rem`;
                                 column_settings_save("", last_load_profile);
-                                switch (setting_width_num){
-                                    case 15:
-                                        column_width_preset.value = 0;
-                                        break;
-                                    case 20:
-                                        column_width_preset.value = 1;
-                                        break;
-                                    case 30:
-                                        column_width_preset.value = 2;
-                                        break;
-                                    default:
-                                        column_width_preset.value = 3;
-                                        break;
-                                }
+                                column_width_preset.value = column_settings.width_preset_index(setting_width_num);
                             }else{
                                 alert(i18n_message("msg_invalid_value_alert"));
                             }

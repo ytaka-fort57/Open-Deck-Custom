@@ -154,3 +154,11 @@ test("text review always has a timeout and failure recovery", () => {
     assert.match(textReview, /this\.UITexts\[requested_lang\].*\? requested_lang : "en"/);
     assert.match(textReview, /finally\s*\{\s*review_state = false/);
 });
+
+test("column width preset mapping lives in the settings boundary", () => {
+    assert.match(columnSettings, /const WIDTH_PRESETS = \[15, 20, 30\]/);
+    assert.equal((content.match(/column_settings\.width_preset_index\(/g) ?? []).length, 2);
+    assert.equal((content.match(/column_settings\.width_from_preset\(/g) ?? []).length, 1);
+    assert.doesNotMatch(content, /case '15':/);
+    assert.doesNotMatch(content, /case 15:/);
+});

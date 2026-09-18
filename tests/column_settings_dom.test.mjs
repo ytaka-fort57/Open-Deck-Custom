@@ -204,3 +204,22 @@ test("profile reading follows visual order for save and rebuild round trips", ()
             + "<column type='home' id='rebuilt-2' mode='1'></column>"
     );
 });
+
+test("column width presets round-trip between rem values and select indexes", () => {
+    const settings = loadColumnSettings();
+    assert.deepEqual(Array.from(settings.WIDTH_PRESETS), [15, 20, 30]);
+
+    // 初期表示・手入力後: 幅 -> select 値(属性文字列でも数値でも同じ)
+    assert.deepEqual(["15", "20", "30"].map(settings.width_preset_index), [0, 1, 2]);
+    assert.deepEqual([15, 20, 30].map(settings.width_preset_index), [0, 1, 2]);
+    assert.deepEqual([null, "", "25", 42, "abc"].map(settings.width_preset_index), [3, 3, 3, 3, 3]);
+
+    // select 変更: select 値 -> 幅。カスタム(3)と不正値は 30 に寄せる
+    assert.deepEqual(["0", "1", "2"].map(settings.width_from_preset), [15, 20, 30]);
+    assert.deepEqual(["3", 3, "9", null, undefined, "x"].map(settings.width_from_preset), [30, 30, 30, 30, 30, 30]);
+
+    for (const [index, width] of settings.WIDTH_PRESETS.entries()) {
+        assert.equal(settings.width_preset_index(settings.width_from_preset(String(index))), index);
+        assert.equal(settings.width_from_preset(settings.width_preset_index(String(width))), width);
+    }
+});

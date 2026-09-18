@@ -4,9 +4,24 @@ window.opd_custom_column_settings = (function(){
     const safe_values = window.opd_custom_safe_values;
     const AUTO_RELOAD_TYPES = new Set(["home", "explore"]);
     const VIEW_MODES = new Set(["0", "1", "2"]);
+    //カラム幅プリセット(rem)。select の value 0/1/2 に対応し、それ以外は 3(カスタム)
+    const WIDTH_PRESETS = [15, 20, 30];
 
     function is_auto_reload_type(type){
         return AUTO_RELOAD_TYPES.has(type);
+    }
+
+    //幅(rem)から select の value を求める。プリセット外はカスタム(=プリセット数)
+    function width_preset_index(width){
+        const index = WIDTH_PRESETS.indexOf(Number(width));
+        return index === -1 ? WIDTH_PRESETS.length : index;
+    }
+
+    //select の value から幅(rem)を求める。カスタムや不正値は最大プリセットに寄せる
+    function width_from_preset(index){
+        const key = String(index);
+        const width = /^\d+$/.test(key) ? WIDTH_PRESETS[Number(key)] : undefined;
+        return width ?? WIDTH_PRESETS[WIDTH_PRESETS.length - 1];
     }
 
     function is_checked(column, selector){
@@ -192,5 +207,8 @@ window.opd_custom_column_settings = (function(){
         render_values: render_values,
         new_column_setting: new_column_setting,
         new_column_values: new_column_values,
+        WIDTH_PRESETS: WIDTH_PRESETS,
+        width_preset_index: width_preset_index,
+        width_from_preset: width_from_preset,
     };
 })();
