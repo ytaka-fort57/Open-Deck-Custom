@@ -7,8 +7,9 @@
 最新監査は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) を参照。
 リファクタ候補の一覧と着手順は [code-audit-2026-09-11.md](code-audit-2026-09-11.md) に記載する。
 カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
+実DOM E2E基盤の方針は [browser-e2e-test-design.md](browser-e2e-test-design.md) を参照。
 
-## リファクタ進捗（2026-09-12）
+## リファクタ進捗（2026-09-18）
 
 - R-8の第一段階として、カラム設定DOMのfixtureと4種類のカラム設定テストを追加した。
 - R-2の第一段階として、`extensions/custom/column_settings.js`へDOM読み取りと新規カラムの
@@ -20,15 +21,24 @@
   load監視を`extensions/custom/column_dom.js`へ切り出し、ローカル回帰テスト71/71成功を確認した。
 - R-2の第三段階として、settings codecの旧形式正規化、未知項目保持、`column_settings`との
   import/export round-trip境界を検証した。
-- 残るR-8はcontent.js全体の初期化とカラム追加・削除・再構築・並び替えを同一fixtureで実行すること、
-  R-2はcontent.js全体のround-trip検証である。
+- R-2/R-8の次段階として、初期プロファイルのラック分割・HTML生成と、表示順に沿った設定読み取りを
+  `column_settings`へ集約した。4種類のカラム追加も`column_dom.add_column`へ共通化し、生成・追加・
+  並び替え委譲・保存・再生成の境界をNode fixtureで検証した。ローカル回帰テストは74/74成功した。
+- R-8/R-2のブラウザーE2E基盤をPlaywright同梱Chromiumで実装した。実X通信と個人profileを使わず、
+  request routingした`x.com` fixture上で`content.js`全体を実行し、初期化、通知カラム追加、
+  `style.order`並び替え、削除、保存・再構築round-trip、iframe実行context保持を検証する。
+  E2Eで検出したサイドバーのprofile混入と、独自並び替え後に保存されない不整合も修正した。
+- E2EのPhase 4として、cross-rack移動、プロファイル切替、戻る / Backspace、タブ復元、
+  引用メディア選択の5シナリオを追加した。タブ保存の位置がDOM順で数えられていた不具合を
+  検出して修正した（`extensions/custom/index.js`）。並び替え後に別カラムのタブ保存を
+  奪っていた。Phase 3のCI導入は安定を確認してから行う。
 - 実ブラウザーのログイン済みXでの操作確認は、従来どおり未実施。
 
 ## 優先度: 中
 
 ### 1. 引用付きメディアの選択境界
 
-引用コンテナを特定できた場合に引用側のメディア情報を優先するコード修正と回帰テストを追加済み。Xの現行DOMとReact propsを使った実ブラウザーfixtureで、引用元・引用先の選択結果を確認する。
+引用コンテナを特定できた場合に引用側のメディア情報を優先するコード修正と回帰テストを追加済み。決定的E2E(`tests/e2e/media-viewer.spec.mjs`)で、helper注入・token・ビューアー表示・キー操作までの経路も確認できるようにした。残るのは、Xの現行DOMとReact propsそのものを使った実ブラウザーでの選択結果確認。
 
 ### 2. `misskey` / `bsky`カラム対応（保留）
 
@@ -53,6 +63,10 @@
   上書きする場合、2回目以降を行わない制限が復元漏れになっていないか
 - 画面上の戻るを押したとき、押したカラムだけが戻り、別カラムのタブが動かないか
 - ラックをまたいでカラムを移動した後もBackspaceで戻れるか
+
+最後の2点は決定的E2Eで機序を固定した。
+実Xのルーターとjoint session historyでの確認は引き続き必要。
+(`column-back.spec.mjs` / `column-cross-rack.spec.mjs`)
 
 ## 優先度: 低
 

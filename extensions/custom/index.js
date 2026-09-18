@@ -48,8 +48,16 @@
     }
 
     //タイムラインカラムを左からの並び順で取得する
+    //
+    //独自の並び替えはDOMを動かさずflexのorderだけを変えるため、DOM順は表示順と一致しない。
+    //タブ保存の鍵・並び替え時の付け替え・プロファイル保存はすべて表示順が基準で、
+    //ここだけDOM順で数えると、並び替え後に別カラムの保存を奪う。
     function get_timeline_columns(){
-        return Array.from(document.querySelectorAll('#opd_main_element div[opd_column_type="home"]'));
+        const ordered = column_reorder?.get_visual_column_elements?.(document);
+        const columns = ordered ?? Array.from(document.querySelectorAll("#opd_main_element div[opd_column_type]"));
+        return columns.filter(function(column){
+            return column.getAttribute?.("opd_column_type") === "home";
+        });
     }
 
     //このカラムが今どこにあるか。並び替えで動くため、保存のたびに求め直す

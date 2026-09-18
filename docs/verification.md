@@ -1,6 +1,6 @@
 # Open-Deck Custom 検証手順
 
-更新日: 2026-08-25
+更新日: 2026-09-18
 
 本家更新の移植、リファクタ、不具合修正後は、手作業の確認前に共通回帰テストを実行する。
 
@@ -39,6 +39,46 @@ node tests/run.mjs
 
 `tests/scope_lint.test.mjs`が、ブロック内で宣言した関数のブロック外呼び出しを
 プロジェクト全体で検査する。追加パッケージは不要。
+
+## 決定的ブラウザーE2E
+
+Node.js 20以上を使用し、初回だけ依存とPlaywright同梱Chromiumを取得する。
+
+```powershell
+npm install
+npx playwright install --no-shell chromium
+```
+
+実行コマンド:
+
+```powershell
+npm run test:e2e
+```
+
+`https://x.com/`のURLとproduction manifestのmatch条件は維持したまま、通信を
+`tests/e2e/pages/`のローカルfixtureへ差し替える。個人profile、cookie、token、実X通信は
+使用しない。fixture外のHTTP(S)通信、console error、未処理例外は失敗となり、失敗時は
+`test-results/`にtrace、screenshot、診断情報を残す。
+
+シナリオ:
+
+| spec | 確認内容 |
+| --- | --- |
+| `open-deck-profile` | 初期描画、通知カラム追加、`style.order`での並び替え、削除、保存・再構築、iframe実行context保持 |
+| `column-cross-rack` | 2段表示の追加、ラックをまたぐdropでのDOM移動と保存順、移動後も戻るが効くこと |
+| `column-back` | Backspaceと画面上の戻るが押したカラムだけを戻すこと、実ナビゲーションへ落ちないこと、メディアURLに介入しないこと |
+| `profile-switch` | プロファイル切替での再構築、`last_load_profile`保存、切替元プロファイルの保存が壊れないこと |
+| `tab-restore` | 選択タブの保存、再読み込み後の復元、並び替えに追従する保存鍵の付け替え |
+| `media-viewer` | 引用内メディアの選択、ビューアー表示、`ArrowLeft` / `ArrowRight` / `Escape` |
+
+カラムごとの戻るは`column_history.js`が400ms周期でiframeのURLを見て履歴を積む。
+この状態はDOM・URL・storageのどこにも出ないため、E2Eは遷移前に監視周期分だけ待ち、
+戻る操作は戻れるようになるまで繰り返す(`tests/e2e/fixtures/deck.mjs`)。
+
+画面を確認する場合は`npm run test:e2e:headed`、Playwright Inspectorを使う場合は
+`npm run test:e2e:debug`を実行する。E2EはNode回帰と配布ZIP検証を置き換えない。
+Windowsの制限環境でChromium起動が`spawn EPERM`になる場合は、許可された通常の
+ローカルシェルから同じコマンドを実行する。
 
 ## カラム内の戻る規約(joint session history)
 
@@ -97,7 +137,7 @@ Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで
 
 ## 実ブラウザーで残る確認
 
-自動テストはXの現行DOMやログイン状態を再現しない。次は別途確認する。
+決定的E2EはXの現行DOMやログイン状態を再現しない。次は別途確認する。
 
 - ログイン済みChromiumでの起動、追加、削除、並び替え、プロファイル切り替え
 - Backspaceと画面上の戻る(リプライ詳細→本体、リプライ→リプライ)と、戻った後のスクロール位置
