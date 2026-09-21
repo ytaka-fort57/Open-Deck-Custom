@@ -4,10 +4,10 @@
 
 ## サマリー
 
-- 総数: 31
-- 優先度: P1 3 / P2 13 / P3 15
-- カテゴリ: uiux 2 / architecture 13 / persistence 2 / release 3 / validation 3 / performance 5 / feature 2 / i18n 1
-- 状態: discovered 0 / triaged 18 / in-progress 3 / monitoring 0 / verified 9 / wont-fix 1
+- 総数: 33
+- 優先度: P1 3 / P2 13 / P3 17
+- カテゴリ: uiux 3 / architecture 14 / persistence 2 / release 3 / validation 3 / performance 5 / feature 2 / i18n 1
+- 状態: discovered 2 / triaged 18 / in-progress 3 / monitoring 0 / verified 9 / wont-fix 1
 
 ## 要対応
 
@@ -63,6 +63,8 @@
 | BL-029 | feature | custom | P3 | triaged | タイムラインのリアルタイム流し込み(X Pro相当)が未実装 | TweetDeck / X Pro のような常時流し込みにならない。 | code: [extensions/auto_reload_helper.js:50-70](../../extensions/auto_reload_helper.js#L50) | docs/backlog.md#3 | 周期更新の安定化を優先し見送る。着手時は GraphQL 応答監視の設計から始める。 | 未確認 |
 | BL-030 | feature | custom | P3 | wont-fix | misskey / bskyカラムの描画・保存対応 | 利用予定がないため影響なし。 | code: [extensions/custom/settings_codec.js](../../extensions/custom/settings_codec.js)<br>code: [content.js:938-945](../../content.js#L938) | docs/backlog.md#2 | 必要になった時点で描画・保存・import・移行テストをまとめて実装する。 | 未確認 |
 | BL-031 | release | config | P3 | triaged | content_scriptsのmatchesがChromiumとFirefoxのmanifestで異なる | Firefox では mobile.x.com などサブドメインで拡張が動かない。意図的な差か取りこぼしか未確認。 | code: [manifest.json](../../manifest.json)<br>code: [manifest_firefox.json](../../manifest_firefox.json)<br>code: [tests/project_integrity.test.mjs](../../tests/project_integrity.test.mjs) | — | 意図を確認し、揃えるなら Firefox 側を *.x.com に合わせて BL-011 の検査に matches を追加する。 | 未確認 |
+| BL-032 | uiux | custom | P3 | discovered | プロファイル切替サマリが未知のカラム型を落として連番もずらす | 現行の描画対象8型では表に出ないが、型を足したときや main_bar_empty_column を含まない保存データで、サマリからカラムが消え以降の番号が実際の並びとずれる。切替ダイアログでプロファイルを取り違える。 | code: [extensions/custom/column_settings.js:273-305](../../extensions/custom/column_settings.js#L273)<br>code: [extensions/custom/column_settings.js:160-190](../../extensions/custom/column_settings.js#L160) | — | 連番を描画対象カラムだけで数え、段区切り(empty_column / second_empty_column)でのみ 1 へ戻す。main_bar_empty_column と dsp_column は連番を消費せず行も出さない別扱いにし、それ以外の未知の型は型名を添えた1行を出して落とさない。Node テストで main_bar_empty_column の有無にかかわらず 1 始まりになることを固定する。 | 未確認 |
+| BL-033 | architecture | content | P3 | discovered | プロファイル切替ハンドラ内のconst column_settingsがモジュール参照を隠す | 845行の呼び出しを confirm ブロック内へ動かす、または同ブロックで column_settings.* を参照すると、一時的死角(TDZ)で ReferenceError になりプロファイル切替が無言で止まる。読む側もどちらの column_settings か判別できない。 | code: [content.js:841-861](../../content.js#L841)<br>code: [content.js:23-23](../../content.js#L23) | — | run() へ渡すオブジェクトの変数名を profile_settings など別名にする。BL-014 の profile_controller 切り出しと同じコミット列で行い、content_regression でモジュール名の再宣言が無いことを固定する。 | 未確認 |
 
 ## 実画面未確認一覧
 
@@ -90,6 +92,8 @@
 | BL-029 | feature | custom | P3 | triaged | タイムラインのリアルタイム流し込み(X Pro相当)が未実装 | TweetDeck / X Pro のような常時流し込みにならない。 | code: [extensions/auto_reload_helper.js:50-70](../../extensions/auto_reload_helper.js#L50) | docs/backlog.md#3 | 周期更新の安定化を優先し見送る。着手時は GraphQL 応答監視の設計から始める。 | 未確認 |
 | BL-030 | feature | custom | P3 | wont-fix | misskey / bskyカラムの描画・保存対応 | 利用予定がないため影響なし。 | code: [extensions/custom/settings_codec.js](../../extensions/custom/settings_codec.js)<br>code: [content.js:938-945](../../content.js#L938) | docs/backlog.md#2 | 必要になった時点で描画・保存・import・移行テストをまとめて実装する。 | 未確認 |
 | BL-031 | release | config | P3 | triaged | content_scriptsのmatchesがChromiumとFirefoxのmanifestで異なる | Firefox では mobile.x.com などサブドメインで拡張が動かない。意図的な差か取りこぼしか未確認。 | code: [manifest.json](../../manifest.json)<br>code: [manifest_firefox.json](../../manifest_firefox.json)<br>code: [tests/project_integrity.test.mjs](../../tests/project_integrity.test.mjs) | — | 意図を確認し、揃えるなら Firefox 側を *.x.com に合わせて BL-011 の検査に matches を追加する。 | 未確認 |
+| BL-032 | uiux | custom | P3 | discovered | プロファイル切替サマリが未知のカラム型を落として連番もずらす | 現行の描画対象8型では表に出ないが、型を足したときや main_bar_empty_column を含まない保存データで、サマリからカラムが消え以降の番号が実際の並びとずれる。切替ダイアログでプロファイルを取り違える。 | code: [extensions/custom/column_settings.js:273-305](../../extensions/custom/column_settings.js#L273)<br>code: [extensions/custom/column_settings.js:160-190](../../extensions/custom/column_settings.js#L160) | — | 連番を描画対象カラムだけで数え、段区切り(empty_column / second_empty_column)でのみ 1 へ戻す。main_bar_empty_column と dsp_column は連番を消費せず行も出さない別扱いにし、それ以外の未知の型は型名を添えた1行を出して落とさない。Node テストで main_bar_empty_column の有無にかかわらず 1 始まりになることを固定する。 | 未確認 |
+| BL-033 | architecture | content | P3 | discovered | プロファイル切替ハンドラ内のconst column_settingsがモジュール参照を隠す | 845行の呼び出しを confirm ブロック内へ動かす、または同ブロックで column_settings.* を参照すると、一時的死角(TDZ)で ReferenceError になりプロファイル切替が無言で止まる。読む側もどちらの column_settings か判別できない。 | code: [content.js:841-861](../../content.js#L841)<br>code: [content.js:23-23](../../content.js#L23) | — | run() へ渡すオブジェクトの変数名を profile_settings など別名にする。BL-014 の profile_controller 切り出しと同じコミット列で行い、content_regression でモジュール名の再宣言が無いことを固定する。 | 未確認 |
 
 ## 異常発生時確認待ち
 
