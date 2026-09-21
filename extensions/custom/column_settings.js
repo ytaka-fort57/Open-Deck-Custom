@@ -6,6 +6,8 @@ window.opd_custom_column_settings = (function(){
     const VIEW_MODES = new Set(["0", "1", "2"]);
     //カラム幅プリセット(rem)。select の value 0/1/2 に対応し、それ以外は 3(カスタム)
     const WIDTH_PRESETS = [15, 20, 30];
+    //切替ダイアログに出すExploreカラムのタイトルの最大文字数
+    const SUMMARY_TITLE_MAX = 40;
 
     function is_auto_reload_type(type){
         return AUTO_RELOAD_TYPES.has(type);
@@ -30,6 +32,36 @@ window.opd_custom_column_settings = (function(){
 
     function string_value(value, fallback = ""){
         return typeof value === "string" ? value : fallback;
+    }
+
+    //Xのページタイトルは未読件数 "(3) " とサービス名 " / X" が付く。
+    //同じページでも変わるため、保存するタイトルからは落とす
+    function normalize_explore_title(title){
+        if(typeof title !== "string"){
+            return "";
+        }
+        return title
+            .replace(/\s*\/\s*X$/, "")
+            .replace(/^\(\d+\)\s*/, "")
+            .trim();
+    }
+
+    //XはSPA遷移でURLを変えたあとに document.title を書き換えるため、URL変更の通知では
+    //タイトルがまだ前のページのものになっている。両者を別々に比べ、変わった項目だけ返す。
+    //遷移途中の空タイトルでは上書きしない
+    function explore_state_changes(previous, current){
+        const changes = {};
+        if(current == null){
+            return changes;
+        }
+        if(typeof current.path === "string" && previous?.href !== current.href){
+            changes.column_save_path = current.path;
+        }
+        const title = normalize_explore_title(current.title);
+        if(title !== "" && normalize_explore_title(previous?.title) !== title){
+            changes.column_save_title = title;
+        }
+        return changes;
     }
 
     function normalize(input = {}, fallback = {}){
@@ -201,6 +233,41 @@ window.opd_custom_column_settings = (function(){
         };
     }
 
+    //検索パスは日本語がパーセント符号化されていて読めないため、表示用に戻す
+    function decode_summary_path(path){
+        const value = string_value(path);
+        try{
+            return decodeURIComponent(value);
+        }catch(error){
+            //壊れた符号化はそのまま出す
+            return value;
+        }
+    }
+
+    //切替ダイアログは1行が長いと読めないため、タイトルは頭だけ残す
+    function shorten_summary_title(title){
+        const value = string_value(title).trim();
+        return value.length > SUMMARY_TITLE_MAX
+            ? `${value.slice(0, SUMMARY_TITLE_MAX)}…`
+            : value;
+    }
+
+    //Exploreカラムは保存時に見ていたページのタイトルだけでは見分けられないため、
+    //読み込まれるパスを添える。ピン留め中はピン留めパスが読み込まれ、タイトルは
+    //その後に見たページのものになっているので、パスとピン留めの印だけを出す
+    function explore_summary_label(column, i18n_message){
+        const pinned_path = string_value(column?.column_pinned_path);
+        if(pinned_path !== ""){
+            return `${decode_summary_path(pinned_path)} (${i18n_message("msg_profile_desc_pinned_mark")})`;
+        }
+        const save_path = decode_summary_path(column?.column_save_path);
+        const title = shorten_summary_title(column?.column_save_title);
+        if(title === ""){
+            return save_path;
+        }
+        return save_path === "" ? title : `${title} (${save_path})`;
+    }
+
     //プロファイル切替の確認ダイアログに出す説明文。カラム型ごとに i18n キーを選び、
     //段の区切り(empty_column / second_empty_column)と区切り以外の未知の型で連番を戻す
     function profile_summary(profile, i18n_message){
@@ -226,7 +293,7 @@ window.opd_custom_column_settings = (function(){
                     lines.push(i18n_message("msg_profile_desc_notification_column", [count]));
                     break;
                 case "explore":
-                    lines.push(i18n_message("msg_profile_desc_explore_column", [count, column.column_save_title]));
+                    lines.push(i18n_message("msg_profile_desc_explore_column", [count, explore_summary_label(column, i18n_message)]));
                     break;
                 default:
                     count = 0;
@@ -252,6 +319,8 @@ window.opd_custom_column_settings = (function(){
         read: read,
         read_profile: read_profile,
         profile_summary: profile_summary,
+        normalize_explore_title: normalize_explore_title,
+        explore_state_changes: explore_state_changes,
         render: render,
         render_profile: render_profile,
         render_values: render_values,

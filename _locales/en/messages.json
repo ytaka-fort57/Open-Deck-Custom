@@ -221,6 +221,9 @@
   "msg_profile_desc_explore_column": {
     "message": "$1-[$2]-Universal (Explore) column"
   },
+  "msg_profile_desc_pinned_mark": {
+    "message": "pinned"
+  },
   "msg_profile_desc_misskey_column": {
     "message": "Misskey column"
   },

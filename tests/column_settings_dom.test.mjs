@@ -264,7 +264,7 @@ test("profile summary picks one i18n line per visible column and numbers each ro
         { type: "post" },
         { type: "home" },
         { type: "notification" },
-        { type: "explore", column_save_title: "List 42" },
+        { type: "explore", column_save_title: "List 42", column_save_path: "/i/lists/42" },
         { type: "empty_column" },
         { type: "misskey" },
         { type: "bsky" },
@@ -276,11 +276,92 @@ test("profile summary picks one i18n line per visible column and numbers each ro
         "msg_profile_desc_post_column(1)",
         "msg_profile_desc_timeline_column(2)",
         "msg_profile_desc_notification_column(3)",
-        "msg_profile_desc_explore_column(4,List 42)",
+        "msg_profile_desc_explore_column(4,List 42 (/i/lists/42))",
         "msg_profile_desc_first_row_end",
         "msg_profile_desc_timeline_column(1)",
         "msg_profile_desc_second_row_end",
     ]);
     assert.deepEqual(Array.from(settings.profile_summary([], i18n)), []);
     assert.deepEqual(Array.from(settings.profile_summary(undefined, i18n)), []);
+});
+
+test("profile summary shows the explore path that will actually load", () => {
+    const settings = loadColumnSettings();
+    const i18n = (key, substitutions) => substitutions == null ? key : `${key}(${substitutions.join(",")})`;
+    const summary = (column) => settings.profile_summary([column], i18n)[0];
+
+    //ピン留め中は保存時に見ていたページではなくピン留めパスが読み込まれるため、
+    //タイトルは出さずピン留めパスと印だけを出す
+    assert.equal(
+        summary({ type: "explore", column_save_path: "/explore", column_save_title: "話題を検索", column_pinned_path: "/i/lists/42" }),
+        "msg_profile_desc_explore_column(0,/i/lists/42 (msg_profile_desc_pinned_mark))"
+    );
+    //タイトルが無いカラムはパスだけで見分ける
+    assert.equal(
+        summary({ type: "explore", column_save_path: "/explore", column_save_title: "" }),
+        "msg_profile_desc_explore_column(0,/explore)"
+    );
+    //ダイアログが読めなくなるため長いタイトルは切り詰める
+    assert.equal(
+        summary({ type: "explore", column_save_path: "/explore", column_save_title: "あ".repeat(60) }),
+        `msg_profile_desc_explore_column(0,${"あ".repeat(40)}… (/explore))`
+    );
+    //検索パスは符号化されたままでは読めないため戻して出す
+    assert.equal(
+        summary({ type: "explore", column_save_path: "/search?q=%E3%83%A1%E3%82%A4%E3%83%89", column_save_title: "" }),
+        "msg_profile_desc_explore_column(0,/search?q=メイド)"
+    );
+    //壊れた符号化はそのまま出す
+    assert.equal(
+        summary({ type: "explore", column_save_path: "/search?q=%E3", column_save_title: "" }),
+        "msg_profile_desc_explore_column(0,/search?q=%E3)"
+    );
+    //保存形式が古くフィールドが欠けていても "undefined" を出さない
+    assert.equal(summary({ type: "explore" }), "msg_profile_desc_explore_column(0,)");
+});
+
+test("explore title drops X decorations and url/title changes are tracked apart", () => {
+    const settings = loadColumnSettings();
+    //vmの外とはプロトタイプが違うため、素のオブジェクトへ写してから比べる
+    const changes = (previous, current) =>
+        JSON.parse(JSON.stringify(settings.explore_state_changes(previous, current)));
+
+    assert.equal(settings.normalize_explore_title("話題を検索 / X"), "話題を検索");
+    assert.equal(settings.normalize_explore_title("(3) 話題を検索 / X"), "話題を検索");
+    assert.equal(settings.normalize_explore_title(undefined), "");
+
+    //XはURLを変えたあとに document.title を書き換える。URLだけが変わった通知で
+    //1ページ前のタイトルを保存し直さない
+    assert.deepEqual(
+        changes(
+            { href: "https://x.com/explore", title: "話題を検索 / X" },
+            { href: "https://x.com/search?q=a", path: "/search?q=a", title: "話題を検索 / X" }
+        ),
+        { column_save_path: "/search?q=a" }
+    );
+    //あとから届くタイトル変更だけの通知でタイトルを追いつかせる
+    assert.deepEqual(
+        changes(
+            { href: "https://x.com/search?q=a", title: "話題を検索" },
+            { href: "https://x.com/search?q=a", path: "/search?q=a", title: "「a」の検索結果 / X" }
+        ),
+        { column_save_title: "「a」の検索結果" }
+    );
+    //遷移途中の空タイトルでは上書きしない
+    assert.deepEqual(
+        changes(
+            { href: "https://x.com/explore", title: "話題を検索" },
+            { href: "https://x.com/explore", path: "/explore", title: "" }
+        ),
+        {}
+    );
+    //未読件数だけの変化では保存し直さない
+    assert.deepEqual(
+        changes(
+            { href: "https://x.com/explore", title: "話題を検索" },
+            { href: "https://x.com/explore", path: "/explore", title: "(5) 話題を検索 / X" }
+        ),
+        {}
+    );
+    assert.deepEqual(changes({ href: "https://x.com/explore" }, null), {});
 });

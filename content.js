@@ -1164,7 +1164,7 @@ function run(settings){
                 return {
                     href: href,
                     path: `${url.pathname}${url.search}`,
-                    title: exp_object.contentWindow.document.title.replace(" / X", ""),
+                    title: exp_object.contentWindow.document.title,
                     document: exp_object.contentWindow.document,
                 };
             }catch(error){
@@ -1184,15 +1184,31 @@ function run(settings){
             if(initial_state == null){
                 return;
             }
+            //XはSPA遷移でURLを先に変え、document.titleをその後で書き換える。
+            //同じ通知でURLとタイトルを一緒に読むと、タイトルだけ1ページ前のまま保存される。
+            //URLとタイトルは別々に比べ、変わった項目だけを書き戻す。
             let exp_old_url = initial_state.href;
+            let exp_old_title = element.getAttribute("opd_explore_title") ?? "";
             const exp_observer = new MutationObserver(function(){
                 const current_state = read_explore_state();
-                if(current_state == null || exp_old_url === current_state.href){
+                if(current_state == null){
                     return;
                 }
-                element.setAttribute("opd_explore_path", current_state.path);
-                exp_old_url = current_state.href;
-                element.setAttribute("opd_explore_title", current_state.title);
+                const changes = column_settings.explore_state_changes(
+                    {href: exp_old_url, title: exp_old_title},
+                    current_state
+                );
+                if(changes.column_save_path != undefined){
+                    exp_old_url = current_state.href;
+                    element.setAttribute("opd_explore_path", changes.column_save_path);
+                }
+                if(changes.column_save_title != undefined){
+                    exp_old_title = changes.column_save_title;
+                    element.setAttribute("opd_explore_title", changes.column_save_title);
+                }
+                if(changes.column_save_path == undefined && changes.column_save_title == undefined){
+                    return;
+                }
                 column_settings_save("", last_load_profile);
             });
             exp_object.opd_url_observer = exp_observer;

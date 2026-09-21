@@ -97,6 +97,9 @@ test("untrusted values cross explicit safe DOM and URL boundaries", () => {
 test("remaining audit hardening paths are wired", () => {
     assert.match(content, /start_auto_reload\(Number\(auto_reload_time\.value\) \* 1000\)/);
     assert.match(content, /const read_explore_state = function/);
+    //URLとタイトルを一緒に保存するとタイトルが1ページ前のまま残るため、差分は純粋関数側で出す
+    assert.match(content, /column_settings\.explore_state_changes\(/);
+    assert.doesNotMatch(content, /element\.setAttribute\("opd_explore_title", current_state\.title\)/);
     assert.match(settingsImport, /reader\.addEventListener\("error"/);
 });
 

@@ -221,6 +221,9 @@
   "msg_profile_desc_explore_column": {
     "message": "$1-[$2]-ユニバーサル(Explore)カラム"
   },
+  "msg_profile_desc_pinned_mark": {
+    "message": "ピン留め"
+  },
   "msg_profile_desc_misskey_column": {
     "message": "Misskeyカラム"
   },
