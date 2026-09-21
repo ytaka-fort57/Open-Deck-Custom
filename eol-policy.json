@@ -1,0 +1,104 @@
+{
+  "$schema-note": "行末形式の正本。方針は docs/dev/line-ending-policy.md、検査は scripts/check-line-endings.mjs。",
+  "$rules-note": "期待値は files(完全一致) > conventions(後勝ち) > 変更前のバイト > default の順で決まる。",
+  "default": {
+    "eol": "lf",
+    "finalNewline": true
+  },
+  "conventions": [
+    {
+      "pattern": "extensions/**",
+      "eol": "lf",
+      "finalNewline": false,
+      "note": "本家由来の拡張スクリプト"
+    },
+    {
+      "pattern": "extensions/custom/**",
+      "eol": "lf",
+      "finalNewline": true,
+      "note": "独自ファイルの標準"
+    }
+  ],
+  "files": {
+    "_locales/ja/messages.json": {
+      "eol": "lf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "about_opd.html": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "about_opd.js": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "background.js": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "content.js": {
+      "eol": "crlf",
+      "finalNewline": true,
+      "note": "本家由来"
+    },
+    "icon/logo_icon.svg": {
+      "eol": "crlf",
+      "finalNewline": true,
+      "note": "本家由来"
+    },
+    "icon/logo_v1.svg": {
+      "eol": "crlf",
+      "finalNewline": true,
+      "note": "本家由来"
+    },
+    "icon/t_logo.svg": {
+      "eol": "crlf",
+      "finalNewline": true,
+      "note": "本家由来"
+    },
+    "manifest.json": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来。本家とバイト互換を優先しCRLFで固定する"
+    },
+    "manifest_firefox.json": {
+      "eol": "lf",
+      "finalNewline": false,
+      "note": "本家由来。manifest.json と同じ形式へ機械変換してはいけない"
+    },
+    "package.sh": {
+      "eol": "lf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "popup.html": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "popup.js": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "profile_debug.html": {
+      "eol": "crlf",
+      "finalNewline": false,
+      "note": "本家由来"
+    },
+    "profile_debug.js": {
+      "eol": "crlf",
+      "finalNewline": true,
+      "note": "本家由来"
+    },
+    "text_review_privacy_policy.md": {
+      "eol": "lf",
+      "finalNewline": false,
+      "note": "本家由来"
+    }
+  }
+}

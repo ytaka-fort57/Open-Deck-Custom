@@ -1,0 +1,48 @@
+name: Line endings
+
+# 行末形式を eol-policy.json の正本とバイト比較する。
+# ローカルの pre-commit を無効化しても、ここで同じ規則が適用される。
+
+on:
+  push:
+    branches:
+      - custom
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: line-endings-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # checkout v6.0.2
+        with:
+          # 変更されたファイルの「変更前のバイト」を読むため、比較元まで遡る
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # setup-node v7.0.0
+        with:
+          node-version: '22'
+
+      # 追跡中の全ファイルが正本と一致していることを確認する
+      - name: Check all tracked files
+        run: node scripts/check-line-endings.mjs --all
+
+      # .editorconfig は eol-policy.json から生成される。手編集によるずれを検知する
+      - name: Check .editorconfig is in sync
+        run: node scripts/check-line-endings.mjs --check-editorconfig
+
+      # 変更分は、変更前のバイトとも突き合わせる (未登録の本家ファイル対策)
+      - name: Check changed files against base
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-line-endings.mjs --base "origin/${{ github.base_ref }}"

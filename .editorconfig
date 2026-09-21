@@ -1,0 +1,100 @@
+# エディタによる行末変換を防ぐ。
+# このファイルは eol-policy.json から生成される。手で編集せず npm run eol:sync を使う。
+# .editorconfig はパッチ適用ツールや任意のスクリプトを制御しないため、
+# 実際の担保は scripts/check-line-endings.mjs の検査で行う。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+# 本家由来の拡張スクリプト
+[/extensions/**]
+end_of_line = lf
+insert_final_newline = false
+
+# 独自ファイルの標準
+[/extensions/custom/**]
+end_of_line = lf
+insert_final_newline = true
+
+# 本家由来
+[/_locales/ja/messages.json]
+end_of_line = lf
+insert_final_newline = false
+
+# 本家由来
+[/about_opd.html]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/about_opd.js]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/background.js]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/content.js]
+end_of_line = crlf
+insert_final_newline = true
+
+# 本家由来
+[/icon/logo_icon.svg]
+end_of_line = crlf
+insert_final_newline = true
+
+# 本家由来
+[/icon/logo_v1.svg]
+end_of_line = crlf
+insert_final_newline = true
+
+# 本家由来
+[/icon/t_logo.svg]
+end_of_line = crlf
+insert_final_newline = true
+
+# 本家由来。本家とバイト互換を優先しCRLFで固定する
+[/manifest.json]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来。manifest.json と同じ形式へ機械変換してはいけない
+[/manifest_firefox.json]
+end_of_line = lf
+insert_final_newline = false
+
+# 本家由来
+[/package.sh]
+end_of_line = lf
+insert_final_newline = false
+
+# 本家由来
+[/popup.html]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/popup.js]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/profile_debug.html]
+end_of_line = crlf
+insert_final_newline = false
+
+# 本家由来
+[/profile_debug.js]
+end_of_line = crlf
+insert_final_newline = true
+
+# 本家由来
+[/text_review_privacy_policy.md]
+end_of_line = lf
+insert_final_newline = false
