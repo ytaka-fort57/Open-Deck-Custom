@@ -18,6 +18,7 @@
     const column_reorder = window.opd_custom_column_reorder;
     const lifecycle = window.opd_custom_lifecycle;
     const list_repost_filter = window.opd_custom_list_repost_filter;
+    const short_post_filter = window.opd_custom_short_post_filter;
 
     function open_settings_import(){
         window.open(chrome.runtime.getURL("extensions/custom/settings_import.html"), "OPD-Custom-Settings-Import", 'width=760, height=680');
@@ -254,12 +255,19 @@
         }
     }
 
+    function setup_short_post_filter(){
+        if(short_post_filter != null){
+            short_post_filter.setup(document, lifecycle);
+        }
+    }
+
     //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
     const observer = new MutationObserver(function(){
         add_menu_button();
         setup_timeline_columns();
         setup_column_keys();
         setup_list_repost_filter();
+        setup_short_post_filter();
         column_reorder.setup(document);
     });
     observer.observe(document.documentElement, {childList: true, subtree: true});
@@ -267,4 +275,5 @@
     setup_timeline_columns();
     setup_column_keys();
     setup_list_repost_filter();
+    setup_short_post_filter();
 })();
