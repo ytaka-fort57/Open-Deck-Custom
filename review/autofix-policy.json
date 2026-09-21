@@ -1,0 +1,43 @@
+{
+  "$comment": "Open-Deck 自動修正ゲート。初回試験では docs-link だけを許可し、方針・CI・エンジン自身は変更不可。",
+  "baseBranch": "custom",
+  "branchPrefix": "autofix/",
+  "maxOpenBranches": 1,
+  "excludeCategories": ["security", "persistence"],
+  "limits": {
+    "maxChangedFiles": 4,
+    "maxChangedLines": 100
+  },
+  "bookkeepingLimits": {
+    "maxChangedFiles": 4,
+    "maxChangedLines": 120
+  },
+  "forbiddenPaths": [
+    ".env*",
+    "package.json",
+    "package-lock.json",
+    ".github/**",
+    ".githooks/**",
+    ".agents/skills/review-*/**",
+    ".claude/skills/review-*/**",
+    "docs/dev/automated-review-cycle-runbook.md",
+    "manifest.json",
+    "manifest_firefox.json",
+    "background.js",
+    "extensions/custom/storage_repository.js",
+    "extensions/custom/safe_values.js",
+    "review.config.json",
+    "review/autofix-policy.json",
+    "scripts/review-*.mjs",
+    "tests/review/**",
+    "tests/review_port.test.mjs"
+  ],
+  "classes": {
+    "docs-link": {
+      "title": "ドキュメントのリンク切れ",
+      "scope": ["*.md", "docs/**/*.md", ".claude/**/*.md", ".agents/**/*.md"],
+      "check": "docs-links",
+      "requireTestChange": false
+    }
+  }
+}

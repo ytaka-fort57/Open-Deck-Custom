@@ -12,7 +12,17 @@
     "backlog:verify": "node scripts/backlog.mjs verify",
     "backlog:suppress": "node scripts/backlog.mjs suppress",
     "backlog:report": "node scripts/backlog.mjs report",
-    "backlog:validate": "node scripts/backlog.mjs validate"
+    "backlog:validate": "node scripts/backlog.mjs validate",
+    "review:lenses": "node scripts/review-cycle.mjs lenses",
+    "review:plan": "node scripts/review-cycle.mjs plan",
+    "review:start": "node scripts/review-cycle.mjs start",
+    "review:finish": "node scripts/review-cycle.mjs finish",
+    "review:runs": "node scripts/review-cycle.mjs runs",
+    "review:stats": "node scripts/review-cycle.mjs stats",
+    "review:check": "node scripts/review-cli.mjs check",
+    "review:check:strict": "node scripts/review-cli.mjs check --strict",
+    "review:autofix": "node scripts/review-cli.mjs autofix",
+    "review": "node scripts/review-cli.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

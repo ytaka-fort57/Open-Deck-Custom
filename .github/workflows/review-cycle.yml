@@ -1,0 +1,89 @@
+name: review-cycle
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+      - run: npm ci
+      - name: Deterministic review checks
+        run: |
+          set -o pipefail
+          npm run review -- check | tee review-check.log
+      - name: Add review summary
+        if: always()
+        run: |
+          {
+            echo '## review check'
+            echo '~~~'
+            cat review-check.log
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  autofix-gate:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'autofix/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.base_ref }}
+          path: .autofix-gate
+      - name: Move trusted gate outside the worktree
+        run: mv .autofix-gate "$RUNNER_TEMP/autofix-gate"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+      - name: Check autofix scope and size
+        env:
+          REVIEW_REPO_ROOT: ${{ github.workspace }}
+          REVIEW_CONFIG_FILE: ${{ runner.temp }}/autofix-gate/review.config.json
+        run: >-
+          node "$RUNNER_TEMP/autofix-gate/scripts/review-cli.mjs" autofix gate
+          --base "origin/$GITHUB_BASE_REF"
+          --policy "$RUNNER_TEMP/autofix-gate/review/autofix-policy.json"
+          --findings "$RUNNER_TEMP/autofix-gate/docs/backlog/findings.jsonl"
+          --fixes "$GITHUB_WORKSPACE/docs/backlog/fixes.jsonl"
+          --skip-verify --no-record
+
+  health:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+      - run: npm ci
+      - run: npm run review -- health
+      - name: Open a report update PR when needed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/review-health
+          title: "chore: 自動レビュー健全性レポートを更新する"
+          commit-message: "chore: 自動レビュー健全性レポートを更新する"
+          body: `npm run review -- health` の定期更新。
+          add-paths: |
+            docs/backlog/health.md
+            docs/backlog/report.md
+      - name: Fail only for actionable alerts
+        run: npm run review -- health --stdout --fail-on-alert > /dev/null

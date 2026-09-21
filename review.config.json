@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "paths": {
+    "lenses": "review/lenses.jsonl",
+    "findings": "docs/backlog/findings.jsonl",
+    "runs": "docs/backlog/runs.jsonl",
+    "fixes": "docs/backlog/fixes.jsonl",
+    "report": "docs/backlog/report.md",
+    "health": "docs/backlog/health.md",
+    "autofixPolicy": "review/autofix-policy.json"
+  },
+  "vocabulary": {
+    "findingIdPrefix": "BL",
+    "categories": ["uiux", "architecture", "persistence", "release", "validation", "security", "performance", "feature", "i18n"],
+    "components": ["content", "custom", "helper", "background", "tests", "docs", "config"],
+    "areas": ["interaction", "state", "responsive", "accessibility", "visual", "copy", "navigation", "layout", "feedback", "performance", "architecture", "persistence", "migration", "release", "validation", "security", "i18n", "lifecycle", "history", "css"]
+  },
+  "limits": {
+    "maxFindingsPerRun": 5,
+    "maxScannedFiles": 120,
+    "maxDurationMinutes": 45,
+    "staleLockMinutes": 60
+  },
+  "verification": [
+    "npm run test:unit",
+    "npm run backlog:validate -- --report"
+  ]
+}
