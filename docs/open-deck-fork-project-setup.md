@@ -1,13 +1,14 @@
 # Open-Deck を fork してカスタム開発プロジェクトを作る手順
 
-最終確認日: 2026-07-18
+最終確認日: 2026-09-21
 
 ## 1. この手順の目的
 
 この文書では、[kawa-nobu/Open-Deck](https://github.com/kawa-nobu/Open-Deck) を自分の GitHub アカウントへ fork し、Windows 上にカスタム版の開発プロジェクトを用意して、次の状態まで進めます。
 
 - Chromium 系ブラウザーで fork 版をデベロッパーモード実行できる
-- Firefox 用パッケージも作成できる
+- 実運用は Microsoft Edge（Chromium）を対象とする
+- Firefox 用 manifest / ZIP は既存定義の自動検査用に残すが、Firefox の使用・実機確認は対象外とする
 - 独自変更を本家コードから分離して管理できる
 - 本家 `Release` ブランチの更新を検知し、必要な変更だけを意味移植できる
 - 最初の不具合修正を安全に開始できる
@@ -23,7 +24,7 @@
 - npm、Vite、Webpack などを使う一般的なビルドプロジェクトではない
 - JavaScript、HTML、画像、マニフェストを直接読み込むブラウザー拡張
 - Chromium 用は `manifest.json`（Manifest V3）
-- Firefox 用は `manifest_firefox.json`（Manifest V2）
+- Firefox 用は `manifest_firefox.json`（Manifest V2）。ただし本プロジェクトでは使用予定がない
 - `package.ps1` を実行すると、Chromium 版と Firefox 版の ZIP が `package/` に作られる
 - Firefox 版の作成時は、スクリプトが一時領域で `manifest_firefox.json` を `manifest.json` に置き換える
 - ライセンスは MIT。ただし、フォーク版にも元の `LICENSE` と著作権表示を残す
@@ -58,7 +59,7 @@
 
 任意:
 
-- Firefox（Firefox 版も確認する場合）
+- Firefox（本プロジェクトでは使用予定なし。実機確認は行わない）
 - GitHub CLI `gh`（CLI で fork、Pull Request 作成を行う場合）
 - Visual Studio Code などのエディター
 
@@ -175,7 +176,11 @@ git status --short
 
 ソースを変更した後は、拡張機能管理画面の Open-Deck カードにある再読み込みボタンを押してから対象タブを再読み込みします。`background.js`、`manifest.json`、content script の変更は、ページの再読み込みだけでは反映されない場合があります。
 
-## 11. Firefox で開発版を読み込む
+## 11. Firefox で開発版を読み込む（運用対象外）
+
+Firefox は使用予定がないため、以下の手動手順は現行の開発・リリース確認には適用しません。
+`package.ps1` による Firefox ZIP の生成と構造検査は、既存の配布定義を壊していないことを確認する目的でのみ残しています。
+Firefox を将来使用することになった場合にだけ、この節の手順を再開してください。
 
 Firefox 用はルートの `manifest_firefox.json` をそのまま選ぶのではなく、付属スクリプトで Firefox 用 ZIP を作ります。
 
@@ -218,7 +223,7 @@ Expand-Archive -Path $FirefoxZip.FullName -DestinationPath .\.firefox-dev
 3. `.firefox-dev\manifest.json` を選ぶ。
 4. X の対象ページを開いて動作確認する。
 
-一時アドオンは Firefox の終了時に解除されます。日常開発の主対象を Chromium にし、Firefox は節目ごとに確認すると作業が簡単です。
+一時アドオンは Firefox の終了時に解除されます。本プロジェクトでは Firefox の実機確認は行いません。
 
 ## 12. 開発用ファイルを Git 管理から除外する
 
@@ -400,7 +405,7 @@ Issueへの書き込みには`issues: write`だけを使い、repository content
 3. 画像ビューアーの全体表示、`Esc`、背景クリックを修正する
 4. リロード前後のプロファイル、選択カラム、カラム URL の保存状態を調査する
 5. Chromium で安定させる
-6. Firefox の差分を吸収する
+6. Firefox の差分を吸収する（運用対象外のため保留）
 7. 本家レビューIssueの週次検知を有効にする
 
 ## 参考リンク
