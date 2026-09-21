@@ -51,7 +51,7 @@ function react_props(props){
     return Object.assign({}, { "__reactProps$fixture": props });
 }
 
-function quotedMediaEvent(){
+function quotedMediaEvent({ compact = false } = {}){
     const quoted_media = [
         { media_url_https: "https://x.com/quoted-first.jpg" },
         { media_url_https: "https://x.com/quoted-current.jpg" },
@@ -59,8 +59,9 @@ function quotedMediaEvent(){
     const direct_media = [
         { media_url_https: "https://x.com/direct.jpg" },
     ];
-    const quoted_props = react_props({
-        children: [
+    const quoted_children = compact
+        ? [{ props: { attachment: { props: { children: { props: { mediaDetails: quoted_media } } } } } }]
+        : [
             [
                 {
                     props: {
@@ -84,7 +85,9 @@ function quotedMediaEvent(){
             ],
             { props: { children: [{ props: { mediaDetails: direct_media } }] } },
             { props: { tweet: { extended_entities: { media: direct_media } } } },
-        ],
+        ];
+    const quoted_props = react_props({
+        children: quoted_children,
     });
     const image = {
         src: "https://x.com/quoted-current",
@@ -122,6 +125,17 @@ test("video playback clicks are left to X instead of opening the media viewer", 
 test("quoted media details take precedence over the outer post media", () => {
     const { click_listener, dispatched } = loadHelper();
     const event = quotedMediaEvent();
+
+    click_listener(event);
+
+    assert.equal(dispatched.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(dispatched[0].media_info)), event.quoted_media);
+    assert.equal(dispatched[0].selected_index, 1);
+});
+
+test("quoted media is found when a compact column changes the React children layout", () => {
+    const { click_listener, dispatched } = loadHelper();
+    const event = quotedMediaEvent({ compact: true });
 
     click_listener(event);
 

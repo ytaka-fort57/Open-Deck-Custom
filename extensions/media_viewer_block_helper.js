@@ -61,12 +61,9 @@
         //引用の場合のメディアソースの一覧を取得
         let media_details_quoted = root_props?.children?.[2]?.props?.tweet?.extended_entities?.media;
         if(quoted){
-            media_details_quoted = root_props?.children?.[0]?.[0]?.props?.children?.[1]?.props?.children?.[5]?.props?.children?.props?.mediaDetails;
-            
-            //小さいサイズ表示になっている引用画像を取得する
-            if(!media_details_quoted){
-                media_details_quoted = root_props?.children?.[0]?.[0]?.props?.children?.[1]?.props?.children?.[0]?.props?.children?.[1]?.props?.children?.props?.mediaDetails;
-            }
+            //Xはカラム幅や遅延描画によって引用カードのchildren構造を変える。
+            //固定添字ではなく、クリックした画像URLに対応するメディア配列を引用カード内から探す。
+            media_details_quoted = find_media_details(root_props, img?.src, current_video_source?.posterImage);
             media_details = media_details_quoted ?? media_details;
         }else{
             media_details ??= media_details_quoted;
@@ -133,6 +130,54 @@
         }
         const media_without_extension = media_url.replace(/\.(?:jpe?g|png|webp)$/i, "");
         return image_src.includes(media_url) || image_src.includes(media_without_extension);
+    }
+
+    function find_media_details(root, image_src, poster_image){
+        if(root == null || typeof root !== "object"){
+            return null;
+        }
+
+        const queue = [root];
+        const visited = new WeakSet();
+        const candidates = [];
+        const max_nodes = 2000;
+        let cursor = 0;
+
+        while(cursor < queue.length && cursor < max_nodes){
+            const current = queue[cursor++];
+            if(current == null || typeof current !== "object" || visited.has(current)){
+                continue;
+            }
+            visited.add(current);
+
+            if(Array.isArray(current.mediaDetails) && current.mediaDetails.length > 0){
+                candidates.push(current.mediaDetails);
+            }
+            const legacy_media = current.extended_entities?.media;
+            if(Array.isArray(legacy_media) && legacy_media.length > 0){
+                candidates.push(legacy_media);
+            }
+
+            let values;
+            try{
+                values = Object.values(current);
+            }catch(_error){
+                continue;
+            }
+            values.forEach(function(value){
+                if(value != null && typeof value === "object"){
+                    queue.push(value);
+                }
+            });
+        }
+
+        const matching = candidates.find(function(media_items){
+            return media_items.some(function(media){
+                const media_url = media?.media_url_https;
+                return media_url_matches(image_src, media_url) || poster_image === media_url;
+            });
+        });
+        return matching ?? candidates[0] ?? null;
     }
 
     //機能動作用のトークンを設定

@@ -21,7 +21,14 @@
 
     //引用コンテナ:
     //root_props.children[0][0].props.children[1].props.children[5].props.children.props.mediaDetails
-    function quoted_props(media){
+    function quoted_props(media, compact){
+        if(compact){
+            return {
+                children: [
+                    {props: {attachment: {props: {children: {props: {mediaDetails: media}}}}}},
+                ],
+            };
+        }
         return {
             children: [[
                 {props: {children: [null, {props: {children: [
@@ -43,6 +50,8 @@
     }
     const quote_container = document.getElementById("opd_fixture_quote_container");
     if(quote_container != null){
-        quote_container[PROPS_KEY] = quoted_props(quote_media);
+        const timeline_frames = Array.from(parent.document.querySelectorAll('#first_rack_element iframe[src*="/home"]'));
+        const is_compact_column = timeline_frames.indexOf(window.frameElement) > 0;
+        quote_container[PROPS_KEY] = quoted_props(quote_media, is_compact_column);
     }
 })();
