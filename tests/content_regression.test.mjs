@@ -7,6 +7,9 @@ const background = readFileSync("background.js", "utf8");
 const textReview = readFileSync("extensions/text_review.js", "utf8");
 const textReviewHelper = readFileSync("extensions/text_review_helper.js", "utf8");
 const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
+const columnResourceRegistry = readFileSync("extensions/custom/column_resource_registry.js", "utf8");
+const pageEventLifecycle = readFileSync("extensions/custom/page_event_lifecycle.js", "utf8");
+const pageObserverLifecycle = readFileSync("extensions/custom/page_observer_lifecycle.js", "utf8");
 const columnDom = readFileSync("extensions/custom/column_dom.js", "utf8");
 const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8");
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
@@ -17,8 +20,8 @@ const columnFrameCss = readFileSync("extensions/custom/column_frame_css.js", "ut
 test("new auto-reload columns use seconds in the UI", () => {
     assert.match(columnSettings, /"%column_auto_reload_time%"/);
     assert.match(columnSettings, /function new_column_setting\(type\)/);
-    assert.match(content, /add_new_column\("home"\)/);
-    assert.match(content, /add_new_column\("explore"\)/);
+    assert.match(content, /add_new_column\("home", event\.shiftKey\)/);
+    assert.match(content, /add_new_column\("explore", event\.shiftKey\)/);
     assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
 });
 
@@ -52,14 +55,14 @@ test("profile deletion validates a non-negative in-range integer", () => {
 });
 
 test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
-    assert.match(lifecycle, /const auto_reload_disposers = new Set\(\)/);
-    assert.match(lifecycle, /is_page_observer_initialized/);
-    assert.match(lifecycle, /is_page_event_listener_initialized/);
-    assert.match(lifecycle, /const media_viewer_tokens_by_frame = new WeakMap\(\)/);
+    assert.match(columnResourceRegistry, /const auto_reload_disposers = new Set\(\)/);
+    assert.match(columnResourceRegistry, /const media_viewer_tokens_by_frame = new WeakMap\(\)/);
+    assert.match(pageObserverLifecycle, /let dispose_page_observers = null/);
+    assert.match(pageEventLifecycle, /let dispose_listeners = null/);
     assert.match(content, /deck_lifecycle\.register_media_viewer_token\(column_frame,/);
     assert.match(content, /deck_lifecycle\.initialize_page_observers/);
     assert.match(content, /deck_lifecycle\.dispose_column_resources_in/);
-    assert.match(lifecycle, /register_column_resource/);
+    assert.match(columnResourceRegistry, /function register_column_resource/);
     assert.doesNotMatch(columnDom, /watch_load_column/);
     assert.doesNotMatch(content, /column_dom\.watch_load_column/);
     //iframe単位の load リスナーは lifecycle 経由で1回だけ登録し、削除時に外す(R-12)
@@ -157,19 +160,27 @@ test("column reorder preserves iframe documents and saves visual order", () => {
     assert.doesNotMatch(reorder, /Node\.prototype\.insertBefore/);
     assert.match(reorder, /if\(source_rack !== target_rack\)\{\s*return false;/);
     assert.match(reorder, /dispatchEvent\(new CustomEvent\("opd_custom_column_reordered"\)\)/);
-    assert.match(content, /addEventListener\("opd_custom_column_reordered"[\s\S]*?column_settings_save\("", last_load_profile\)/);
+    assert.match(content, /addEventListener\("opd_custom_column_reordered"[\s\S]*?save_current_profile\(last_load_profile\)/);
     //並び替え保存リスナーは run() の外で1回だけ登録する。run() 内だとプロファイル切替ごとに増える(R-13)
     assert.equal((content.match(/addEventListener\("opd_custom_column_reordered"/g) ?? []).length, 1);
     assert.match(content, /^document\.addEventListener\("opd_custom_column_reordered"/m);
-    assert.match(content, /^function column_settings_save\(mode, profile_num\)/m);
+    assert.match(content, /^function read_current_profile\(\)/m);
+    assert.match(content, /^function save_current_profile\(profile_num\)/m);
+    assert.doesNotMatch(content, /column_settings_save/);
 });
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
     assert.match(columnDom, /function get_add_target\(doc, is_shift_pressed\)/);
     assert.match(columnDom, /function add_column\(doc, type, template, settings_api/);
-    assert.match(content, /function add_new_column\(type\)\{[\s\S]*?column_dom\.add_column\(/);
+    assert.match(content, /function add_new_column\(type, is_shift_pressed\)\{[\s\S]*?column_dom\.add_column\(/);
     assert.match(columnDom, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
-    assert.equal((content.match(/add_new_column\("(?:post|home|notification|explore)"\)/g) ?? []).length, 4);
+    assert.equal(
+        (content.match(/add_new_column\("(?:post|home|notification|explore)", event\.shiftKey\)/g) ?? []).length,
+        4
+    );
+    //Shift押下はクリックイベントから読む。グローバルな keydown/keyup 追跡は残さない。
+    assert.doesNotMatch(content, /let is_shift_pressed = false/);
+    assert.doesNotMatch(content, /event\.key === 'Shift'/);
 });
 
 test("profile initialization and saving share the settings boundary", () => {
@@ -211,4 +222,64 @@ test("profile switch confirmation builds its summary in the settings boundary", 
     assert.ok(content.includes('preload_desc_array.join("\\r\\n")'));
     assert.doesNotMatch(content, /msg_profile_desc_misskey_column/);
     assert.doesNotMatch(content, /preload_desc_count/);
+});
+
+test("profile list rendering is centralized and avoids the settings module shadow", () => {
+    assert.equal((content.match(/function render_profile_buttons\(\)/g) ?? []).length, 1);
+    assert.equal((content.match(/function render_profile_sidebar\(\)/g) ?? []).length, 1);
+    assert.equal((content.match(/function refresh_profile_list\(/g) ?? []).length, 1);
+    assert.doesNotMatch(content, /const column_settings = \{column_settings:profile_store/);
+    assert.match(content, /const profile_settings = \{column_settings:profile_store/);
+});
+
+test("lifecycle is split into three responsibilities and only composes them", () => {
+    //合成点は状態(Set/WeakMap/初期化フラグ)を持たず、3モジュールの入口だけを公開する
+    assert.doesNotMatch(lifecycle, /new Set\(\)|new WeakMap\(\)|new MutationObserver/);
+    assert.match(lifecycle, /window\.opd_custom_column_resource_registry/);
+    assert.match(lifecycle, /window\.opd_custom_page_event_lifecycle/);
+    assert.match(lifecycle, /window\.opd_custom_page_observer_lifecycle/);
+    //observer を張る初期化はすべて disposer を返す
+    assert.match(pageObserverLifecycle, /function observe_when_ready\(get_target, watch_root, observer_callback, observer_options\)/);
+    for (const source of [pageObserverLifecycle, pageEventLifecycle]) {
+        assert.match(source, /return dispose_/);
+    }
+
+    //読み込み順は合成点より前でなければ undefined を参照する
+    for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
+        const scripts = JSON.parse(readFileSync(manifestName, "utf8")).content_scripts[0].js;
+        for (const source of [
+            "extensions/custom/column_resource_registry.js",
+            "extensions/custom/page_event_lifecycle.js",
+            "extensions/custom/page_observer_lifecycle.js",
+        ]) {
+            assert.ok(
+                scripts.indexOf(source) >= 0
+                && scripts.indexOf(source) < scripts.indexOf("extensions/custom/lifecycle.js"),
+                `${manifestName}: ${source}`
+            );
+        }
+    }
+});
+
+test("small utilities have a single implementation", () => {
+    const safeValues = readFileSync("extensions/custom/safe_values.js", "utf8");
+    const indexJs = readFileSync("extensions/custom/index.js", "utf8");
+    const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
+
+    //ランダムIDとHTMLエスケープの実体は safe_values だけに置く
+    assert.match(safeValues, /function create_random_id\(\)/);
+    assert.match(safeValues, /\.replaceAll\("'", "&#39;"\)/);
+    assert.match(content, /const create_random_id = deck_safe_values\.create_random_id;/);
+    assert.doesNotMatch(content, /function create_random_id\(\)/);
+    assert.match(textReview, /window\.opd_custom_safe_values\.create_random_id\(\)/);
+    assert.match(textReview, /window\.opd_custom_safe_values\.escape_html_attribute\(str\)/);
+    assert.doesNotMatch(textReview, /Math\.random\(\)\.toString\(32\)/);
+    assert.doesNotMatch(textReview, /replace\(\/&\/g, '&amp;'\)/);
+
+    //iframeの読み込み判定は column_dom に1つだけ置く
+    assert.match(columnDom, /function is_frame_loaded\(iframe\)/);
+    for (const source of [indexJs, listRepostFilter]) {
+        assert.match(source, /column_dom\.is_frame_loaded\(iframe\)/);
+        assert.doesNotMatch(source, /function is_loaded\(iframe\)/);
+    }
 });

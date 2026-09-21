@@ -48,7 +48,7 @@ test("cross-rack drop moves the column and keeps its own back history", async ({
 
     //作り直されたiframeでもカラム単位の戻るが効くこと
     const movedHomeFrame = frameForSection(page, homeSectionId);
-    const movedHomePost = movedHomeFrame.locator('article[data-testid="tweet"]');
+    const movedHomePost = movedHomeFrame.locator("#opd_fixture_post_link");
     await expect(movedHomePost).toBeVisible();
     await waitForColumnHistoryBaseline(page);
     await navigateColumn(movedHomeFrame, "/status/opd-cross-rack");

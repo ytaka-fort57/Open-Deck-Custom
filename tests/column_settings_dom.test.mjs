@@ -278,11 +278,30 @@ test("profile summary picks one i18n line per visible column and numbers each ro
         "msg_profile_desc_notification_column(3)",
         "msg_profile_desc_explore_column(4,List 42 (/i/lists/42))",
         "msg_profile_desc_first_row_end",
-        "msg_profile_desc_timeline_column(1)",
+        "1-misskey",
+        "2-bsky",
+        "msg_profile_desc_timeline_column(3)",
         "msg_profile_desc_second_row_end",
     ]);
     assert.deepEqual(Array.from(settings.profile_summary([], i18n)), []);
     assert.deepEqual(Array.from(settings.profile_summary(undefined, i18n)), []);
+});
+
+test("profile summary starts at one without structural columns and ignores non-rendered columns", () => {
+    const settings = loadColumnSettings();
+    const i18n = (key, substitutions) => substitutions == null ? key : `${key}(${substitutions.join(",")})`;
+
+    assert.deepEqual(Array.from(settings.profile_summary([
+        { type: "dsp_column" },
+        { type: "main_bar_empty_column" },
+        { type: "home" },
+        { type: "empty_column" },
+        { type: "post" },
+    ], i18n)), [
+        "msg_profile_desc_timeline_column(1)",
+        "msg_profile_desc_first_row_end",
+        "msg_profile_desc_post_column(1)",
+    ]);
 });
 
 test("profile summary shows the explore path that will actually load", () => {
@@ -294,30 +313,30 @@ test("profile summary shows the explore path that will actually load", () => {
     //タイトルは出さずピン留めパスと印だけを出す
     assert.equal(
         summary({ type: "explore", column_save_path: "/explore", column_save_title: "話題を検索", column_pinned_path: "/i/lists/42" }),
-        "msg_profile_desc_explore_column(0,/i/lists/42 (msg_profile_desc_pinned_mark))"
+        "msg_profile_desc_explore_column(1,/i/lists/42 (msg_profile_desc_pinned_mark))"
     );
     //タイトルが無いカラムはパスだけで見分ける
     assert.equal(
         summary({ type: "explore", column_save_path: "/explore", column_save_title: "" }),
-        "msg_profile_desc_explore_column(0,/explore)"
+        "msg_profile_desc_explore_column(1,/explore)"
     );
     //ダイアログが読めなくなるため長いタイトルは切り詰める
     assert.equal(
         summary({ type: "explore", column_save_path: "/explore", column_save_title: "あ".repeat(60) }),
-        `msg_profile_desc_explore_column(0,${"あ".repeat(40)}… (/explore))`
+        `msg_profile_desc_explore_column(1,${"あ".repeat(40)}… (/explore))`
     );
     //検索パスは符号化されたままでは読めないため戻して出す
     assert.equal(
         summary({ type: "explore", column_save_path: "/search?q=%E3%83%A1%E3%82%A4%E3%83%89", column_save_title: "" }),
-        "msg_profile_desc_explore_column(0,/search?q=メイド)"
+        "msg_profile_desc_explore_column(1,/search?q=メイド)"
     );
     //壊れた符号化はそのまま出す
     assert.equal(
         summary({ type: "explore", column_save_path: "/search?q=%E3", column_save_title: "" }),
-        "msg_profile_desc_explore_column(0,/search?q=%E3)"
+        "msg_profile_desc_explore_column(1,/search?q=%E3)"
     );
     //保存形式が古くフィールドが欠けていても "undefined" を出さない
-    assert.equal(summary({ type: "explore" }), "msg_profile_desc_explore_column(0,)");
+    assert.equal(summary({ type: "explore" }), "msg_profile_desc_explore_column(1,)");
 });
 
 test("explore title drops X decorations and url/title changes are tracked apart", () => {

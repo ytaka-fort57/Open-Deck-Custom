@@ -127,19 +127,12 @@ class OpdExtTextReview {
                 `<div id="opd_hashtag_restore" class="opd_function_btn" title="${this.UITexts[this.opd_use_lang].hashTagRestore_buttonTitle.message}" disabled><div class="opd_functions_btn_icon_color opd_hashtag_restore_btn_icon"></div></div>`,
             ]
 
-            //ヘルパースクリプト追加
-            const helper_script = column_window.document.createElement('script');
-            helper_script.src = chrome.runtime.getURL("extensions/text_review_helper.js");
-            column_window.document.head.appendChild(helper_script);
-
-            //貼り付け認証トークンを追加する
-            this.opd_text_review_token = crypto.randomUUID();
-
-            helper_script.addEventListener("load", ()=>{
-                column_window.document.dispatchEvent(new CustomEvent('opd_text_review_init', {
-                    detail: JSON.stringify({ token:this.opd_text_review_token })
-                }));
-            });
+            //ヘルパースクリプト追加と貼り付け認証トークンの受け渡し
+            this.opd_text_review_token = window.opd_custom_helper_injector.inject(
+                column_window,
+                "extensions/text_review_helper.js",
+                'opd_text_review_init'
+            );
             
             const on_focusin = (ev) => {
                 //テキストエリアフォーカスタイミングで文字有無のカウンタを仕込む
@@ -417,22 +410,16 @@ class OpdExtTextReview {
             return is_firefox;
         }
         this.CreateRandomID = () =>{
-            //ランダムなIDを生成する関数
-            return Math.random().toString(32).substring(2);
+            //ランダムなIDを生成する関数(実体は safe_values と共通)
+            return window.opd_custom_safe_values.create_random_id();
         }
         this.CssChecker = (str) =>{
             //CSSが正常かどうかチェックする関数
             return CSS.supports('color', str) ? str : 'black'
         }
         this.EscapeHTML = (str) =>{
-            //文字列をエスケープ化する関数
-            if (str == null) return '';
-            return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+            //文字列をエスケープ化する関数(実体は safe_values と共通)
+            return window.opd_custom_safe_values.escape_html_attribute(str);
         }
         this.UITexts = {
             ja:{

@@ -29,7 +29,7 @@ for zip_file in "${ZIP_FILES[@]}"; do
     while IFS= read -r entry; do
         root="${entry%%/*}"
         case "$root" in
-          _locales|extensions|icon|about_opd.html|about_opd.js|background.js|content.js|icon.png|LICENSE|manifest.json|popup.html|popup.js|profile_debug.html|profile_debug.js|text_review_privacy_policy.md) ;;
+          _locales|extensions|icon|about_opd.html|about_opd.js|background.js|content.js|deck.css|icon.png|LICENSE|manifest.json|popup.html|popup.js|profile_debug.html|profile_debug.js|text_review_privacy_policy.md) ;;
           "") ;;
           *) echo "$zip_file に許可リスト外の項目があります: $entry" >&2; exit 1 ;;
         esac

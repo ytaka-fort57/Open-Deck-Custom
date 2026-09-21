@@ -9,6 +9,12 @@ test("profile golden path preserves iframes and round-trips storage", async ({ e
     const { context, storage, navigationCounts, blockedRequests, errors } = extensionSession;
     const page = await openDeck(context, storage, goldenStorageItems());
 
+    await expect(page.locator("#opd_main_element")).toBeVisible();
+    await expect(page.locator('link[href$="deck.css"]')).toHaveCount(1);
+    await expect.poll(() => page.locator(".dsp_btn_add_post_img").evaluate((element) => (
+        getComputedStyle(element).backgroundImage
+    ))).toMatch(/^url\("chrome-extension:\/\//);
+
     await expect(page.locator('#first_rack_element div[opd_column_type="home"]')).toHaveAttribute("opd_column_width", "32");
     await expect(page.locator('#first_rack_element div[opd_column_type="explore"]')).toHaveAttribute("opd_explore_path", "/i/lists/42");
     await expect(page.locator('#first_rack_element div[opd_column_type="home"] .opd_tw_view_mode')).toHaveValue("1");

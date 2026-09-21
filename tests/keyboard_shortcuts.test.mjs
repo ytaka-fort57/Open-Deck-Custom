@@ -11,6 +11,7 @@ function loadKeyboard(history) {
         WeakSet,
     };
     vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/navigation_policy.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/keyboard_shortcuts.js", "utf8"), context);
     return context.window.opd_custom_keyboard;
 }

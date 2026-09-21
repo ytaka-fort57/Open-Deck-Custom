@@ -22,6 +22,8 @@ function createReview(sendMessage) {
         String
     };
     vm.createContext(context);
+    //本家クラスは helper 注入を共通関数へ委譲するため、manifest と同じく先に読み込む
+    vm.runInContext(readFileSync("extensions/custom/helper_injector.js", "utf8"), context);
     vm.runInContext(source, context);
     return { review: new context.TestClass(), document };
 }

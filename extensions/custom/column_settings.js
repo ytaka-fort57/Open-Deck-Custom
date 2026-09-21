@@ -268,21 +268,24 @@ window.opd_custom_column_settings = (function(){
         return save_path === "" ? title : `${title} (${save_path})`;
     }
 
-    //プロファイル切替の確認ダイアログに出す説明文。カラム型ごとに i18n キーを選び、
-    //段の区切り(empty_column / second_empty_column)と区切り以外の未知の型で連番を戻す
+    //プロファイル切替の確認ダイアログに出す説明文。描画対象カラムだけを連番化し、
+    //段の区切り(empty_column / second_empty_column)でだけ連番を1へ戻す。
     function profile_summary(profile, i18n_message){
         const lines = [];
-        let count = 0;
+        let count = 1;
         Array.from(profile ?? []).forEach(function(column){
             switch (column?.type) {
                 case "empty_column":
                     lines.push(i18n_message("msg_profile_desc_first_row_end"));
-                    count = 0;
-                    break;
+                    count = 1;
+                    return;
                 case "second_empty_column":
                     lines.push(i18n_message("msg_profile_desc_second_row_end"));
-                    count = 0;
-                    break;
+                    count = 1;
+                    return;
+                case "main_bar_empty_column":
+                case "dsp_column":
+                    return;
                 case "post":
                     lines.push(i18n_message("msg_profile_desc_post_column", [count]));
                     break;
@@ -296,7 +299,7 @@ window.opd_custom_column_settings = (function(){
                     lines.push(i18n_message("msg_profile_desc_explore_column", [count, explore_summary_label(column, i18n_message)]));
                     break;
                 default:
-                    count = 0;
+                    lines.push(`${count}-${String(column?.type ?? "unknown")}`);
                     break;
             }
             count += 1;

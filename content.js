@@ -13,13 +13,14 @@ let is_added_system_color_mode = false;
 let apply_ui_color = null;
 let system_color_scheme = null;
 const i18n_message = chrome.i18n.getMessage;
-let is_shift_pressed = false;
 let profile_store;
 let last_load_profile = 0;
 let is_removed_default_style = false;
 const deck_lifecycle = window.opd_custom_lifecycle;
 const deck_storage = window.opd_custom_storage;
 const deck_safe_values = window.opd_custom_safe_values;
+//ランダムID作成(text_review と実体を共通化)
+const create_random_id = deck_safe_values.create_random_id;
 const column_settings = window.opd_custom_column_settings;
 const column_dom = window.opd_custom_column_dom;
 const column_frame_css = window.opd_custom_column_frame_css;
@@ -60,13 +61,6 @@ function unix_time_mmss(input){
     const date = new Date(input * 1000);
     return date.toLocaleTimeString();
 }
-//ショートカットキー用に shift キーが押されていることを検出
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'Shift') is_shift_pressed = true;
-});
-document.addEventListener('keyup', (event) => {
-    if (event.key === 'Shift') is_shift_pressed = false;
-});
 //ストレージの書き込み監視(主にAPIリミット監視に使う)
 let api_limit_obj = null;
 let api_limit_dsc_obj = {time_line:"", recommend_timeline:"", search:""};
@@ -173,13 +167,24 @@ function run(settings){
     //再構築前のカラムが保持していた監視・イベント・自動更新を確実に停止する
     deck_lifecycle.dispose_column_resources_in(document.querySelector("#opd_main_element"));
     deck_lifecycle.dispose_all_auto_reload();
-    let profile_list_html;
-    let profile_list_btn_html = "";
-    //プロファイルリスト初期化
-    for (let index = 0; index < profile_store.length; index++) {
-        profile_list_btn_html += `<div class="dsp_btn_parent" title="${i18n_message("ui_profile_switch_title")}" id="userProfile-${index}"><div class="dsp_btn_change_profile_btn">P${index}</div></div>`;//<div class="profile_list"><input type="button" id="userProfile-${index}" value="P${index}"></div>
+    function render_profile_buttons(){
+        return profile_store.map(function(_profile, index){
+            return `<div class="dsp_btn_parent" title="${i18n_message("ui_profile_switch_title")}" id="userProfile-${index}"><div class="dsp_btn_change_profile_btn">P${index}</div></div>`;
+        }).join("");
     }
-    profile_list_html = `<div class="profile_val_now" title="${i18n_message("ui_profile_current_title")}">${last_load_profile}</div><div class="dsp_profile_list"><div id="profile_btn_list">${profile_list_btn_html}</div>`;
+    function render_profile_sidebar(){
+        return `<div class="profile_val_now" title="${i18n_message("ui_profile_current_title")}">${last_load_profile}</div><div class="dsp_profile_list"><div id="profile_btn_list">${render_profile_buttons()}</div>`;
+    }
+    function refresh_profile_list(current_profile_index = null){
+        const profile_button_list = document.querySelector("#profile_btn_list");
+        if(profile_button_list == null) return;
+        profile_button_list.innerHTML = render_profile_buttons();
+        if(current_profile_index != null){
+            document.querySelector(".profile_val_now").textContent = current_profile_index;
+        }
+        create_profile_list_btn();
+    }
+    const profile_list_html = render_profile_sidebar();
     deck_lifecycle.initialize_page_event_listeners({
         on_post_focus: function(detail){
             if(detail){
@@ -201,557 +206,7 @@ function run(settings){
         },
     });
     //CSSタグ追加
-    document.querySelector("head").insertAdjacentHTML("afterbegin", `<style opd_default_css>
-    html{
-        overflow-y:hidden !important;
-    }
-    .main_bar_functions{
-        display: flex;
-        justify-content: center;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 0.5rem;
-    }
-    .main_bar_functions hr{
-        width: 80%;
-        margin: 0;
-    }
-    .opd_version_span{
-        cursor: pointer;
-    }
-    .opd_debug_menu{
-        display: none;
-    }
-    #opd_main_element{
-        background: #e4e4e4 !important;
-    }
-    div[opd_column_type="dsp_column"]{
-        overflow-x: scroll;
-        scrollbar-width: none;
-    }
-    #main_bar_empty_column{
-        background-color: white;
-    }
-    #api_limit_status{
-        border-radius: 100px;
-        width: 50px;
-    }
-    #api_limit_status:hover{
-        background-color: #d5d5d5;
-        cursor: help;
-    }
-    .opd_ui_logo_parent{
-        overflow: hidden;
-        display: flex;
-        width: 50px;
-        align-content: center;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-    }
-    .opd_ui_logo{
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL("icon/logo_icon.svg")});
-        height: 50px;
-        width: 50px;
-        cursor: pointer;
-    }
-    .profile_val_now{
-        border-radius: 100px;
-        width: 55px;
-    }
-    .profile_val_now:hover{
-        background-color: #d5d5d5;
-    }
-    #main_rack_element{
-        position: fixed;
-        left:60px;
-        height:100vh;
-        max-width:calc(100vw - 60px);
-        width:calc(100vw - 60px);
-        overflow:scroll hidden;
-    }
-    #first_rack_element{
-        /*overflow: hidden;*/
-    }
-    #second_rack_element{
-        /*overflow: hidden;*/
-    }
-    .dsp_column_emptycolumn p{
-        text-align: center;
-    }
-    .dsp_column_second_emptycolumn p{
-        text-align: center;
-    }
-    .dsp_btn_parent{
-        overflow: hidden;
-        border-radius: 100px;
-        display: flex;
-        width: 50px;
-        height: 50px;
-        align-content: center;
-        justify-content: center;
-        align-items: center;
-    }
-    .dsp_btn_parent:hover{
-        background: #d5d5d5;
-        cursor: pointer;
-    }
-    .dsp_btn_add_post_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.add_post_column)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_add_tl_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.add_timeline_column)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_add_ntfc_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.add_notification_column)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_add_explr_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.add_explore_column)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_second_rack_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_second_rack)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_profile_add_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.profile_save)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_profile_delete_img{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.profile_delete)});
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_btn_change_profile_btn{
-        display: flex;
-        font-size: 1.2rem;
-        justify-content: center;
-        align-items: center;
-        height: 69%;
-        width: 69%;
-    }
-    .dsp_profile_list{
-        max-height: 1000px;
-        overflow-y: scroll;
-        scrollbar-width: none;
-    }
-    .dsp_column_draggable_true{
-        border-left: solid 3px #0000002e;
-        border-right: solid 3px #0000002e;
-        border-bottom: solid 3px #0000002e;
-        /*overflow: hidden;*/
-        background-color: white;
-        border-radius: 6px 6px;
-    }
-    .dsp_column_draggable_true div[opd_column_type]{
-        display: flex;
-        flex-direction: column;
-    }
-    .dsp_column iframe{
-        border: 0;
-    }
-    .dsp_column_btn{
-        width: 20px;
-        min-width: 20px;
-        border-radius: 2px;
-        overflow: hidden;
-        margin-right: 5px;
-    }
-    .dsp_column_btn:hover{
-        background: #d5d5d5;
-        cursor: pointer;
-    }
-    .column_bar{
-        display: flex;
-        flex-direction: row;
-        width: 100%;
-        min-height: 20px;
-        overflow: hidden;
-        border-top: solid #a0a0a073 1px !important;
-        border-bottom: solid #a0a0a073 1px !important;
-        border-radius: 4px 4px 0 0;
-    }
-    .dsp_column_title{
-        width: auto;
-        background-color: white;
-        margin-right: 5px;
-    }
-    .dsp_column_move_icon_parent{
-        max-height: 20px;
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-    }
-    .dsp_column_move_icon{
-        display: block;
-        filter: brightness(0) saturate(100%) invert(61%) sepia(13%) saturate(13%) hue-rotate(335deg) brightness(89%) contrast(79%);
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_move)});
-        background-size: cover;
-        width: 15px;
-        height: 15px;   
-    }
-    .dsp_column_settings_btn{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_settings)});
-        background-size: cover;
-        width: 20px;
-        height: 20px;    
-    }
-    .dsp_column_settings_btn:hover{
-        cursor: pointer;
-    }
-    .dsp_column_settings_btn input{
-        display: none;
-    }
-    .dsp_column_reload_icon{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_reload)});
-        background-size: cover;
-        width: 20px;
-        height: 20px;
-    }
-    .dsp_column_reload_icon:hover{
-        cursor: pointer;
-    }
-    .dsp_column_reload_icon input{
-        display: none;
-    }
-    .dsp_column_reload_icon[opd_reloading]{
-        animation: opd_column_reload_spin 0.6s linear;
-    }
-    @keyframes opd_column_reload_spin{
-        from{ transform: rotate(0deg); }
-        to{ transform: rotate(360deg); }
-    }
-    .dsp_column_empty_area {
-    	width: 100%;
-    }
-    .dsp_column_close_btn{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_close)});
-        background-size: 15px;
-        background-repeat: no-repeat;
-        background-position: center;
-        width: 20px;
-        height: 20px;
-    }
-    .dsp_column_close_btn:hover{
-        cursor: pointer;
-    }
-    .dsp_column_close_btn input{
-        display: none;
-    }
-
-    .dsp_column_banner_btn{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.banner_hide)});
-        transform: rotate(180deg);
-        background-size: cover;
-        width: 20px;
-        height: 20px;
-    }
-    input:checked + .dsp_column_banner_btn{
-        transform: rotate(0deg);
-    }
-    .dsp_column_btn input{
-        opacity: 0;
-        position: absolute;
-        z-index: 10;
-        margin: 0;
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-    }
-    .dsp_column_top_btn{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.top_bar_hide)});
-        transform: rotate(180deg);
-        background-size: cover;
-        width: 20px;
-        height: 20px;
-        cursor: pointer;  
-    }
-    input:checked + .dsp_column_top_btn{
-        transform: rotate(0deg);
-    }
-    .dsp_column_top_btn input{
-        opacity: 0;
-        position: absolute;
-        z-index: 10;
-        margin: 0;
-        width: 20px;
-        height: 20px;
-    }
-    .dsp_column_close_btn_wrap{
-        display: flex;
-        justify-content: flex-end;
-    }
-    .dsp_column_close_btn input{
-        display: none;
-    }
-
-    .dsp_column_pin_btn{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_pin)});
-        background-size: cover;
-        width: 20px;
-        height: 20px;    
-    }
-    input:checked + .dsp_column_pin_btn{
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_pinned)});
-    }
-    .dsp_column_pin_btn input{
-        opacity: 0;
-        position: absolute;
-        z-index: 10;
-        margin: 0;
-        width: 20px;
-        height: 20px;
-    }
-
-    .dsp_column_settings_panel{
-        display: none;
-        position: relative;
-        width: inherit;
-        height: auto;
-        background: #efefefeb;
-        border: 1px solid #a9a9a9eb;
-        flex-direction: column;
-    }
-    .dsp_column_settings_panel h2{
-        /*margin: 0 0 0.2rem;*/
-        margin: 0;
-    }
-    .dsp_column_settings_panel_content{
-        margin-left: 0.5rem;
-    }
-    .dsp_column_settings_panel_content h2{
-        font-size: 1.2rem;
-    }
-    .opd_column_settings_input_text{
-        width: 5rem;
-        margin-right: 0.2rem;
-    }
-    .dsp_column_settings_list{
-        background: white;
-        border-radius: 5px;
-        margin: 0 0.5rem 0.5rem 0;
-        padding: 0.5rem;
-    }
-    .dsp_column_settings_content_div{
-        margin-bottom: 0.1rem;
-        display: flex;
-        justify-content: space-between;
-    }
-    .dsp_column_settings_panel_close_btn_wrap{
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        margin: 0 0.5rem 0.5rem 0;
-    }
-    .opd_ui_icon_color{
-        filter: brightness(0) saturate(100%) invert(11%) sepia(16%) saturate(13%) hue-rotate(322deg) brightness(107%) contrast(80%);
-    }
-    /*#main_rack_element section:first-child{
-        margin-left:110px
-    }*/
-    /*:root {color-scheme: light;}*/
-    /*#opd_main_element[opd-dsp-theme="dark"] {
-        color-scheme: dark;
-    }*/
-    #opd_main_element[opd-dsp-theme="light"] {
-        color-scheme: light;
-    }
-    /*ダークモード検出時*/
-    #opd_main_element[opd-dsp-theme="dark"] {
-        color-scheme: dark;
-
-        & #main_rack_element {
-            background-color: black !important;
-            scrollbar-color: auto;
-        }
-
-        & .dsp_column_draggable_false,
-        & #first_rack_element,
-        & #second_rack_element,
-        & #main_bar_empty_column {
-            background-color: black !important;
-            color: white;
-        }
-
-        & .dsp_column_draggable_true,
-        & .dsp_column_title {
-            background-color: #2e2e2e !important;
-        }
-
-        & .dsp_btn_add_post_img,
-        & .dsp_btn_add_tl_img,
-        & .dsp_btn_add_ntfc_img,
-        & .dsp_btn_add_explr_img,
-        & .dsp_btn_second_rack_img,
-        & .dsp_btn_profile_add_img,
-        & .dsp_btn_profile_delete_img,
-        & .dsp_column_move_icon,
-        & .opd_ui_icon_color {
-            filter: brightness(0) saturate(100%) invert(48%) sepia(0%) saturate(93%) hue-rotate(266deg) brightness(93%) contrast(86%);
-        }
-
-        & #api_limit_status:hover,
-        & .dsp_btn_parent:hover,
-        & .dsp_column_btn:hover,
-        & .profile_val_now:hover {
-            background: #555555;
-        }
-
-        & .dsp_column_settings_panel {
-            background: #2e2e2e;
-            border: 1px solid #5d5d5d;
-        }
-
-        & .dsp_column_settings_list {
-            background: #474747;
-        }
-        
-        & .dsp_column_title {
-            background-color: transparent !important;
-        }
-
-        /* 焼付き軽減 */
-        & div[opd_column_type="dsp_column"] {
-            filter: brightness(0.7);
-            transition: filter 0.3s;
-            &:hover {
-                filter: brightness(1);
-            }
-        }
-
-        & .column_bar {
-            filter: brightness(0.85);
-            transition: filter 0.3s;
-            &:hover {
-                filter: brightness(1);
-            }
-        }
-
-        & #main_bar_empty_column, div[opd_column_type="empty_column"], div[opd_column_type="second_empty_column"] {
-            filter: brightness(0.7);
-        }
-    }
-
-    /* メディアビューワー */
-    ::backdrop {
-        background: rgba(0, 0, 0, 0.9);
-    }
-    #opd_media_viewer:focus {
-        outline: none;
-    }
-    .opd_media_viewer_func_btn{
-        border: 0;
-        background: #00000000;
-        cursor: pointer;
-        outline: none;
-    }
-    .opd_media_viewer_func_btn.media_switch_btn{
-        width: 80px;
-        height: 80px;
-        margin: 10px;
-        border-radius: 10px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    .opd_media_viewer_func_btn_circle button{
-        border: 0;
-        background: #00000000;
-        cursor: pointer;
-        outline: none;
-        border-radius: 10px;
-    }
-    button[disabled].opd_media_viewer_func_btn{
-        visibility: hidden;
-    }
-    .opd_media_viewer_func_btn_icon_color{
-        filter: brightness(0) saturate(100%) invert(96%) sepia(6%) saturate(0%) hue-rotate(285deg) brightness(115%) contrast(100%);
-    }
-    .opd_media_viewer_func_btn:hover{
-        background: #2f2f2fa3;
-    }
-    .opd_media_viewer_func_btn_circle button:hover{
-        background: #2f2f2fa3;
-    }
-    .media_viewer_icon_close{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.column_close)});
-        background-size: 20px;
-        background-repeat: no-repeat;
-        background-position: center;
-        width: 40px;
-        height: 40px;
-        padding: 5px;
-    }
-    .media_viewer_icon_forward{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.forward)});
-        background-size: 20px;
-        background-repeat: no-repeat;
-        background-position: center;
-        width: 30px;
-        height: 30px;
-        padding: 5px;
-    }
-    .media_viewer_icon_next{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.next)});
-        background-size: 20px;
-        background-repeat: no-repeat;
-        background-position: center;
-        width: 30px;
-        height: 30px;
-        padding: 5px;
-    }
-    .media_viewer_icon_download{
-        display: block;
-        background-image: url(${chrome.runtime.getURL(ui_icon_define.download)});
-        background-size: 20px;
-        background-repeat: no-repeat;
-        background-position: center;
-        width: 30px;
-        height: 30px;
-        padding: 5px;
-    }
-    </style>`);
+    document.querySelector("head").insertAdjacentHTML("afterbegin", `<link rel="stylesheet" href="${chrome.runtime.getURL("deck.css")}">`);
     //カラム要素作成-挿入
     let default_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_reload_icon opd_ui_icon_color" title="${i18n_message("ui_column_reload_title")}"><input class="opd_column_reload_btn" type="button" value="R"></label></span><span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span><span class="dsp_column_btn"><input class="opd_banner" type="checkbox" title="${i18n_message("ui_column_banner_toggle_title")}" %column_banner_ch%><label class="dsp_column_banner_btn opd_ui_icon_color"></label></span><span class="dsp_column_btn"><input class="opd_top_bar" type="checkbox" title="${i18n_message("ui_column_top_toggle_title")}" %column_top_bar_ch%><label class="dsp_column_top_btn opd_ui_icon_color"></label></span>`;
     let post_element_bar = `<span class="dsp_column_btn"><label class="dsp_column_settings_btn opd_ui_icon_color" title="${i18n_message("ui_column_settings_title")}"><input class="opd_settings_btn" type="button" value="S"></label></span>`;
@@ -852,8 +307,8 @@ function run(settings){
                         settings.last_load_profile = index;
                         return settings;
                     });
-                    const column_settings = {column_settings:profile_store[index].profile};
-                    run(column_settings);
+                    const profile_settings = {column_settings:profile_store[index].profile};
+                    run(profile_settings);
                 }
             })
         }
@@ -1012,7 +467,7 @@ function run(settings){
                         let preset_rem = column_settings.width_from_preset(this.value);
                         this.closest("div[opd_column_type]").setAttribute("opd_column_width", preset_rem);
                         this.closest("div[opd_column_type]").style.width = `${preset_rem}rem`;
-                        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                     })
                 }
                 //カラム横幅設定イベント
@@ -1025,7 +480,7 @@ function run(settings){
                         if(!Number.isNaN(setting_width_num) && setting_width_num > 11){
                             this.closest("div[opd_column_type]").setAttribute("opd_column_width", setting_width_num);
                             this.closest("div[opd_column_type]").style.width = `${setting_width_num}rem`;
-                            column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                             column_width_preset.value = column_settings.width_preset_index(setting_width_num);
                         }else{
                             alert(i18n_message("msg_invalid_value_alert"));
@@ -1060,14 +515,14 @@ function run(settings){
                             if(opd_column_auto_reload_checkbox.checked){
                                 start_auto_reload(Number(auto_reload_time.value) * 1000);
                             }
-                            column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                         }else{
                             alert(i18n_message("msg_auto_reload_minimum_alert"));
                             auto_reload_time.value = '10';
                             if(opd_column_auto_reload_checkbox.checked){
                                 start_auto_reload(10000);
                             }
-                            column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                         }
                     });
                     //初期チェック動作
@@ -1081,14 +536,14 @@ function run(settings){
 
                 //バナーチェックイベント
                 opd_column_banner_checkbox?.addEventListener("change", function(){
-                    column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                     let banner_mode_target_object = this.closest("div[opd_column_type]").querySelector("iframe");
                     column_frame_css.apply(banner_mode_target_object.contentWindow.document, "opd_banner_css", column_frame_css.banner_css(this.checked == true));
                 });
 
                 //トップ検索欄等削除イベント
                 opd_column_top_visible_checkbox?.addEventListener("change", function(){
-                    column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                     let topvisible_mode_target_object = this.closest("div[opd_column_type]").querySelector("iframe");
                     const column_type = this.closest("div[opd_column_type]").getAttribute("opd_column_type");
                     column_frame_css.apply(topvisible_mode_target_object.contentWindow.document, "opd_top_visible_css", column_frame_css.top_visible_css(column_type, this.checked == true));
@@ -1101,14 +556,14 @@ function run(settings){
                             if(confirm(i18n_message("msg_explore_pin_confirm"))){
                                 const now_path = this.closest("div[opd_column_type]").getAttribute("opd_explore_path");
                                 this.closest("div[opd_column_type]").setAttribute("opd_pinned_path",now_path);
-                                column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                             }else{
                                 this.checked = false;
                             }
                         }else{
                             if(confirm(i18n_message("msg_explore_unpin_confirm"))){
                                 this.closest("div[opd_column_type]").setAttribute("opd_pinned_path","");
-                                column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                                 this.checked = false;
                             }else{
                                 this.checked = true;
@@ -1124,17 +579,17 @@ function run(settings){
                         if(this.checked){
                             auto_reload_time_input.disabled = true;
                             start_auto_reload(auto_reload_time);
-                            column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                         }else{
                             auto_reload_time_input.disabled = false;
                             stop_auto_reload();
-                            column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                         }
                     });
                 }
                 //ツイート表示モードイベント
                 opd_column_tw_view_mode_opt.addEventListener("change", function(){
-                    column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                     let tw_view_mode_target_object = this.closest("div[opd_column_type]").querySelector("iframe");
                     column_frame_css.apply(tw_view_mode_target_object.contentWindow.document, "opd_tw_view_mode_css", column_frame_css.view_mode_css(this.value));
                 })
@@ -1209,7 +664,7 @@ function run(settings){
                 if(changes.column_save_path == undefined && changes.column_save_title == undefined){
                     return;
                 }
-                column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
             });
             exp_object.opd_url_observer = exp_observer;
             exp_observer.observe(initial_state.document, {childList: true, subtree: true});
@@ -1243,7 +698,7 @@ function run(settings){
             document.querySelector("#second_rack_element").insertAdjacentHTML("beforeend", second_rack_default_html);
             column_dd();
             column_close();
-            column_settings_save("", last_load_profile);
+            save_current_profile(last_load_profile);
             second_rack_mode = true;
             document.querySelector(".dsp_btn_second_rack_img").style.backgroundImage = `url(${chrome.runtime.getURL(ui_icon_define.column_single_rack)})`;
         }else{
@@ -1255,7 +710,7 @@ function run(settings){
                 document.querySelector("#first_rack_element").style.height = "100vh";
                 document.querySelector("#second_rack_element").style.height = "0";
                 document.querySelector("#second_rack_element").style.height = "0";
-                column_settings_save("", last_load_profile);
+                save_current_profile(last_load_profile);
                 second_rack_mode = false;
                 document.querySelector(".dsp_btn_second_rack_img").style.backgroundImage = `url(${chrome.runtime.getURL(ui_icon_define.column_second_rack)})`;
             }
@@ -1281,7 +736,8 @@ function run(settings){
             chrome.runtime.sendMessage({message: "ext_reload"});
         }
     });
-    function add_new_column(type){
+    //Shiftを押しながらの追加は先頭へ入れる。押下状態はクリックイベントから直接読む。
+    function add_new_column(type, is_shift_pressed){
         return column_dom.add_column(
             document,
             type,
@@ -1294,63 +750,57 @@ function run(settings){
     }
 
     //ポストカラム追加
-    document.getElementById("add_post").addEventListener("click", function(){
-        const new_column_element = add_new_column("post");
+    document.getElementById("add_post").addEventListener("click", function(event){
+        const new_column_element = add_new_column("post", event.shiftKey);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css(all_webview);
         column_dd();
         column_close();
-        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
     });
     //タイムラインカラム追加
-    document.getElementById("add_timeline").addEventListener("click", function(){
+    document.getElementById("add_timeline").addEventListener("click", function(event){
         const timeline_before = snapshot_timeline_state();
-        const new_column_element = add_new_column("home");
+        const new_column_element = add_new_column("home", event.shiftKey);
         remap_timeline_state(timeline_before);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css(all_webview);
         column_dd();
         column_close();
-        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
     });
     //通知カラム追加
-    document.getElementById("add_notify").addEventListener("click", function(){
-        const new_column_element = add_new_column("notification");
+    document.getElementById("add_notify").addEventListener("click", function(event){
+        const new_column_element = add_new_column("notification", event.shiftKey);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css(all_webview);
         column_dd();
         column_close();
-        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
     });
     //Explore(ユニバーサル)カラム追加
-    document.getElementById("add_explore").addEventListener("click", function(){
-        const new_column_element = add_new_column("explore");
+    document.getElementById("add_explore").addEventListener("click", function(event){
+        const new_column_element = add_new_column("explore", event.shiftKey);
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css(all_webview);
         column_dd();
         column_close();
-        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
     });
     //プロファイル保存ボタン
     document.getElementById("profile_save").addEventListener("click", function(){
         if(confirm(i18n_message("msg_profile_save_confirm"))){
-            let profile = column_settings_save("profile_out");
+            let profile = read_current_profile();
             const save_object = {name:"user_profile", profile:profile.column_settings};
             profile_store.push(save_object);
             const new_profile_index = profile_store.length - 1;
             deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
                 copy_profile_tab_state(last_load_profile, new_profile_index);
-                let profile_list_btn_html = "";
-                //プロファイルリスト初期化
-                for (let index = 0; index < profile_store.length; index++) {
-                    profile_list_btn_html += `<div class="dsp_btn_parent" id="userProfile-${index}"><div class="dsp_btn_change_profile_btn">P${index}</div></div>`;
-                }
-                document.querySelector("#profile_btn_list").innerHTML = profile_list_btn_html;
-                create_profile_list_btn();
+                refresh_profile_list();
             });
         }
     });
@@ -1391,14 +841,7 @@ function run(settings){
                         settings.last_load_profile = after_profile_num;
                         return settings;
                     }, function(){
-                            let profile_list_btn_html = "";
-                            //プロファイルリスト初期化
-                            for (let index = 0; index < profile_store.length; index++) {
-                                profile_list_btn_html += `<div class="dsp_btn_parent" id="userProfile-${index}"><div class="dsp_btn_change_profile_btn">P${index}</div></div>`;
-                            }
-                            document.querySelector(".profile_val_now").textContent = after_profile_num;
-                            document.querySelector("#profile_btn_list").innerHTML = profile_list_btn_html;
-                            create_profile_list_btn();
+                            refresh_profile_list(after_profile_num);
                     });
                 });
             }
@@ -1506,7 +949,7 @@ function run(settings){
                     }
                     remap_timeline_state(timeline_before);
                     this.style.borderLeft = '';
-                    column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                 }else{
                     this.style.borderLeft = '';
                 }
@@ -1527,14 +970,14 @@ function run(settings){
                     const column = this.closest(".dsp_column");
                     column_dom.dispose_and_remove(column, deck_lifecycle);
                     remap_timeline_state(timeline_before);
-                    column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                 }else{
                     if(confirm(i18n_message("msg_pinned_column_close_confirm"))){
                         const timeline_before = snapshot_timeline_state();
                         const column = this.closest(".dsp_column");
                         column_dom.dispose_and_remove(column, deck_lifecycle);
                         remap_timeline_state(timeline_before);
-                        column_settings_save("", last_load_profile);
+        save_current_profile(last_load_profile);
                     }
                 }
             })
@@ -1552,35 +995,30 @@ function run(settings){
         }
         return true;
     }
-    //ランダムID作成
-    function create_random_id(){
-        return Math.random().toString(32).substring(2);
-    }
 }
-//カラム構成保存(run() の外に置き、プロファイル切替で run() が再実行されても関数は1つのまま)
-function column_settings_save(mode, profile_num){
-    let settings_array = {
-        column_settings:[],
-        version:manifest.version
+//現在表示中のカラム構成を読み取る。読み取り専用の呼び出しは保存経路を通さない。
+function read_current_profile(){
+    return {
+        column_settings: column_settings.read_profile(
+            document,
+            window.opd_custom_column_reorder
+        ),
+        version: manifest.version
     };
-    settings_array["column_settings"] = column_settings.read_profile(
-        document,
-        window.opd_custom_column_reorder
-    );
-    if(mode == "profile_out"){
-        return settings_array;
-    }else{
-        const save_object = {name:"user_profile", profile:settings_array.column_settings};
-        Object.assign(profile_store[profile_num], save_object);
-        deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
-        });
-    }
+}
+//現在のプロファイルへカラム構成を保存する。
+function save_current_profile(profile_num){
+    const settings_array = read_current_profile();
+    const save_object = {name:"user_profile", profile:settings_array.column_settings};
+    Object.assign(profile_store[profile_num], save_object);
+    deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
+    });
 }
 //独自の左右・表示順コントロールはDOMを差し替えずstyle.orderだけを変える。
 //並び替え完了通知を本家の保存境界へ接続する。run() 内で登録するとプロファイル切替の
 //たびにリスナーが増え、並び替え1回で保存が切替回数ぶん走るため、ここで1回だけ登録する。
 document.addEventListener("opd_custom_column_reordered", function(){
-    column_settings_save("", last_load_profile);
+    save_current_profile(last_load_profile);
 });
 
 //カラー・CSS周りを設定する

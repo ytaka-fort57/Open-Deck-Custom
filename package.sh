@@ -37,6 +37,7 @@ PACKAGE_ENTRIES=(
   "about_opd.js"
   "background.js"
   "content.js"
+  "deck.css"
   "icon.png"
   "LICENSE"
   "manifest.json"

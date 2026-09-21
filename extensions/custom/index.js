@@ -14,8 +14,10 @@
     const selectors = window.opd_custom_selectors;
     const column_state = window.opd_custom_column_state;
     const keyboard = window.opd_custom_keyboard;
+    const navigation_policy = window.opd_custom_navigation_policy;
     const column_history = window.opd_custom_column_history;
     const column_reorder = window.opd_custom_column_reorder;
+    const column_dom = window.opd_custom_column_dom;
     const lifecycle = window.opd_custom_lifecycle;
     const list_repost_filter = window.opd_custom_list_repost_filter;
     const short_post_filter = window.opd_custom_short_post_filter;
@@ -37,15 +39,6 @@
         import_btn.addEventListener("click", open_settings_import);
         profile_loader_btn.insertAdjacentElement("afterend", import_btn);
         profile_loader_btn.insertAdjacentHTML("afterend", "<br>");
-    }
-
-    //Xのページが読み込まれ、仕掛ける価値のある文書になっているか
-    function is_loaded(iframe){
-        const doc = iframe.contentDocument;
-        if(doc == null || doc.readyState != "complete"){
-            return false;
-        }
-        return doc.location != null && doc.location.href.indexOf("http") == 0;
     }
 
     //タイムラインカラムを左からの並び順で取得する
@@ -194,7 +187,7 @@
                 });
                 //生成直後のiframeは about:blank で readyState は complete になる。
                 //その文書はXの読み込みで捨てられるため、仕掛けても無駄に終わる
-                if(is_loaded(iframe)){
+                if(column_dom.is_frame_loaded(iframe)){
                     setup_column(iframe, profile_index);
                 }
             });
@@ -234,12 +227,19 @@
         }
         const on_click = function(event){
             const back_button = event.target?.closest?.('button[data-testid="app-bar-back"]');
-            if(back_button == null || column_history.is_media_route?.(iframe)){
+            if(back_button == null){
                 return;
             }
+            const action = navigation_policy.classify_back({
+                source: "app-bar",
+                key: "Back",
+                is_media_route: column_history.is_media_route?.(iframe),
+                can_back: column_history.can_back(iframe),
+            });
+            if(action === "ignore" || action === "native") return;
             event.preventDefault();
             event.stopImmediatePropagation();
-            if(column_history.can_back(iframe)){
+            if(action === "column"){
                 column_history.back(iframe);
             }
         };

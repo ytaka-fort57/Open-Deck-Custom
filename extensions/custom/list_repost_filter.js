@@ -5,6 +5,7 @@ window.opd_custom_list_repost_filter = (function(){
     const STYLE_ATTR = "opd_custom_same_author_repost_css";
     const FRAME_ATTR = "opd_custom_list_repost_filter_attached";
     const RESOURCE_KEY = "list-repost-filter";
+    const column_dom = window.opd_custom_column_dom;
     const LIST_PATH_RE = /^\/i\/lists\/[^/]+\/?$/i;
     const HOME_NON_LIST_TAB_LABELS = new Set([
         "おすすめ", "フォロー中", "for you", "following"
@@ -372,15 +373,6 @@ window.opd_custom_list_repost_filter = (function(){
         state.refresh();
     }
 
-    function is_loaded(iframe){
-        try{
-            return iframe.contentDocument?.readyState === "complete"
-                && iframe.contentWindow.location.href.startsWith("http");
-        }catch(error){
-            return false;
-        }
-    }
-
     function setup(deck_document, lifecycle){
         if(deck_document == null || lifecycle == null){
             return;
@@ -400,7 +392,7 @@ window.opd_custom_list_repost_filter = (function(){
                     setup_frame(iframe, lifecycle, column.getAttribute("opd_column_type"));
                 });
             }
-            if(is_loaded(iframe)){
+            if(column_dom.is_frame_loaded(iframe)){
                 setup_frame(iframe, lifecycle, column.getAttribute("opd_column_type"));
             }
         });

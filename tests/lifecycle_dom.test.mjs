@@ -56,13 +56,20 @@ function attachFrameLoadListeners(lifecycle, frame) {
     }
 }
 
+//manifest の content_scripts と同じ順で、分割した3責務とその合成点を読み込む
+const LIFECYCLE_SOURCES = [
+    "extensions/custom/column_resource_registry.js",
+    "extensions/custom/page_event_lifecycle.js",
+    "extensions/custom/page_observer_lifecycle.js",
+    "extensions/custom/lifecycle.js",
+];
+
 function loadLifecycle() {
     const context = { window: {} };
     vm.createContext(context);
-    vm.runInContext(
-        readFileSync("extensions/custom/lifecycle.js", "utf8"),
-        context
-    );
+    for (const source of LIFECYCLE_SOURCES) {
+        vm.runInContext(readFileSync(source, "utf8"), context);
+    }
     return context.window.opd_custom_lifecycle;
 }
 
@@ -132,4 +139,100 @@ test("a new iframe after rebuild receives an independent resource registry", () 
     lifecycle.dispose_column_resources_in(new_frame);
 
     assert.deepEqual(disposed, ["old", "new"]);
+});
+
+class MutationObserverFixture {
+    static instances = [];
+
+    constructor(callback) {
+        this.callback = callback;
+        this.target = null;
+        this.disconnected = false;
+        MutationObserverFixture.instances.push(this);
+    }
+
+    observe(target) {
+        this.target = target;
+    }
+
+    disconnect() {
+        this.disconnected = true;
+    }
+
+    fire() {
+        this.callback([]);
+    }
+}
+
+function loadObserverLifecycle() {
+    MutationObserverFixture.instances = [];
+    const context = { window: {}, MutationObserver: MutationObserverFixture };
+    vm.createContext(context);
+    vm.runInContext(
+        readFileSync("extensions/custom/page_observer_lifecycle.js", "utf8"),
+        context
+    );
+    return context.window.opd_custom_page_observer_lifecycle;
+}
+
+test("observe_when_ready returns a disposer whether the target exists or appears later", () => {
+    const observers = loadObserverLifecycle();
+    const target = { id: "root" };
+    const seen = [];
+
+    //即座に見つかる場合: 初回コールバックのあと監視observerを止められる
+    const dispose_ready = observers.observe_when_ready(() => target, null, (found) => seen.push(found.id), {});
+    assert.deepEqual(seen, ["root"]);
+    dispose_ready();
+    assert.deepEqual(MutationObserverFixture.instances.map((item) => item.disconnected), [true]);
+
+    //待機する場合: 待機observerと切り替え後のobserverの両方が止まる
+    let late_target = null;
+    const watch_root = { id: "watch" };
+    const dispose_waiting = observers.observe_when_ready(
+        () => late_target, watch_root, (found) => seen.push(found.id), {}
+    );
+    const wait_observer = MutationObserverFixture.instances.at(-1);
+    assert.equal(wait_observer.target, watch_root);
+    late_target = { id: "late" };
+    wait_observer.fire();
+    assert.deepEqual(seen, ["root", "late"]);
+    dispose_waiting();
+    assert.ok(MutationObserverFixture.instances.every((item) => item.disconnected));
+});
+
+test("observe_when_ready without a watch root disposes without throwing", () => {
+    const observers = loadObserverLifecycle();
+    const dispose = observers.observe_when_ready(() => null, null, () => {}, {});
+    dispose();
+    assert.equal(MutationObserverFixture.instances.length, 0);
+});
+
+test("page observers are attached once and their disposer stops every observer", () => {
+    const observers = loadObserverLifecycle();
+    const react_root = { id: "react" };
+    const head = { id: "head" };
+    const changes = [];
+    const options = {
+        get_react_root: () => react_root,
+        react_watch_root: null,
+        on_react_change: (target) => changes.push(`react:${target.id}`),
+        react_observer_options: {},
+        get_head: () => head,
+        head_watch_root: null,
+        on_head_change: (target) => changes.push(`head:${target.id}`),
+        head_observer_options: {},
+    };
+
+    const dispose = observers.initialize_page_observers(options);
+    assert.deepEqual(changes, ["react:react", "head:head"]);
+    assert.equal(MutationObserverFixture.instances.length, 2);
+
+    //2度目はコールバックを流し直すだけでobserverは増やさない
+    assert.equal(observers.initialize_page_observers(options), dispose);
+    assert.deepEqual(changes, ["react:react", "head:head", "react:react", "head:head"]);
+    assert.equal(MutationObserverFixture.instances.length, 2);
+
+    dispose();
+    assert.ok(MutationObserverFixture.instances.every((item) => item.disconnected));
 });

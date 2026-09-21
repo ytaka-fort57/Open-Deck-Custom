@@ -3,18 +3,12 @@ class OpdExtAutoReload {
     constructor() {
         this.opd_reload_token = null;
         this.Init = (column_frame) => {
-            const column_window = column_frame.contentWindow;
-            //ヘルパースクリプト追加
-            const helper_script = column_window.document.createElement('script');
-            helper_script.src = chrome.runtime.getURL("extensions/auto_reload_helper.js");
-            column_window.document.head.appendChild(helper_script);
-
-            this.opd_reload_token = crypto.randomUUID();
-            helper_script.addEventListener('load', () => {
-                column_window.document.dispatchEvent(new CustomEvent('opd_column_reload_init', {
-                    detail: JSON.stringify({ token:this.opd_reload_token })
-                }));
-            });
+            //ヘルパースクリプト追加とトークンの受け渡し
+            this.opd_reload_token = window.opd_custom_helper_injector.inject(
+                column_frame.contentWindow,
+                "extensions/auto_reload_helper.js",
+                'opd_column_reload_init'
+            );
         }
         this.Reload = (column_window)=>{
             if (!this.opd_reload_token) return false;

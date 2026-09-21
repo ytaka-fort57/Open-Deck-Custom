@@ -1,5 +1,19 @@
 //カラム追加・削除・load監視のDOM境界をまとめる
 window.opd_custom_column_dom = (function(){
+    //Xのページが読み込まれ、仕掛ける価値のある文書になっているか
+    //クロスオリジンのiframeでは contentDocument 参照自体が投げるため握り潰す
+    function is_frame_loaded(iframe){
+        try{
+            const doc = iframe?.contentDocument;
+            if(doc == null || doc.readyState !== "complete"){
+                return false;
+            }
+            return doc.location != null && doc.location.href.startsWith("http");
+        }catch(error){
+            return false;
+        }
+    }
+
     function get_add_target(doc, is_shift_pressed){
         const empty_column = doc?.querySelector?.(".dsp_column_emptycolumn");
         const rack = empty_column?.parentElement;
@@ -46,5 +60,6 @@ window.opd_custom_column_dom = (function(){
         dispose_and_remove,
         get_add_target,
         insert_before_target,
+        is_frame_loaded,
     };
 })();

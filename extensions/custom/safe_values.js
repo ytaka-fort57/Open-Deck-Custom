@@ -1,13 +1,20 @@
-//外部データをHTML属性・URLとして使う境界を共通化する
+//外部データをHTML属性・URLとして使う境界と、そこで使う値の生成を共通化する
 window.opd_custom_safe_values = (function(){
     const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
+    //単引用符も落とす。属性を ' で囲む書き方が混ざっても壊れないようにするため。
     function escape_html_attribute(value){
         return String(value ?? "")
             .replaceAll("&", "&amp;")
             .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;")
             .replaceAll("<", "&lt;")
             .replaceAll(">", "&gt;");
+    }
+
+    //DOM要素の一時IDに使う。暗号用途には使わない。
+    function create_random_id(){
+        return Math.random().toString(32).substring(2);
     }
 
     function render_attribute_template(template, replacements){
@@ -76,6 +83,7 @@ window.opd_custom_safe_values = (function(){
     }
 
     return {
+        create_random_id,
         escape_html_attribute,
         render_attribute_template,
         is_safe_text,

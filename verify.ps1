@@ -17,7 +17,7 @@ $ExpectedZips = @(
 )
 $AllowedRoots = @(
     "_locales", "extensions", "icon",
-    "about_opd.html", "about_opd.js", "background.js", "content.js",
+    "about_opd.html", "about_opd.js", "background.js", "content.js", "deck.css",
     "icon.png", "LICENSE", "manifest.json", "popup.html", "popup.js",
     "profile_debug.html", "profile_debug.js", "text_review_privacy_policy.md"
 )

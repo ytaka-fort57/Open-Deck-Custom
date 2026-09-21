@@ -5,6 +5,7 @@
 window.opd_custom_keyboard = (function(){
     const VIEWER_ID = "opd_media_viewer";
     const attached_docs = new WeakSet();
+    const navigation_policy = window.opd_custom_navigation_policy;
 
     function find_open_viewer(deck_document){
         const dialog = deck_document.getElementById(VIEWER_ID);
@@ -57,10 +58,12 @@ window.opd_custom_keyboard = (function(){
         const dialog = find_open_viewer(deck_document);
         if(dialog != null){
             handled = handle_viewer_key(event, dialog);
-        }else if(event.key === "Backspace"
-            && iframe != null
-            && !window.opd_custom_column_history.is_media_route?.(iframe)
-            && !is_typing(event)){
+        }else if(iframe != null && navigation_policy.classify_back({
+            source: "keyboard",
+            key: event.key,
+            is_typing: is_typing(event),
+            is_media_route: window.opd_custom_column_history.is_media_route?.(iframe),
+        }) === "column"){
             //ブラウザーの戻るは別のカラムを動かしてしまうため、独自履歴で戻す。
             //履歴が無くても preventDefault する。落とすと joint history の
             //直近フレーム（別カラム）が戻ってしまう。

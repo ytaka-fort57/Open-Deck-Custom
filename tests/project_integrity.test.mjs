@@ -135,3 +135,13 @@ test("content scripts and web accessible resources match between manifests", () 
         "manifest_firefox.json: web_accessible_resources differs from manifest.json"
     );
 });
+
+test("deck CSS is packaged and loaded as a web-accessible stylesheet", () => {
+    const content = readFileSync(join(root, "content.js"), "utf8");
+    assert.match(content, /<link rel="stylesheet" href="\$\{chrome\.runtime\.getURL\("deck\.css"\)\}">/);
+    assert.doesNotMatch(content, /opd_default_css/);
+    for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
+        const manifest = JSON.parse(readFileSync(join(root, manifestName), "utf8"));
+        assert.ok(webAccessibleResources(manifest).includes("deck.css"), `${manifestName}: missing deck.css`);
+    }
+});
