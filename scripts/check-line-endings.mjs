@@ -8,7 +8,6 @@
 //
 // 使い方:
 //   node scripts/check-line-endings.mjs --staged              コミット予定の内容を検査 (pre-commit)
-//   node scripts/check-line-endings.mjs --base <ref>          <ref> からの変更を検査 (CI)
 //   node scripts/check-line-endings.mjs --all                 追跡中の全ファイルを検査
 //   node scripts/check-line-endings.mjs --all --fix           期待値へ書き戻す
 //   node scripts/check-line-endings.mjs --adopt [path...]     実測値を正本として登録する
@@ -48,14 +47,6 @@ function readIndex(path) {
     }
 }
 
-function readRef(ref, path) {
-    try {
-        return git(["show", `${ref}:${path}`]);
-    } catch {
-        return null;
-    }
-}
-
 // --- 正本ポリシー --------------------------------------------------------
 
 function loadPolicy() {
@@ -88,9 +79,13 @@ function globToRegExp(pattern) {
     return new RegExp(`${source}$`);
 }
 
-// 期待値は 正本テーブル > 規約glob > 比較元のバイト > 既定 の順で決まる。
-// 「比較元のバイト」は、本家取り込みで増えた未登録ファイルを誤検知しないための保険。
-function expectedFor(path, policy, baseline) {
+// 期待値は 正本テーブル > 規約glob > 既定 の順で決まる。
+//
+// 「変更前のバイトを期待値にする」ことはしない。それをすると、既にコミット
+// されている形式が常に正しいことになり、意図した正規化を検査が永久に拒む。
+// 本家取り込みで増えた未登録ファイルは既定と違えば報告されるが、それは
+// npm run eol:adopt で正本へ登録すべきものなので、黙って通すより望ましい。
+function expectedFor(path, policy) {
     const exact = policy.files[path];
     if (exact) return { ...exact, source: "eol-policy.json (files)" };
 
@@ -99,8 +94,6 @@ function expectedFor(path, policy, baseline) {
         if (globToRegExp(convention.pattern).test(path)) matched = convention;
     }
     if (matched) return { ...matched, source: `eol-policy.json (conventions: ${matched.pattern})` };
-
-    if (baseline) return { ...baseline, source: "変更前のファイル" };
 
     return { ...policy.default, source: "eol-policy.json (default)" };
 }
@@ -178,55 +171,34 @@ function trackedFiles() {
 }
 
 // A(追加) / M(変更) / R(改名) を対象にする。D(削除) は検査できない。
-function changedFiles(mode, base) {
-    const args = ["diff", "--name-status", "-z", "--diff-filter=AMR", "--find-renames"];
-    if (mode === "staged") args.push("--cached", "HEAD");
-    else args.push(base, "HEAD");
+function stagedFiles() {
+    const args = ["diff", "--name-status", "-z", "--diff-filter=AMR", "--find-renames", "--cached", "HEAD"];
 
     const fields = gitText(args).split("\0").filter(Boolean);
     const targets = [];
     for (let i = 0; i < fields.length; i++) {
         const status = fields[i];
-        if (status.startsWith("R")) {
-            const from = fields[++i];
-            const to = fields[++i];
-            targets.push({ path: to, basePath: from });
-        } else {
-            const path = fields[++i];
-            targets.push({ path, basePath: status === "A" ? null : path });
-        }
+        // 改名は「改名前・改名後」の2欄を持つ。検査対象は改名後の内容。
+        if (status.startsWith("R")) i++;
+        targets.push(fields[++i]);
     }
     return targets;
 }
 
 // --- 検査 ----------------------------------------------------------------
 
-function runCheck({ mode, base, fix }) {
+function runCheck({ mode, fix }) {
     const policy = loadPolicy();
-    const baseRef = mode === "staged" ? "HEAD" : base;
-    const targets =
-        mode === "all"
-            ? trackedFiles().map((path) => ({ path, basePath: null }))
-            : changedFiles(mode, base);
+    const targets = mode === "all" ? trackedFiles() : stagedFiles();
 
     const failures = [];
 
-    for (const { path, basePath } of targets) {
+    for (const path of targets) {
         // --fix は作業ツリーを直すので、読む対象も作業ツリーに合わせる。
         const buffer = mode === "staged" && !fix ? readIndex(path) : readRepoFile(path);
         if (!buffer) continue;
 
-        let baseline = null;
-        if (basePath) {
-            const baseBuffer = readRef(baseRef, basePath);
-            if (baseBuffer) {
-                const before = analyze(baseBuffer);
-                const usable = !before.empty && !before.binary && before.eol !== "mixed" && before.cr === 0;
-                if (usable) baseline = { eol: before.eol, finalNewline: before.finalNewline };
-            }
-        }
-
-        const expected = expectedFor(path, policy, baseline);
+        const expected = expectedFor(path, policy);
         const problems = inspect(buffer, expected);
         if (problems.length === 0) continue;
 
@@ -287,7 +259,7 @@ function runAdopt(paths) {
         const observed = { eol: actual.eol, finalNewline: actual.finalNewline };
         const withoutExact = { ...policy, files: { ...policy.files } };
         delete withoutExact.files[path];
-        const fallback = expectedFor(path, withoutExact, null);
+        const fallback = expectedFor(path, withoutExact);
         const current = policy.files[path];
 
         if (fallback.eol === observed.eol && fallback.finalNewline === observed.finalNewline) {
@@ -375,7 +347,6 @@ function runSyncEditorConfig({ check }) {
 export function main(argv) {
     const positional = [];
     let mode = null;
-    let base = null;
     let fix = false;
     let adopt = false;
     let sync = false;
@@ -385,10 +356,7 @@ export function main(argv) {
         const arg = argv[i];
         if (arg === "--staged") mode = "staged";
         else if (arg === "--all") mode = "all";
-        else if (arg === "--base") {
-            mode = "base";
-            base = argv[++i];
-        } else if (arg === "--fix") fix = true;
+        else if (arg === "--fix") fix = true;
         else if (arg === "--adopt") adopt = true;
         else if (arg === "--sync-editorconfig") sync = true;
         else if (arg === "--check-editorconfig") {
@@ -403,14 +371,10 @@ export function main(argv) {
     if (adopt) return runAdopt(positional);
     if (sync) return runSyncEditorConfig({ check: syncCheck });
     if (!mode) {
-        console.error("モードを指定してください: --staged / --base <ref> / --all / --adopt / --sync-editorconfig");
+        console.error("モードを指定してください: --staged / --all / --adopt / --sync-editorconfig");
         return 2;
     }
-    if (mode === "base" && !base) {
-        console.error("--base には比較元の ref を指定してください");
-        return 2;
-    }
-    return runCheck({ mode, base, fix });
+    return runCheck({ mode, fix });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
