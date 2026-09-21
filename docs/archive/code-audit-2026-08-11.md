@@ -48,6 +48,6 @@
 
 ## 関連文書
 
-- 現在の残課題: [backlog.md](backlog.md)
-- 完了済み監査: [docs/archive/README.md](archive/README.md)
-- fork運用手順: [open-deck-fork-project-setup.md](open-deck-fork-project-setup.md)
+- 現在の残課題: [backlog.md](../backlog.md)
+- 完了済み監査: [docs/archive/README.md](README.md)
+- fork運用手順: [open-deck-fork-project-setup.md](../open-deck-fork-project-setup.md)
