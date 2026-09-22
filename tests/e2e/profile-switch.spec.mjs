@@ -29,6 +29,8 @@ test("switching profiles rebuilds the deck without corrupting the other profile"
     await page.locator("#userProfile-0").click();
     await expect(page.locator(".profile_val_now")).toHaveText("0");
     await expect.poll(() => visualTypes(page)).toEqual(["home", "explore", "empty_column"]);
+    //run() は切替のたびに呼ばれるが、デッキのスタイルシートは1つのまま
+    await expect(page.locator('head link[rel="stylesheet"][href$="/deck.css"]')).toHaveCount(1);
     await expect(page.locator('#first_rack_element div[opd_column_type="home"]')).toHaveAttribute("opd_column_width", "32");
     await expect(page.locator('#first_rack_element div[opd_column_type="explore"]')).toHaveAttribute("opd_explore_path", "/i/lists/42");
     await expect(page.locator('#first_rack_element div[opd_column_type="home"] .opd_a_reload_time_setting')).toHaveValue("15");

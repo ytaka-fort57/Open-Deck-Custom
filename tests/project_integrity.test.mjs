@@ -175,7 +175,7 @@ test("content scripts and web accessible resources match between manifests", () 
 
 test("deck CSS is packaged and loaded as a web-accessible stylesheet", () => {
     const content = readFileSync(join(root, "content.js"), "utf8");
-    assert.match(content, /<link rel="stylesheet" href="\$\{chrome\.runtime\.getURL\("deck\.css"\)\}">/);
+    assert.match(content, /<link rel="stylesheet" opd_deck_css href="\$\{chrome\.runtime\.getURL\("deck\.css"\)\}">/);
     assert.doesNotMatch(content, /opd_default_css/);
     for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
         const manifest = JSON.parse(readFileSync(join(root, manifestName), "utf8"));

@@ -222,8 +222,10 @@ function run(settings){
             });
         },
     });
-    //CSSタグ追加
-    document.querySelector("head").insertAdjacentHTML("afterbegin", `<link rel="stylesheet" href="${chrome.runtime.getURL("deck.css")}">`);
+    //CSSタグ追加。run() はプロファイル切替でも呼ばれるため、1つだけにする
+    if(document.querySelector("link[opd_deck_css]") == null){
+        document.querySelector("head").insertAdjacentHTML("afterbegin", `<link rel="stylesheet" opd_deck_css href="${chrome.runtime.getURL("deck.css")}">`);
+    }
     //カラム要素作成-挿入
     let default_element = window.opd_custom_column_template.build(i18n_message, (path) => chrome.runtime.getURL(path), ui_icon_define);
     let ins_html = document.createElement("div");
