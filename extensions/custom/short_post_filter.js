@@ -4,6 +4,8 @@ window.opd_custom_short_post_filter = (function(){
     const STYLE_ATTR = "opd_custom_short_post_filter_css";
     const FRAME_ATTR = "opd_custom_short_post_filter_attached";
     const RESOURCE_KEY = "short-post-filter";
+    const column_dom = window.opd_custom_column_dom;
+    const PATH_INTERVAL_MS = 1000;
     const SHORT_TEXT_MAX = 30;
     const REPEAT_WINDOW_MS = 30 * 60 * 1000;
     const REPEAT_MIN_COUNT = 2;
@@ -33,6 +35,24 @@ window.opd_custom_short_post_filter = (function(){
     });
 
     const frame_states = new WeakMap();
+    const watched_states = new Set();
+    let path_timer = null;
+
+    //全カラムを1本のschedulerで確認し、最後の監視対象が消えたら停止する。
+    function start_path_watch(){
+        if(path_timer != null){
+            return;
+        }
+        path_timer = setInterval(function(){
+            watched_states.forEach(function(state){
+                state.refresh();
+            });
+            if(watched_states.size === 0){
+                clearInterval(path_timer);
+                path_timer = null;
+            }
+        }, PATH_INTERVAL_MS);
+    }
     const article_observations = new WeakMap();
     const recent_patterns = new Map();
     const recent_post_observations = new Map();
@@ -349,9 +369,7 @@ window.opd_custom_short_post_filter = (function(){
 
     function dispose_state(state){
         state.observer?.disconnect();
-        if(state.path_timer != null){
-            clearInterval(state.path_timer);
-        }
+        watched_states.delete(state);
         if(state.refresh_timer != null){
             clearTimeout(state.refresh_timer);
             state.refresh_timer = null;
@@ -393,7 +411,6 @@ window.opd_custom_short_post_filter = (function(){
             doc,
             path: "",
             observer: null,
-            path_timer: null,
             refresh_timer: null,
             refresh: null,
             schedule_refresh: null,
@@ -426,7 +443,8 @@ window.opd_custom_short_post_filter = (function(){
                 attributeFilter: ["href", "title", "aria-label"],
             });
         }
-        state.path_timer = setInterval(state.refresh, 1000);
+        watched_states.add(state);
+        start_path_watch();
         frame_states.set(iframe, state);
         lifecycle.register_column_resource(iframe, RESOURCE_KEY, function(){
             if(frame_states.get(iframe) === state){
@@ -435,15 +453,6 @@ window.opd_custom_short_post_filter = (function(){
             dispose_state(state);
         });
         state.refresh();
-    }
-
-    function is_loaded(iframe){
-        try{
-            return iframe.contentDocument?.readyState === "complete"
-                && iframe.contentWindow.location.href.startsWith("http");
-        }catch(error){
-            return false;
-        }
     }
 
     function setup(deck_document, lifecycle){
@@ -465,7 +474,7 @@ window.opd_custom_short_post_filter = (function(){
                     setup_frame(iframe, lifecycle);
                 });
             }
-            if(is_loaded(iframe)){
+            if(column_dom.is_frame_loaded(iframe)){
                 setup_frame(iframe, lifecycle);
             }
         });

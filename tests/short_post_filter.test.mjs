@@ -143,3 +143,72 @@ test("normalization makes template fingerprints stable across case and whitespac
         filter.template_fingerprint(" 続きはこちら　200 ")
     );
 });
+
+test("multiple frames share one path timer and release it after disposal", () => {
+    const intervals = [];
+    const cleared = [];
+    const context = {
+        URL,
+        console: { warn() {} },
+        setInterval(callback) {
+            intervals.push(callback);
+            return intervals.length;
+        },
+        clearInterval(id) { cleared.push(id); },
+        setTimeout(callback) { callback(); return 1; },
+        clearTimeout() {},
+        MutationObserver: class {
+            observe() {}
+            disconnect() {}
+        },
+    };
+    context.window = {};
+    vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/column_dom.js", "utf8"), context);
+    vm.runInContext(readFileSync("extensions/custom/short_post_filter.js", "utf8"), context);
+
+    const disposers = new Map();
+    const lifecycle = {
+        register_column_resource(frame, key, dispose) {
+            disposers.set(frame, dispose);
+        },
+    };
+    function runtimeDocument() {
+        return {
+            readyState: "complete",
+            location: { href: "https://x.com/home" },
+            documentElement: {},
+            head: { querySelector: () => null, appendChild() {} },
+            createElement: () => ({ setAttribute() {}, remove() {}, textContent: "" }),
+            querySelector: () => null,
+            querySelectorAll: () => [],
+        };
+    }
+    function frame() {
+        const attributes = new Set();
+        const doc = runtimeDocument();
+        return {
+            contentDocument: doc,
+            contentWindow: { location: doc.location },
+            getAttribute: (name) => attributes.has(name) ? "true" : null,
+            setAttribute: (name) => attributes.add(name),
+            addEventListener() {},
+        };
+    }
+    const frames = [frame(), frame()];
+    const deck = {
+        querySelectorAll: () => frames.map((item) => ({
+            querySelector: () => item,
+        })),
+    };
+
+    context.window.opd_custom_short_post_filter.setup(deck, lifecycle);
+    assert.equal(intervals.length, 1);
+    intervals[0]();
+    disposers.get(frames[0])();
+    intervals[0]();
+    assert.deepEqual(cleared, []);
+    disposers.get(frames[1])();
+    intervals[0]();
+    assert.deepEqual(cleared, [1]);
+});
