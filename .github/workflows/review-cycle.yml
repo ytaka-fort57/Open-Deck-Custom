@@ -81,7 +81,8 @@ jobs:
           branch: chore/review-health
           title: "chore: 自動レビュー健全性レポートを更新する"
           commit-message: "chore: 自動レビュー健全性レポートを更新する"
-          body: `npm run review -- health` の定期更新。
+          # YAMLでは行頭のバッククォートは予約文字。引用符で囲まないとファイル全体がparseできない
+          body: "`npm run review -- health` の定期更新。"
           add-paths: |
             docs/backlog/health.md
             docs/backlog/report.md
