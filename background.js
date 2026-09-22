@@ -1,4 +1,6 @@
 const EXTENSION_DOMAIN = new URL(chrome.runtime.getURL('')).hostname;
+//Xの長文ポストの上限(25,000文字)
+const TEXT_REVIEW_MAX_LENGTH = 25000;
 
 //インストール時にあらかじめDNRを設定しておく
 chrome.runtime.onInstalled.addListener(() => {
@@ -27,6 +29,11 @@ chrome.runtime.onMessage.addListener(
             return true;
         }
         if(request.message === "text_review"){
+            //外部サービスへ送る値は、ポスト本文として取り得る文字列だけにする
+            if(typeof request.review_text !== "string" || request.review_text.length === 0 || request.review_text.length > TEXT_REVIEW_MAX_LENGTH){
+                sendResponse(false);
+                return false;
+            }
             const api_url = "https://opd.kwdev-sys.com/api/opd/text_review/review";
             (async () => {
                 const controller = new AbortController();
@@ -109,7 +116,10 @@ chrome.webRequest.onHeadersReceived.addListener(function (resp) {
 }, { urls: [
     '*://x.com/i/api/graphql/*/SearchTimeline*',
     '*://x.com/i/api/graphql/*/HomeLatestTimeline*',
-    '*://x.com/i/api/graphql/*/HomeTimeline*'
+    '*://x.com/i/api/graphql/*/HomeTimeline*',
+    '*://twitter.com/i/api/graphql/*/SearchTimeline*',
+    '*://twitter.com/i/api/graphql/*/HomeLatestTimeline*',
+    '*://twitter.com/i/api/graphql/*/HomeTimeline*'
 ] }, ['responseHeaders']);
 
 
