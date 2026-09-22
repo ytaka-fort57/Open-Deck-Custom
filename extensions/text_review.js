@@ -249,11 +249,12 @@ class OpdExtTextReview {
                 panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_failed.message}</div>`);
                 return;
             }
-            const indication_items = this.NormalizeIndications(text, review_request.indications).map((indication) => ({
-                indication: indication,
-                id: this.CreateRandomID(),
-                enabled: false
-            }));
+            const review_model = window.opd_custom_text_review_model.create_preview_model(
+                text,
+                review_request.indications,
+                this.CreateRandomID
+            );
+            const indication_items = review_model.items;
             //校正パネルを空にする
             panel_elem.textContent = "";
 
@@ -276,7 +277,7 @@ class OpdExtTextReview {
                 result.push(`<div class="opd_text_review_indication_switch"><input id="opd_text_review_iid_${item.id}" type="checkbox" opd_indication_id="${item.id}"><div><span style="font-size: 0.8em;">(${this.EscapeHTML(review.message)})</span><div><span style="text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(review.relevant_part?.problem)}</span>${suggest_elem}${this.EscapeHTML(review.relevant_part?.after)}</div></div></div>`);
             });
             //校正パネルへ全文指摘を表示
-            const review_view = this.IndicationTexts(text, indication_items);
+            const review_view = this.IndicationTexts(review_model.segments);
             panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div class="opd_text_review_result"><div class="opd_text_review_result_preview">${review_view}</div><div class="opd_text_review_indication_switcher">${result.join("")}</div><div class="opd_text_review_indication_apply_panel"><button id="opd_text_review_apply_selected">${this.UITexts[this.opd_use_lang].textReview_applySelected.message}</button><button id="opd_text_review_apply_all">${this.UITexts[this.opd_use_lang].textReview_applyAll.message}</button></div></div>`);
 
             indication_items.forEach((item)=>{
@@ -317,83 +318,21 @@ class OpdExtTextReview {
             });
         }
         this.NormalizeIndications = (text, result) =>{
-            if(!Array.isArray(result)) return [];
-
-            const sorted = result.filter((ind) => {
-                if(ind == null || !Number.isInteger(ind.offset) || !Number.isInteger(ind.length)) return false;
-                if(ind.offset < 0 || ind.length < 0) return false;
-                return ind.offset + ind.length <= text.length;
-            }).sort((a, b) => a.offset - b.offset || a.length - b.length);
-
-            const normalized = [];
-            let current_end = 0;
-            for(const ind of sorted){
-                if(ind.offset < current_end) continue;
-                normalized.push(ind);
-                current_end = ind.offset + ind.length;
-            }
-            return normalized;
+            return window.opd_custom_text_review_model.normalize_indications(text, result);
         }
-        this.IndicationTexts = (text, items) =>{
+        this.IndicationTexts = (segments) =>{
             //全文指摘表示機能用のHTML生成関数
-            if (!items?.length) return this.EscapeHTML(text);
-
-            let cur = 0;
-            let html = "";
-
-            for (const item of items) {
-                const ind = item.indication;
-                const { offset, length, params } = ind;
-                const start = offset;
-                const end = start + length;
-                const suggest = params?.suggests?.at(-1) ?? "";
-
-                html += this.EscapeHTML(text.slice(cur, start));
-
-                let suggest_elem = "";
-                if(suggest !== ""){
-                    suggest_elem = `<span style="padding:3px;border-radius:3px;background:#14ff0063;">${this.EscapeHTML(suggest)}</span>`;
+            return segments.map((segment) => {
+                if(segment.type === "text"){
+                    return this.EscapeHTML(segment.text);
                 }
-
-                html += `<span class="patch" data-offset="${start}" data-length="${length}"><span id="opd_text_review_problem_id_${item.id}" style="padding:3px;border-radius:3px;text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(text.slice(start, end))}</span>${suggest_elem}</span>`;
-
-                cur = end;
-            }
-
-            html += this.EscapeHTML(text.slice(cur));
-
-            return html;
+                const suggest_elem = segment.suggestion === "" ? ""
+                    : `<span style="padding:3px;border-radius:3px;background:#14ff0063;">${this.EscapeHTML(segment.suggestion)}</span>`;
+                return `<span class="patch" data-offset="${segment.offset}" data-length="${segment.length}"><span id="opd_text_review_problem_id_${segment.id}" style="padding:3px;border-radius:3px;text-decoration: line-through;background:#ff000054;">${this.EscapeHTML(segment.problem)}</span>${suggest_elem}</span>`;
+            }).join("");
         }
         this.GetReviewedText = (text, items) =>{
-            //指摘適用済みのテキストを生成生成する関数
-            if (!items?.length) return text;
-
-            let cur = 0;
-            let output = "";
-
-            for (const item of items) {
-                const ind = item.indication;
-                const { offset, length, params } = ind;
-                const start = offset;
-                const end = start + length;
-                const suggest = params?.suggests?.at(-1) ?? "";
-                const problem = text.slice(start, end);
-
-                //前の修正部分の後から今回の修正部分の前までを追加
-                output += text.slice(cur, start);
-
-                if (item.enabled) {
-                    output += String(suggest);
-                } else {
-                    output += String(problem);
-                }
-
-                cur = end;
-            }
-
-            output += text.slice(cur);
-
-            return output;
+            return window.opd_custom_text_review_model.apply_selected(text, items);
         }
         this.ReviewRquest = async(str)=>{
             //校正を開始し、結果を得る関数

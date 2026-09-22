@@ -17,10 +17,10 @@ const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8"
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
 const columnFrameCss = readFileSync("extensions/custom/column_frame_css.js", "utf8");
+const safeValues = readFileSync("extensions/custom/safe_values.js", "utf8");
 
 test("the sidebar add buttons pass the Shift state to the settings boundary", () => {
-    assert.match(content, /add_new_column\("home", event\.shiftKey\)/);
-    assert.match(content, /add_new_column\("explore", event\.shiftKey\)/);
+    assert.match(content, /add_new_column\(config\.type, event\.shiftKey\)/);
     assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
 });
 
@@ -69,11 +69,27 @@ test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
     //引数なしの全iframe再走査は残さない(削除時の再初期化は行わない)
     assert.doesNotMatch(content, /^\s*append_object_css\(\);/m);
     assert.match(content, /append_object_css\(document\.querySelectorAll\('#main_rack_element iframe\[opd_init_webview\]'\)\);/);
-    assert.equal((content.match(/append_object_css\(all_webview\);/g) ?? []).length, 4);
+    assert.equal((content.match(/append_object_css\(all_webview\);/g) ?? []).length, 1);
     assert.match(content, /column_dom\.dispose_and_remove/);
     assert.doesNotMatch(content, /function observe_when_ready/);
     assert.doesNotMatch(content, /function set_title_favicon/);
     assert.doesNotMatch(content, /media_viewer_token\.push/);
+});
+
+test("column extensions are initialized from one typed registry", () => {
+    assert.match(content, /const column_extension_registry = \[/);
+    assert.match(content, /types: \["post"\]/);
+    assert.match(content, /types: \["home", "explore"\]/);
+    assert.match(content, /column_extension_registry\.forEach/);
+    assert.match(content, /extension\.types == null \|\| extension\.types\.includes\(column_type\)/);
+
+    const reinit = content.slice(
+        content.indexOf("function reinit_column_extensions"),
+        content.indexOf("function snapshot_timeline_state")
+    );
+    assert.doesNotMatch(reinit, /column_type ===/);
+    assert.match(reinit, /column_frame\.addEventListener\("load", ext_load\)/);
+    assert.match(content, /register_media_viewer_token\(column_frame, blocker\.opd_send_media_info_token\)/);
 });
 
 test("settings and profiles use the shared storage repository", () => {
@@ -87,7 +103,8 @@ test("untrusted values cross explicit safe DOM and URL boundaries", () => {
     assert.match(content, /column_settings\.render/);
     assert.doesNotMatch(mediaViewer, /src="\$\{/);
     assert.doesNotMatch(mediaViewer, /wrapper\.innerHTML/);
-    assert.match(mediaViewer, /normalize_https_url/);
+    assert.match(mediaViewer, /resolve_media_url/);
+    assert.match(safeValues, /function resolve_media_url[\s\S]*?normalize_https_url/);
 });
 
 test("remaining audit hardening paths are wired", () => {
@@ -154,13 +171,21 @@ test("column reorder preserves iframe documents and saves visual order", () => {
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
     assert.match(content, /function add_new_column\(type, is_shift_pressed\)\{[\s\S]*?column_dom\.add_column\(/);
-    assert.equal(
-        (content.match(/add_new_column\("(?:post|home|notification|explore)", event\.shiftKey\)/g) ?? []).length,
-        4
-    );
+    assert.match(content, /\{id: "add_post", type: "post", remap_timeline: false\}/);
+    assert.match(content, /\{id: "add_timeline", type: "home", remap_timeline: true\}/);
+    assert.match(content, /\{id: "add_notify", type: "notification", remap_timeline: false\}/);
+    assert.match(content, /\{id: "add_explore", type: "explore", remap_timeline: false\}/);
+    assert.match(content, /function finalize_added_column\(new_column_element, timeline_before\)[\s\S]*?remap_timeline_state\(timeline_before\)[\s\S]*?append_object_css\(all_webview\)[\s\S]*?column_dd\(\)[\s\S]*?column_close\(\)[\s\S]*?save_current_profile\(last_load_profile\)/);
+    assert.equal((content.match(/add_new_column\(config\.type, event\.shiftKey\)/g) ?? []).length, 1);
+    assert.equal((content.match(/finalize_added_column\(new_column_element, timeline_before\)/g) ?? []).length, 2);
     //Shift押下はクリックイベントから読む。グローバルな keydown/keyup 追跡は残さない。
     assert.doesNotMatch(content, /let is_shift_pressed = false/);
     assert.doesNotMatch(content, /event\.key === 'Shift'/);
+});
+
+test("media preview and download share the safe URL resolver", () => {
+    assert.equal((mediaViewer.match(/opd_custom_safe_values\.resolve_media_url\(/g) ?? []).length, 2);
+    assert.doesNotMatch(mediaViewer, /select_video_variant_url|searchParams\.set\("name", "orig"\)/);
 });
 
 test("profile initialization and saving share the settings boundary", () => {
@@ -180,6 +205,16 @@ test("text review always has a timeout and failure recovery", () => {
     assert.match(background, /finally\s*\{\s*clearTimeout\(timeout_id\)/);
     assert.match(textReview, /this\.UITexts\[requested_lang\].*\? requested_lang : "en"/);
     assert.match(textReview, /finally\s*\{\s*review_state = false/);
+});
+
+test("text review apply falls back when X no longer exposes Draft _onPaste", () => {
+    assert.match(textReviewHelper, /typeof editor\?\._onPaste === "function"/);
+    assert.match(textReviewHelper, /new InputEvent\("beforeinput",[\s\S]*?inputType: "insertText"/);
+    assert.match(textReviewHelper, /target_editor_elem\.dispatchEvent\(input_evt\)/);
+    assert.match(textReviewHelper, /if\(!input_evt\.defaultPrevented\)[\s\S]*?target_editor_elem\.dispatchEvent\(evt\)/);
+    assert.match(textReviewHelper, /if\(!input_evt\.defaultPrevented && !evt\.defaultPrevented && !setEditorText\(target_editor_elem, detail\.text\)\)[\s\S]*?execCommand\("insertText", false, detail\.text\)/);
+    assert.match(textReviewHelper, /const candidates = \[[\s\S]*?fiber\.stateNode,[\s\S]*?fiber\.memoizedProps\?\.editor/);
+    assert.match(textReviewHelper, /candidate\._latestEditorState \|\| candidate\.props\?\.editorState/);
 });
 
 test("column width preset mapping lives in the settings boundary", () => {
@@ -217,6 +252,7 @@ test("small utilities have a single implementation", () => {
     const safeValues = readFileSync("extensions/custom/safe_values.js", "utf8");
     const indexJs = readFileSync("extensions/custom/index.js", "utf8");
     const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
+    const shortPostFilter = readFileSync("extensions/custom/short_post_filter.js", "utf8");
 
     //ランダムIDとHTMLエスケープの実体は safe_values だけに置く
     assert.match(content, /const create_random_id = deck_safe_values\.create_random_id;/);
@@ -227,7 +263,7 @@ test("small utilities have a single implementation", () => {
     assert.doesNotMatch(textReview, /replace\(\/&\/g, '&amp;'\)/);
 
     //iframeの読み込み判定は column_dom に1つだけ置く
-    for (const source of [indexJs, listRepostFilter]) {
+    for (const source of [indexJs, listRepostFilter, shortPostFilter]) {
         assert.match(source, /column_dom\.is_frame_loaded\(iframe\)/);
         assert.doesNotMatch(source, /function is_loaded\(iframe\)/);
     }
@@ -235,9 +271,16 @@ test("small utilities have a single implementation", () => {
 
 test("periodic work is shared instead of allocated per column", () => {
     const indexJs = readFileSync("extensions/custom/index.js", "utf8");
+    const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
+    const shortPostFilter = readFileSync("extensions/custom/short_post_filter.js", "utf8");
 
     //デッキ側のMutationObserverは冪等な全体走査をまとめてから呼ぶ。
     //index.js は location で自分を止める入口のため、実行テストには載せられない
     assert.match(indexJs, /new MutationObserver\(schedule_setup\)/);
     assert.match(indexJs, /function schedule_setup\(\)/);
+    for (const source of [listRepostFilter, shortPostFilter]) {
+        assert.match(source, /const watched_states = new Set\(\)/);
+        assert.match(source, /watched_states\.forEach/);
+        assert.doesNotMatch(source, /state\.path_timer/);
+    }
 });

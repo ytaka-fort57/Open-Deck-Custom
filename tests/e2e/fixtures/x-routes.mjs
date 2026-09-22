@@ -7,6 +7,7 @@ const SCRIPT_PLACEHOLDER = /<!--opd-script:([a-z0-9._-]+)-->/g;
 const fixtureByPath = new Map([
     ["/run-opdeck", "run-opdeck.html"],
     ["/home", "home.html"],
+    ["/intent/tweet", "home.html"],
     ["/notifications", "notifications.html"],
     ["/explore", "explore.html"],
     ["/i/lists/42", "list.html"],

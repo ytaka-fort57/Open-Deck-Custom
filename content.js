@@ -766,47 +766,32 @@ function run(settings){
         );
     }
 
-    //ポストカラム追加
-    document.getElementById("add_post").addEventListener("click", function(event){
-        const new_column_element = add_new_column("post", event.shiftKey);
+    //カラム型ごとの差はここに閉じ込め、追加後の初期化・再接続・保存は必ず同じ経路を通す。
+    const column_add_buttons = [
+        {id: "add_post", type: "post", remap_timeline: false},
+        {id: "add_timeline", type: "home", remap_timeline: true},
+        {id: "add_notify", type: "notification", remap_timeline: false},
+        {id: "add_explore", type: "explore", remap_timeline: false},
+    ];
+
+    function finalize_added_column(new_column_element, timeline_before){
+        if(timeline_before != null){
+            remap_timeline_state(timeline_before);
+        }
         new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
         const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
         append_object_css(all_webview);
         column_dd();
         column_close();
         save_current_profile(last_load_profile);
-    });
-    //タイムラインカラム追加
-    document.getElementById("add_timeline").addEventListener("click", function(event){
-        const timeline_before = snapshot_timeline_state();
-        const new_column_element = add_new_column("home", event.shiftKey);
-        remap_timeline_state(timeline_before);
-        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
-        const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
-        append_object_css(all_webview);
-        column_dd();
-        column_close();
-        save_current_profile(last_load_profile);
-    });
-    //通知カラム追加
-    document.getElementById("add_notify").addEventListener("click", function(event){
-        const new_column_element = add_new_column("notification", event.shiftKey);
-        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
-        const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
-        append_object_css(all_webview);
-        column_dd();
-        column_close();
-        save_current_profile(last_load_profile);
-    });
-    //Explore(ユニバーサル)カラム追加
-    document.getElementById("add_explore").addEventListener("click", function(event){
-        const new_column_element = add_new_column("explore", event.shiftKey);
-        new_column_element?.scrollIntoView({behavior: "smooth",inline: "end"});
-        const all_webview = document.querySelectorAll('#main_rack_element iframe[opd_init_webview]');
-        append_object_css(all_webview);
-        column_dd();
-        column_close();
-        save_current_profile(last_load_profile);
+    }
+
+    column_add_buttons.forEach(function(config){
+        document.getElementById(config.id).addEventListener("click", function(event){
+            const timeline_before = config.remap_timeline ? snapshot_timeline_state() : null;
+            const new_column_element = add_new_column(config.type, event.shiftKey);
+            finalize_added_column(new_column_element, timeline_before);
+        });
     });
     //プロファイル保存ボタン
     document.getElementById("profile_save").addEventListener("click", function(){
@@ -869,24 +854,26 @@ function run(settings){
             alert(i18n_message("msg_profile_delete_current_alert"));
         }
     });
-    //カラム拡張機能の初期化(カラム拡張機能の追加はここで行います)
-    function reinit_column_extensions(column_div){
-        const column_frame = column_div?.querySelector("iframe");
-        if(!column_frame) return;
-        const column_type = column_div.getAttribute("opd_column_type");
-
-        const ext_load = () => {
-            //TODO:今後を見据えてカラム拡張を容易に組み込めるようにする
-            const opd_utils = new OpdUtils();
-            opd_utils.Init(column_frame);
-
-            if(column_type === "post"){
+    //対象型と初期化手順を同じ定義に置き、追加時の分岐漏れを防ぐ。
+    const column_extension_registry = [
+        {
+            types: null,
+            init(column_frame){
+                const opd_utils = new OpdUtils();
+                opd_utils.Init(column_frame);
+            },
+        },
+        {
+            types: ["post"],
+            init(column_frame){
                 const ext_text_review = new OpdExtTextReview();
                 const ui_lang = chrome.i18n.getUILanguage();
                 ext_text_review.Init(column_frame, ui_icon_define, ui_lang);
-            }
-
-            if(column_type === "home" || column_type === "explore"){
+            },
+        },
+        {
+            types: ["home", "explore"],
+            init(column_frame){
                 const auto_reload = new OpdExtAutoReload();
                 auto_reload.Init(column_frame);
                 column_frame.opd_auto_reload = auto_reload;
@@ -895,7 +882,22 @@ function run(settings){
                 blocker.Init(column_frame);
                 //同じiframeの再読込では最新tokenへ置き換え、削除済みiframeはWeakMapに保持させない
                 deck_lifecycle.register_media_viewer_token(column_frame, blocker.opd_send_media_info_token);
-            }
+            },
+        },
+    ];
+
+    //カラム拡張機能の初期化(カラム拡張機能の追加はregistryで行います)
+    function reinit_column_extensions(column_div){
+        const column_frame = column_div?.querySelector("iframe");
+        if(!column_frame) return;
+        const column_type = column_div.getAttribute("opd_column_type");
+
+        const ext_load = () => {
+            column_extension_registry.forEach(function(extension){
+                if(extension.types == null || extension.types.includes(column_type)){
+                    extension.init(column_frame);
+                }
+            });
         };
 
         //拡張が追加済なら追加しない

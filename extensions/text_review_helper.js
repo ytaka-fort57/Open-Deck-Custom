@@ -112,7 +112,28 @@
                     clipboardData: dt
                 });
                 //内部関数を使って校正文章を擬似的にペーストさせる
-                editor?._onPaste(evt, editor);
+                if(typeof editor?._onPaste === "function"){
+                    editor._onPaste(evt, editor);
+                }else{
+                    const input_evt = new InputEvent("beforeinput", {
+                        bubbles: true,
+                        cancelable: true,
+                        data: detail.text,
+                        inputType: "insertText"
+                    });
+                    target_editor_elem.dispatchEvent(input_evt);
+
+                    //現在のXはDraft Editorの内部インスタンスをDOMへ公開しないため、
+                    //beforeinputを優先し、未処理の場合だけ通常のpasteイベントへ退避する。
+                    if(!input_evt.defaultPrevented){
+                        target_editor_elem.dispatchEvent(evt);
+                    }
+
+                    if(!input_evt.defaultPrevented && !evt.defaultPrevented && !setEditorText(target_editor_elem, detail.text)){
+                        //イベントを扱わない旧構造でも、選択済みcontenteditableへ入力を試す。
+                        target_editor_elem.ownerDocument.execCommand("insertText", false, detail.text);
+                    }
+                }
             }else{
                 //ハッシュタグが含まれていると、execCommandでは動作が崩れるのでこうする
                 setEditorText(target_editor_elem, detail.text);
@@ -262,6 +283,26 @@
             const editor = props?.children?.props?.editor ?? props?.children?.[0]?.props?.editor;
             if (editor) {
                 return editor;
+            }
+
+            //XのReact props構造が変わった場合は、同じDOM要素のFiber祖先から
+            //DraftEditor本体またはeditor propを探す。
+            let fiber = getFiber(target_element);
+            while(fiber){
+                const candidates = [
+                    fiber.stateNode,
+                    fiber.memoizedProps?.editor,
+                    fiber.pendingProps?.editor,
+                    fiber.memoizedProps?.children?.props?.editor,
+                    fiber.pendingProps?.children?.props?.editor
+                ];
+                const draft_editor = candidates.find(candidate =>
+                    candidate &&
+                    (candidate._latestEditorState || candidate.props?.editorState) &&
+                    typeof candidate.props?.onChange === "function"
+                );
+                if(draft_editor) return draft_editor;
+                fiber = fiber.return;
             }
             target_element = target_element.parentElement;
         }

@@ -86,6 +86,7 @@ test("manifests and locale files are valid and complete", () => {
         assert.ok(scripts.indexOf("extensions/custom/column_state_migration.js") < scripts.indexOf("extensions/custom/column_settings.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_state_migration.js") < scripts.indexOf("extensions/custom/column_state.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("content.js"));
+        assert.ok(scripts.indexOf("extensions/custom/text_review_model.js") < scripts.indexOf("extensions/text_review.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("extensions/custom/column_frame_css.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_frame_css.js") < scripts.indexOf("content.js"));
         //lifecycle は3モジュールの合成点なので、合成される側が先に読み込まれていなければ undefined を参照する
