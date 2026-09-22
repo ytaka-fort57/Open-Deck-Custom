@@ -2,6 +2,16 @@
 //Xのclass名は自動生成で変わるため、role属性と表示ラベルだけを手掛かりにする
 window.opd_custom_selectors = (function(){
 
+    //ホームのタイムラインタブが表示されるページか。
+    //ピン留めしたリストのタブは /i/lists/<id> へ遷移するため、そこも含める。
+    //プロフィールの「メディア」や /followers の「フォロー中」など、他ページのタブは対象外
+    const TIMELINE_TAB_PATH_RE = /^\/(?:home|i\/lists\/[^/]+)\/?$/;
+
+    function is_timeline_tab_page(doc){
+        const pathname = doc?.location?.pathname;
+        return typeof pathname === "string" && TIMELINE_TAB_PATH_RE.test(pathname);
+    }
+
     //タイムライン選択タブの一覧を返す
     function get_tabs(doc){
         const tab_list = doc.querySelector('[role="tablist"]');
@@ -115,6 +125,7 @@ window.opd_custom_selectors = (function(){
     }
 
     return {
+        is_timeline_tab_page: is_timeline_tab_page,
         get_tabs: get_tabs,
         tab_label: tab_label,
         is_selected: is_selected,

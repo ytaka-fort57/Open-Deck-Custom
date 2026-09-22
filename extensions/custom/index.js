@@ -77,7 +77,8 @@
                 return;
             }
             const tab = target.closest('[role="tab"]');
-            if(tab == null){
+            //ホームカラムから遷移した先のページのタブは、タイムラインの選択ではない
+            if(tab == null || !selectors.is_timeline_tab_page(doc)){
                 return;
             }
             const label = selectors.tab_label(tab);
@@ -134,7 +135,8 @@
                 clearInterval(timer);
                 return;
             }
-            if(desired.label == undefined){
+            //別ページへ移った間は、同名のタブ(/followers の「フォロー中」など)を押さない
+            if(desired.label == undefined || !selectors.is_timeline_tab_page(doc)){
                 return;
             }
             const target = selectors.find_tab_by_label(doc, desired.label);
@@ -151,7 +153,7 @@
             return;
         }
         selectors.wait_for_tabs(doc, 15000, function(){
-            const target = selectors.find_tab_by_label(doc, desired.label);
+            const target = selectors.is_timeline_tab_page(doc) ? selectors.find_tab_by_label(doc, desired.label) : null;
             if(target != null && !selectors.is_selected(target)){
                 restore_tab(doc, desired, target, iframe);
             }

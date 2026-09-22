@@ -120,3 +120,30 @@ test("a position-keyed save from an older version is migrated on the first run",
     expect(blockedRequests, "fixture外network request").toEqual([]);
     expect(errors, "console/page errors").toEqual([]);
 });
+
+test("tabs on pages other than the home timeline neither overwrite nor get re-selected", async ({ extensionSession }) => {
+    const { context, storage, blockedRequests, errors } = extensionSession;
+    const page = await openDeck(context, storage, storageItems([TWO_TIMELINE_COLUMNS]));
+    const uid = (await sectionByWidth(page, "31")).uid;
+
+    await frameForSection(page, (await sectionByWidth(page, "31")).id)
+        .locator('[role="tab"]', { hasText: "フォロー中" }).click();
+    await expect.poll(() => savedTabs(storage)).toEqual({ [`0:${uid}`]: "フォロー中" });
+
+    //読み込み直後の再選択期間(20秒)中に、同名のタブを持つ別ページへ移る
+    await page.reload();
+    await expect(page.locator("#opd_main_element")).toBeVisible();
+    const frame = frameForSection(page, (await sectionByWidth(page, "31")).id);
+    await expect(frame.locator(SELECTED_TAB)).toHaveText("フォロー中");
+    await frame.locator("body").evaluate(() => window.opdFixtureNavigate("/Alice/followers"));
+    await frame.locator('[role="tab"]', { hasText: "おすすめ" }).click();
+    await expect(frame.locator(SELECTED_TAB)).toHaveText("おすすめ");
+
+    //再選択の監視は1秒周期のため、2周期以上待っても押し戻されず、保存も変わらないことを見る
+    await page.waitForTimeout(2500);
+    await expect(frame.locator(SELECTED_TAB)).toHaveText("おすすめ");
+    expect(await savedTabs(storage)).toEqual({ [`0:${uid}`]: "フォロー中" });
+
+    expect(blockedRequests, "fixture外network request").toEqual([]);
+    expect(errors, "console/page errors").toEqual([]);
+});

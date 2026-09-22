@@ -27,6 +27,20 @@ function createTab(href) {
     };
 }
 
+test("timeline tabs are only saved and restored on the home timeline and pinned lists", () => {
+    const selectors = loadSelectors();
+    for (const pathname of ["/home", "/home/", "/i/lists/12345", "/i/lists/12345/"]) {
+        assert.equal(selectors.is_timeline_tab_page(createDoc(pathname)), true, pathname);
+    }
+    // Profile tabs (Posts / Media) and /followers ("フォロー中") share labels with timeline tabs.
+    for (const pathname of ["/Alice", "/Alice/media", "/Alice/followers", "/Alice/following",
+        "/explore/tabs/for-you", "/i/lists/12345/members", "/homepage", "/notifications", "/"]) {
+        assert.equal(selectors.is_timeline_tab_page(createDoc(pathname)), false, pathname);
+    }
+    assert.equal(selectors.is_timeline_tab_page(null), false);
+    assert.equal(selectors.is_timeline_tab_page({}), false);
+});
+
 test("only tabs that change the URL are treated as navigating", () => {
     const selectors = loadSelectors();
     const doc = createDoc("/home");
