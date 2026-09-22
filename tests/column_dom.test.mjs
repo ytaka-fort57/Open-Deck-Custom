@@ -73,6 +73,47 @@ test("column DOM boundary chooses an insertion target and delegates visual reord
     ]);
 });
 
+//Shift併用の追加は先頭カラムへ、通常の追加は空カラムへ入る。
+//先頭カラムが無いとき(空カラムだけのラック)はShiftでも空カラムへ戻す必要がある。
+test("the insertion target falls back to the empty column when the rack has no column yet", () => {
+    const columnDom = loadColumnDom();
+    //空カラムはsectionだがdraggableを持たないため、先頭カラムとしては拾われない
+    const emptyColumn = { tagName: "SECTION", getAttribute: () => null };
+    //ラック内に空カラムしか無い。並び替え用の draggable な section が無い状態
+    emptyColumn.parentElement = { children: [emptyColumn] };
+    const document = { querySelector: () => emptyColumn };
+
+    assert.equal(columnDom.get_add_target(document, true), emptyColumn);
+    assert.equal(columnDom.get_add_target(document, false), emptyColumn);
+
+    //空カラム自体が見つからない文書では追加先を決められない
+    assert.equal(columnDom.get_add_target({ querySelector: () => null }, true), null);
+    assert.equal(columnDom.get_add_target(null, true), undefined);
+    assert.equal(columnDom.add_column(null, "home", "<home></home>", {}, () => "column-1", null, true), null);
+});
+
+//draggable でない section (ドラッグ無効のカラム) は先頭として扱わない
+test("the head insertion target skips nodes that are not reorderable columns", () => {
+    const columnDom = loadColumnDom();
+    const fixedColumn = {
+        tagName: "SECTION",
+        getAttribute: () => "false",
+    };
+    const divider = {
+        tagName: "DIV",
+        getAttribute: () => "true",
+    };
+    const regularColumn = {
+        tagName: "SECTION",
+        getAttribute: (name) => name === "draggable" ? "true" : null,
+    };
+    const emptyColumn = { tagName: "SECTION", getAttribute: () => null };
+    emptyColumn.parentElement = { children: [divider, fixedColumn, regularColumn, emptyColumn] };
+    const document = { querySelector: () => emptyColumn };
+
+    assert.equal(columnDom.get_add_target(document, true), regularColumn);
+});
+
 test("column removal disposes resources before removing the DOM node", () => {
     const columnDom = loadColumnDom();
     const events = [];
