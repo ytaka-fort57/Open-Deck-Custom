@@ -10,6 +10,7 @@
 着手状況は [backlog/report.md](backlog/report.md) が正。
 カラム内の戻るの機序と規約は [issue-column-back-navigation.md](issue-column-back-navigation.md) を参照。
 実DOM E2E基盤の方針は [browser-e2e-test-design.md](browser-e2e-test-design.md) を参照。
+カラムタブ保存を安定IDへ移す設計は [column-tab-state-id-migration-design.md](column-tab-state-id-migration-design.md) を参照。
 
 実運用・手動確認の対象ブラウザーは Microsoft Edge（Chromium）とする。Firefox は使用予定がないため、
 Firefox Manifest V2 の実機操作は対象外とし、既存の manifest / ZIP 構造検査だけを継続する。
