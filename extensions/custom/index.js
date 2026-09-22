@@ -70,7 +70,7 @@
 
     //ユーザーがタブを切り替えたら、そのカラムの選択として覚える
     //desired はこのカラムが表示すべきタブ。ユーザー操作が常に優先される
-    function watch_tab_click(doc, profile_index, iframe, desired){
+    function watch_tab_click(doc, iframe, desired){
         doc.addEventListener("click", function(event){
             const target = event.target;
             if(target == null || target.closest == undefined){
@@ -87,7 +87,9 @@
             if(column_key == null){
                 return;
             }
-            column_state.save_tab(profile_index, column_key, label);
+            column_state.get_profile_index(function(profile_index){
+                column_state.save_tab(profile_index, column_key, label);
+            });
         }, true);
     }
 
@@ -161,7 +163,9 @@
         });
     }
 
-    function setup_column(iframe, profile_index){
+    //プロファイル番号は読み込みのたびに取り直す。表示中より前のプロファイルを削除すると
+    //番号が詰まるが、デッキは作り直されないため、仕掛けた時点の番号を持ち続けるとずれる
+    function setup_column(iframe){
         //iframeは同一オリジンのため親から直接操作できる
         const doc = iframe.contentDocument;
         if(doc == null){
@@ -171,10 +175,12 @@
         if(column_key == null){
             return;
         }
-        column_state.get_tab(profile_index, column_key, function(saved_label){
-            const desired = {label: saved_label};
-            watch_tab_click(doc, profile_index, iframe, desired);
-            apply_saved_tab(doc, desired, iframe);
+        column_state.get_profile_index(function(profile_index){
+            column_state.get_tab(profile_index, column_key, function(saved_label){
+                const desired = {label: saved_label};
+                watch_tab_click(doc, iframe, desired);
+                apply_saved_tab(doc, desired, iframe);
+            });
         });
     }
 
@@ -190,23 +196,21 @@
     }
 
     function attach_timeline_columns(columns){
-        column_state.get_profile_index(function(profile_index){
-            columns.forEach(function(column){
-                const iframe = column.querySelector("iframe");
-                if(iframe == null || iframe.getAttribute(APPLIED_ATTR) != null){
-                    return;
-                }
-                iframe.setAttribute(APPLIED_ATTR, "true");
-                //自動更新などで再読み込みされた場合も選択し直す
-                iframe.addEventListener("load", function(){
-                    setup_column(iframe, profile_index);
-                });
-                //生成直後のiframeは about:blank で readyState は complete になる。
-                //その文書はXの読み込みで捨てられるため、仕掛けても無駄に終わる
-                if(column_dom.is_frame_loaded(iframe)){
-                    setup_column(iframe, profile_index);
-                }
+        columns.forEach(function(column){
+            const iframe = column.querySelector("iframe");
+            if(iframe == null || iframe.getAttribute(APPLIED_ATTR) != null){
+                return;
+            }
+            iframe.setAttribute(APPLIED_ATTR, "true");
+            //自動更新などで再読み込みされた場合も選択し直す
+            iframe.addEventListener("load", function(){
+                setup_column(iframe);
             });
+            //生成直後のiframeは about:blank で readyState は complete になる。
+            //その文書はXの読み込みで捨てられるため、仕掛けても無駄に終わる
+            if(column_dom.is_frame_loaded(iframe)){
+                setup_column(iframe);
+            }
         });
     }
 
