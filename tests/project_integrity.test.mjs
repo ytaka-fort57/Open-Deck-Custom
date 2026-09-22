@@ -80,6 +80,18 @@ test("manifests and locale files are valid and complete", () => {
         assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("content.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("extensions/custom/column_frame_css.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_frame_css.js") < scripts.indexOf("content.js"));
+        //lifecycle は3モジュールの合成点なので、合成される側が先に読み込まれていなければ undefined を参照する
+        for (const source of [
+            "extensions/custom/column_resource_registry.js",
+            "extensions/custom/page_event_lifecycle.js",
+            "extensions/custom/page_observer_lifecycle.js",
+        ]) {
+            assert.ok(
+                scripts.indexOf(source) >= 0
+                && scripts.indexOf(source) < scripts.indexOf("extensions/custom/lifecycle.js"),
+                `${manifestName}: ${source}`
+            );
+        }
     }
 
     const upstreamBase = readFileSync(join(root, ".github/upstream-base"), "utf8").trim();

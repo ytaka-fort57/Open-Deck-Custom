@@ -48,3 +48,15 @@ test("video selection prefers the highest bitrate HTTPS MP4 regardless of array 
     assert.equal(safe.select_video_variant_url([{ content_type: "video/mp4", url: "https://video.example/gif.mp4" }]), "https://video.example/gif.mp4");
     assert.equal(safe.select_video_variant_url([]), null);
 });
+
+//DOM要素の一時IDとカラムの安定IDはどちらもこの1本から出す。暗号用途ではない
+test("random ids are non-empty, attribute-safe and practically unique", () => {
+    const safeValues = loadSafeValues();
+    const ids = new Set();
+    for (let index = 0; index < 500; index += 1) {
+        const id = safeValues.create_random_id();
+        assert.match(id, /^[0-9a-z]+$/);
+        ids.add(id);
+    }
+    assert.ok(ids.size > 490, `重複が多すぎる: ${ids.size}`);
+});

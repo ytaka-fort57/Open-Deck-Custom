@@ -1,3 +1,8 @@
+//本家ファイル(content.js / background.js / extensions/*.js)は実行テストに載せられないため、
+//ソース文字列でカスタム版の差分が残っていることを確認する。
+//
+//extensions/custom/ の各モジュールは実行テストで振る舞いを固定する。ここに残すのは
+//「二重実装・復活してはいけない書き方」を止める doesNotMatch だけで、あることの確認は置かない。
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -7,19 +12,13 @@ const background = readFileSync("background.js", "utf8");
 const textReview = readFileSync("extensions/text_review.js", "utf8");
 const textReviewHelper = readFileSync("extensions/text_review_helper.js", "utf8");
 const lifecycle = readFileSync("extensions/custom/lifecycle.js", "utf8");
-const columnResourceRegistry = readFileSync("extensions/custom/column_resource_registry.js", "utf8");
-const pageEventLifecycle = readFileSync("extensions/custom/page_event_lifecycle.js", "utf8");
-const pageObserverLifecycle = readFileSync("extensions/custom/page_observer_lifecycle.js", "utf8");
 const columnDom = readFileSync("extensions/custom/column_dom.js", "utf8");
 const autoReloadHelper = readFileSync("extensions/auto_reload_helper.js", "utf8");
 const mediaViewer = readFileSync("extensions/media_viewer/media_viewer.js", "utf8");
 const settingsImport = readFileSync("extensions/custom/settings_import.js", "utf8");
-const columnSettings = readFileSync("extensions/custom/column_settings.js", "utf8");
 const columnFrameCss = readFileSync("extensions/custom/column_frame_css.js", "utf8");
 
-test("new auto-reload columns use seconds in the UI", () => {
-    assert.match(columnSettings, /"%column_auto_reload_time%"/);
-    assert.match(columnSettings, /function new_column_setting\(type\)/);
+test("the sidebar add buttons pass the Shift state to the settings boundary", () => {
     assert.match(content, /add_new_column\("home", event\.shiftKey\)/);
     assert.match(content, /add_new_column\("explore", event\.shiftKey\)/);
     assert.doesNotMatch(content, /replaceAll\("%column_auto_reload_time%"/);
@@ -55,14 +54,9 @@ test("profile deletion validates a non-negative in-range integer", () => {
 });
 
 test("page lifecycle and media tokens do not accumulate after rebuilds", () => {
-    assert.match(columnResourceRegistry, /const auto_reload_disposers = new Set\(\)/);
-    assert.match(columnResourceRegistry, /const media_viewer_tokens_by_frame = new WeakMap\(\)/);
-    assert.match(pageObserverLifecycle, /let dispose_page_observers = null/);
-    assert.match(pageEventLifecycle, /let dispose_listeners = null/);
     assert.match(content, /deck_lifecycle\.register_media_viewer_token\(column_frame,/);
     assert.match(content, /deck_lifecycle\.initialize_page_observers/);
     assert.match(content, /deck_lifecycle\.dispose_column_resources_in/);
-    assert.match(columnResourceRegistry, /function register_column_resource/);
     assert.doesNotMatch(columnDom, /watch_load_column/);
     assert.doesNotMatch(content, /column_dom\.watch_load_column/);
     //iframe単位の load リスナーは lifecycle 経由で1回だけ登録し、削除時に外す(R-12)
@@ -90,7 +84,6 @@ test("settings and profiles use the shared storage repository", () => {
 });
 
 test("untrusted values cross explicit safe DOM and URL boundaries", () => {
-    assert.match(columnSettings, /safe_values\.render_attribute_template/);
     assert.match(content, /column_settings\.render/);
     assert.doesNotMatch(mediaViewer, /src="\$\{/);
     assert.doesNotMatch(mediaViewer, /wrapper\.innerHTML/);
@@ -119,8 +112,6 @@ test("custom history intercepts the X back button and Backspace", () => {
 });
 
 test("top visibility keeps timeline tabs available", () => {
-    assert.match(columnFrameCss, /function top_visible_css\(column_type, visible, legacy_mode = false\)/);
-    assert.match(columnFrameCss, /:not\(:has\(\[role="tab"\]\)\)/);
     assert.ok((content.match(/column_frame_css\.top_visible_css\(/g) ?? []).length >= 3);
     assert.doesNotMatch(content, /function get_top_visible_css/);
     assert.doesNotMatch(columnFrameCss, />div:nth-child\(1\)\{visibility: hidden;/);
@@ -128,10 +119,6 @@ test("top visibility keeps timeline tabs available", () => {
 });
 
 test("post top visibility hides only the composer and keeps back navigation", () => {
-    assert.match(columnFrameCss, /if\(column_type == "post"\)/);
-    assert.match(columnFrameCss, /tweetTextarea_0/);
-    assert.match(columnFrameCss, /tweetTextarea_0.*display:block !important/);
-    assert.match(columnFrameCss, /app-bar-back.*display:block/);
     assert.match(textReviewHelper, /back_button\.style\.display = "block"/);
     assert.doesNotMatch(textReviewHelper, /back_button\.style\.display = "none"/);
 });
@@ -154,12 +141,8 @@ test("iframe CSS is applied only through column_frame_css", () => {
 
 test("column reorder preserves iframe documents and saves visual order", () => {
     const reorder = readFileSync("extensions/custom/column_reorder.js", "utf8");
-    assert.match(reorder, /section\.style\.order/);
-    assert.match(reorder, /get_visual_column_elements/);
     assert.match(content, /reorder_api\?\.move_before\?\./);
     assert.doesNotMatch(reorder, /Node\.prototype\.insertBefore/);
-    assert.match(reorder, /if\(source_rack !== target_rack\)\{\s*return false;/);
-    assert.match(reorder, /dispatchEvent\(new CustomEvent\("opd_custom_column_reordered"\)\)/);
     assert.match(content, /addEventListener\("opd_custom_column_reordered"[\s\S]*?save_current_profile\(last_load_profile\)/);
     //並び替え保存リスナーは run() の外で1回だけ登録する。run() 内だとプロファイル切替ごとに増える(R-13)
     assert.equal((content.match(/addEventListener\("opd_custom_column_reordered"/g) ?? []).length, 1);
@@ -170,10 +153,7 @@ test("column reorder preserves iframe documents and saves visual order", () => {
 });
 
 test("sidebar column additions keep the add-placeholder at the visual right edge", () => {
-    assert.match(columnDom, /function get_add_target\(doc, is_shift_pressed\)/);
-    assert.match(columnDom, /function add_column\(doc, type, template, settings_api/);
     assert.match(content, /function add_new_column\(type, is_shift_pressed\)\{[\s\S]*?column_dom\.add_column\(/);
-    assert.match(columnDom, /reorder_api\?\.move_before\?\.\(new_column, add_target_column\)/);
     assert.equal(
         (content.match(/add_new_column\("(?:post|home|notification|explore)", event\.shiftKey\)/g) ?? []).length,
         4
@@ -203,7 +183,6 @@ test("text review always has a timeout and failure recovery", () => {
 });
 
 test("column width preset mapping lives in the settings boundary", () => {
-    assert.match(columnSettings, /const WIDTH_PRESETS = \[15, 20, 30\]/);
     assert.equal((content.match(/column_settings\.width_preset_index\(/g) ?? []).length, 2);
     assert.equal((content.match(/column_settings\.width_from_preset\(/g) ?? []).length, 1);
     assert.doesNotMatch(content, /case '15':/);
@@ -211,13 +190,11 @@ test("column width preset mapping lives in the settings boundary", () => {
 });
 
 test("settings initialization takes the default profile from the settings boundary", () => {
-    assert.match(columnSettings, /function default_profile\(\)/);
     assert.match(content, /const profile_store_default = column_settings\.default_profile\(\);/);
     assert.doesNotMatch(content, /const profile_store_default = \[\{type:"main_bar_empty_column"/);
 });
 
 test("profile switch confirmation builds its summary in the settings boundary", () => {
-    assert.match(columnSettings, /function profile_summary\(profile, i18n_message\)/);
     assert.match(content, /const preload_desc_array = column_settings\.profile_summary\(profile_store\[index\]\.profile, i18n_message\);/);
     assert.ok(content.includes('preload_desc_array.join("\\r\\n")'));
     assert.doesNotMatch(content, /msg_profile_desc_misskey_column/);
@@ -232,34 +209,9 @@ test("profile list rendering is centralized and avoids the settings module shado
     assert.match(content, /const profile_settings = \{column_settings:profile_store/);
 });
 
-test("lifecycle is split into three responsibilities and only composes them", () => {
+test("the lifecycle composition point holds no state of its own", () => {
     //合成点は状態(Set/WeakMap/初期化フラグ)を持たず、3モジュールの入口だけを公開する
-    assert.doesNotMatch(lifecycle, /new Set\(\)|new WeakMap\(\)|new MutationObserver/);
-    assert.match(lifecycle, /window\.opd_custom_column_resource_registry/);
-    assert.match(lifecycle, /window\.opd_custom_page_event_lifecycle/);
-    assert.match(lifecycle, /window\.opd_custom_page_observer_lifecycle/);
-    //observer を張る初期化はすべて disposer を返す
-    assert.match(pageObserverLifecycle, /function observe_when_ready\(get_target, watch_root, observer_callback, observer_options\)/);
-    for (const source of [pageObserverLifecycle, pageEventLifecycle]) {
-        assert.match(source, /return dispose_/);
-    }
-
-    //読み込み順は合成点より前でなければ undefined を参照する
-    for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
-        const scripts = JSON.parse(readFileSync(manifestName, "utf8")).content_scripts[0].js;
-        for (const source of [
-            "extensions/custom/column_resource_registry.js",
-            "extensions/custom/page_event_lifecycle.js",
-            "extensions/custom/page_observer_lifecycle.js",
-        ]) {
-            assert.ok(
-                scripts.indexOf(source) >= 0
-                && scripts.indexOf(source) < scripts.indexOf("extensions/custom/lifecycle.js"),
-                `${manifestName}: ${source}`
-            );
-        }
-    }
-});
+    assert.doesNotMatch(lifecycle, /new Set\(\)|new WeakMap\(\)|new MutationObserver/);});
 
 test("small utilities have a single implementation", () => {
     const safeValues = readFileSync("extensions/custom/safe_values.js", "utf8");
@@ -267,8 +219,6 @@ test("small utilities have a single implementation", () => {
     const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
 
     //ランダムIDとHTMLエスケープの実体は safe_values だけに置く
-    assert.match(safeValues, /function create_random_id\(\)/);
-    assert.match(safeValues, /\.replaceAll\("'", "&#39;"\)/);
     assert.match(content, /const create_random_id = deck_safe_values\.create_random_id;/);
     assert.doesNotMatch(content, /function create_random_id\(\)/);
     assert.match(textReview, /window\.opd_custom_safe_values\.create_random_id\(\)/);
@@ -277,7 +227,6 @@ test("small utilities have a single implementation", () => {
     assert.doesNotMatch(textReview, /replace\(\/&\/g, '&amp;'\)/);
 
     //iframeの読み込み判定は column_dom に1つだけ置く
-    assert.match(columnDom, /function is_frame_loaded\(iframe\)/);
     for (const source of [indexJs, listRepostFilter]) {
         assert.match(source, /column_dom\.is_frame_loaded\(iframe\)/);
         assert.doesNotMatch(source, /function is_loaded\(iframe\)/);
@@ -286,15 +235,9 @@ test("small utilities have a single implementation", () => {
 
 test("periodic work is shared instead of allocated per column", () => {
     const indexJs = readFileSync("extensions/custom/index.js", "utf8");
-    const columnHistory = readFileSync("extensions/custom/column_history.js", "utf8");
-    const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
 
-    //デッキ側のMutationObserverは冪等な全体走査をまとめてから呼ぶ
+    //デッキ側のMutationObserverは冪等な全体走査をまとめてから呼ぶ。
+    //index.js は location で自分を止める入口のため、実行テストには載せられない
     assert.match(indexJs, /new MutationObserver\(schedule_setup\)/);
     assert.match(indexJs, /function schedule_setup\(\)/);
-
-    //周期処理はカラムごとに持たず、モジュールごとに1本へまとめる
-    for (const source of [columnHistory, listRepostFilter]) {
-        assert.equal(source.match(/setInterval\(/g)?.length, 1);
-    }
 });

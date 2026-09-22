@@ -124,3 +124,31 @@ test("column removal disposes resources before removing the DOM node", () => {
     assert.deepEqual(events, ["dispose", "remove"]);
     assert.equal(columnDom.dispose_and_remove(null, lifecycle), false);
 });
+
+//iframeの読み込み判定はここに1つだけ置く。生成直後の about:blank は complete でも
+//Xの読み込みで捨てられるため、仕掛ける価値のある文書だけを true とする
+test("frame readiness accepts only a loaded http document", () => {
+    const columnDom = loadColumnDom();
+    const frame = (contentDocument) => ({ contentDocument });
+
+    assert.equal(columnDom.is_frame_loaded(frame({
+        readyState: "complete",
+        location: { href: "https://x.com/home" },
+    })), true);
+    assert.equal(columnDom.is_frame_loaded(frame({
+        readyState: "loading",
+        location: { href: "https://x.com/home" },
+    })), false);
+    //生成直後の about:blank
+    assert.equal(columnDom.is_frame_loaded(frame({
+        readyState: "complete",
+        location: { href: "about:blank" },
+    })), false);
+    assert.equal(columnDom.is_frame_loaded(frame({ readyState: "complete", location: null })), false);
+    assert.equal(columnDom.is_frame_loaded(frame(null)), false);
+    assert.equal(columnDom.is_frame_loaded(null), false);
+    //クロスオリジンでは contentDocument 参照自体が投げる
+    assert.equal(columnDom.is_frame_loaded({
+        get contentDocument() { throw new Error("cross origin"); },
+    }), false);
+});

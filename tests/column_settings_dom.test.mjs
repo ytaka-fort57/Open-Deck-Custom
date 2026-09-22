@@ -100,6 +100,17 @@ test("new column values keep the four add-column defaults in one boundary", () =
     assert.deepEqual(values.map((item) => item["%column_width_num%"]), [
         "30", "30", "30", "30",
     ]);
+    //設定UIは秒で入力する。保存はミリ秒なので、描画値は必ず秒へ割り戻す
+    assert.deepEqual(values.map((item) => item["%column_auto_reload_time%"]), [10, 10, 10, 10]);
+    assert.equal(
+        settings.render_values({ type: "home", auto_reload_time: 45000 }, "id")["%column_auto_reload_time%"],
+        45
+    );
+    //1秒未満になる壊れた保存は既定の10秒へ寄せる
+    assert.equal(
+        settings.render_values({ type: "home", auto_reload_time: 10 }, "id")["%column_auto_reload_time%"],
+        10
+    );
 });
 
 test("normalization and rendering form a safe settings round trip", () => {
