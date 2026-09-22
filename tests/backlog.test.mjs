@@ -8,7 +8,10 @@ import {
   findByFingerprint,
   isSuppressed,
   isUnverified,
+  parseAddInput,
+  planAdd,
   renderReport,
+  toAsciiJson,
   validateRecords
 } from "../scripts/backlog.mjs";
 
@@ -171,6 +174,76 @@ test("抑止中の項目は要対応から外れて抑止中の節に載る", ()
   const suppressed = report.slice(report.indexOf("## 抑止中"), report.indexOf("## 全件一覧"));
   assert.equal(suppressed.includes("BL-001"), true);
   assert.equal(suppressed.includes("BL-002"), false);
+});
+
+function inputEntry(overrides = {}) {
+  return {
+    category: "validation",
+    app: "tests",
+    area: "validation",
+    priority: "P3",
+    title: "\"引用\" と 'quote' と $変数 を含む題",
+    finding: "改行を\n含む長文",
+    impact: "影響",
+    proposal: "提案",
+    evidence: ["scripts/backlog.mjs:1-5", { file: "tests/run.mjs", lines: "1-3" }],
+    ...overrides
+  };
+}
+
+test("JSON 入力はシェルの引用を経由せず CLI と同じ項目を組み立てる", () => {
+  const [optionsMap] = parseAddInput(`\uFEFF${JSON.stringify(inputEntry({ verificationRequired: "both", acceptanceCriteria: ["a", "b"], tags: ["t"], sourceDocument: { file: "docs/a.md", section: "R-1" } }))}`);
+  const { records, outcome, id } = planAdd([], optionsMap);
+  assert.equal(outcome, "added");
+  assert.equal(id, "BL-001");
+  const [record] = records;
+  assert.equal(record.title, "\"引用\" と 'quote' と $変数 を含む題");
+  assert.equal(record.finding, "改行を\n含む長文");
+  assert.equal(record.verificationRequired, "both");
+  assert.deepEqual(record.acceptanceCriteria, ["a", "b"]);
+  assert.deepEqual(record.tags, ["t"]);
+  assert.deepEqual(record.sourceDocument, { file: "docs/a.md", section: "R-1" });
+  assert.deepEqual(record.evidence, [
+    { type: "code", file: "scripts/backlog.mjs", lines: "1-5" },
+    { type: "code", file: "tests/run.mjs", lines: "1-3" }
+  ]);
+  assert.doesNotThrow(() => validateRecords(records));
+});
+
+test("JSON 入力の複数件は前の件を踏まえて採番と重複判定を行う", () => {
+  const entries = parseAddInput(JSON.stringify([
+    inputEntry(),
+    inputEntry({ title: "まったく別の題", app: "docs", evidence: ["README.md"] })
+  ]));
+  let records = [makeRecord({ id: "BL-007" })];
+  const outcomes = [];
+  for (const entry of entries) {
+    const result = planAdd(records, entry);
+    records = result.records;
+    outcomes.push(`${result.id} ${result.outcome}`);
+  }
+  assert.deepEqual(outcomes, ["BL-008 added", "BL-009 added"]);
+
+  // 同じ内容をもう一度流すと、新規ではなく同じバッチで追加した項目への再検出になる。
+  const again = planAdd(records, parseAddInput(JSON.stringify(inputEntry()))[0]);
+  assert.equal(again.outcome, "re-detected");
+  assert.equal(again.id, "BL-008");
+  assert.equal(records.find((record) => record.id === "BL-008").workNotes.length, 0, "planAdd は入力の records を書き換えない");
+});
+
+test("JSON 入力は未知のキーと型違いを弾く", () => {
+  assert.throws(() => parseAddInput(JSON.stringify(inputEntry({ titel: "typo" }))), /unknown key: titel/);
+  assert.throws(() => parseAddInput(JSON.stringify(inputEntry({ priority: 3 }))), /priority must be a string/);
+  assert.throws(() => parseAddInput(JSON.stringify(inputEntry({ allowSimilar: "yes" }))), /allowSimilar must be a boolean/);
+  assert.throws(() => parseAddInput("[]"), /at least one finding/);
+  assert.throws(() => parseAddInput("{"), /invalid add input JSON/);
+});
+
+test("show --ascii の出力は ASCII だけで、元の JSON へ戻せる", () => {
+  const record = makeRecord({ title: "日本語の題 🚀" });
+  const ascii = toAsciiJson(JSON.stringify(record, null, 2));
+  assert.match(ascii, /^[\x00-\x7f]*$/);
+  assert.deepEqual(JSON.parse(ascii), record);
 });
 
 test("正本の findings.jsonl と report.md が整合している", async () => {

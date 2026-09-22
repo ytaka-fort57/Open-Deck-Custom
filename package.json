@@ -12,6 +12,7 @@
     "eol:sync": "node scripts/check-line-endings.mjs --sync-editorconfig",
     "backlog:add": "node scripts/backlog.mjs add",
     "backlog:list": "node scripts/backlog.mjs list",
+    "backlog:show": "node scripts/backlog.mjs show",
     "backlog:update": "node scripts/backlog.mjs update",
     "backlog:verify": "node scripts/backlog.mjs verify",
     "backlog:suppress": "node scripts/backlog.mjs suppress",

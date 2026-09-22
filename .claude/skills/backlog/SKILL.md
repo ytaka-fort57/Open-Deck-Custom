@@ -30,7 +30,12 @@ description: 残課題(リファクタ候補・不具合・実機確認待ち・
    - `--evidence` `--acceptance-criteria` `--step` `--commit` `--tag` `--work-note` は複数回指定できる。
    - 元文書があれば `--source-document docs/code-audit-2026-09-18.md#R-11` の形で渡す。
 4. `--verification-required` は、ログイン済み X の実ブラウザーを見ないと判定できない項目にだけ `manual` または `both` を選ぶ。Node テスト・Playwright E2E で判定できる項目は `code`。
-5. PowerShell で日本語と長文を渡すと引用が壊れやすい。複数件をまとめて登録するときは、argv 配列を並べた `.mjs` スクリプトから `main()` を呼ぶ(スクリプトはスクラッチ領域に置き、リポジトリへ残さない)。
+5. 日本語の長文や複数件は、引数ではなく JSON で渡す。`npm run backlog:add -- --input <file.json>`。stdin から渡すときは `node scripts/backlog.mjs add --input -` を直接呼ぶ(PowerShell の `npm.ps1` はパイプ入力時に `--` を落とす)。
+   - JSON は 1 件のオブジェクトか、その配列。キーは CLI のオプション名(`verification-required`)か findings のフィールド名(`verificationRequired` / `acceptanceCriteria` / `tags` / `relatedCommits`)。
+   - `evidence` は `"file:lines"` 文字列か `{ "file": …, "lines": … }`、`sourceDocument` は `"file#section"` か `{ "file": …, "section": … }`。
+   - 配列の 1 件でも失敗したら何も書き込まれない。先に `--dry-run` で採番と類似検出を確かめる。
+   - JSON ファイルはスクラッチ領域に置き、リポジトリへ残さない。
+6. 登録内容を 1 件ずつ確かめるときは `npm run backlog:show -- BL-0NN`。PowerShell のパイプなど標準出力の文字コードが UTF-8 でない経路では `--ascii` を付ける(非 ASCII を `\uXXXX` で出すので化けない)。
 
 ### 状態を進める
 

@@ -24,6 +24,24 @@ npm run backlog:validate -- --report
 `--evidence`、`--acceptance-criteria`、`--step`、`--commit`、`--tag`、`--work-note` は複数回指定できる。タグを外すときは `--untag`。
 類似項目が検出された場合は追加を止めて既存 ID を表示する。意図的に別項目として追加する場合だけ `--allow-similar` を付ける。
 
+日本語の長文や複数件はシェルの引用を経由せず JSON で渡す。
+
+```powershell
+npm run backlog:add -- --input findings-draft.json --dry-run
+npm run backlog:add -- --input findings-draft.json
+Get-Content findings-draft.json -Raw | node scripts/backlog.mjs add --input -
+npm run backlog:show -- BL-001
+npm run backlog:show -- BL-001 --ascii
+```
+
+stdin へパイプするときは `npm run` を経由しない。PowerShell の `npm.ps1` はパイプ入力があると `--` を落とし、
+`--input` 以降を npm 自身のオプションとして消費する。
+
+JSON は 1 件のオブジェクトかその配列で、キーは CLI のオプション名か findings のフィールド名(camelCase)を使う。
+`evidence` は `"file:lines"` か `{ "file", "lines" }`、`sourceDocument` は `"file#section"` か `{ "file", "section" }`。
+配列のうち 1 件でも失敗したら何も書き込まない。`--input` と項目のオプション(`--title` など)は併用できない。
+`show` は 1 件の全フィールドを JSON で出す。`--ascii` は非 ASCII を `\uXXXX` で出し、標準出力の文字コードに左右されない。
+
 `verified` へ変更するには、`verificationRequired` が要求する方法の検証をすべて `passed` で記録する必要がある。
 ログイン済み X での実機確認が必要な項目(`manual` / `both`)は、Node テストや E2E の成功だけでは検証済みにならない。
 E2E(Playwright + ローカル `x.com` fixture)は `code` 側の検証として記録する。
