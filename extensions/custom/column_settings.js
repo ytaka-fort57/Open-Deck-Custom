@@ -2,6 +2,10 @@
 //content.jsの保存形式は変えず、DOMからの読み取りとtemplate値の組み立てだけを担当する
 window.opd_custom_column_settings = (function(){
     const safe_values = window.opd_custom_safe_values;
+    const migration = window.opd_custom_column_state_migration;
+    //カラム固有の安定ID。保存項目とDOM属性で同じ名前を使う
+    const UID_FIELD = migration.UID_FIELD;
+    const UID_ATTRIBUTE = migration.UID_ATTRIBUTE;
     const AUTO_RELOAD_TYPES = new Set(["home", "explore"]);
     const VIEW_MODES = new Set(["0", "1", "2"]);
     //カラム幅プリセット(rem)。select の value 0/1/2 に対応し、それ以外は 3(カスタム)
@@ -73,6 +77,7 @@ window.opd_custom_column_settings = (function(){
 
         return {
             type: type,
+            opd_custom_uid: string_value(source[UID_FIELD]),
             banner: source.banner === true,
             top_visible: source.top_visible === true,
             tw_view_mode: VIEW_MODES.has(raw_view_mode) ? raw_view_mode : "0",
@@ -94,6 +99,7 @@ window.opd_custom_column_settings = (function(){
         const view_mode = column.querySelector?.(".opd_tw_view_mode")?.value;
         const settings = normalize({
             type: type,
+            [UID_FIELD]: column.getAttribute(UID_ATTRIBUTE),
             banner: is_checked(column, ".opd_banner"),
             top_visible: is_checked(column, ".opd_top_bar"),
             tw_view_mode: view_mode == undefined ? "0" : view_mode,
@@ -156,13 +162,32 @@ window.opd_custom_column_settings = (function(){
         };
     }
 
+    //本家のテンプレートへプレースホルダーを足さずに安定IDを載せる。
+    //カラムのルート要素はテンプレート内で唯一 opd_column_type を持つ要素なので、
+    //その属性の直前へ差し込む
+    function with_uid(html, uid){
+        const value = string_value(uid);
+        const marker = "opd_column_type=";
+        const index = value === "" ? -1 : html.indexOf(marker);
+        if(index < 0){
+            return html;
+        }
+        return html.slice(0, index)
+            + UID_ATTRIBUTE + '="' + safe_values.escape_html_attribute(value) + '" '
+            + html.slice(index);
+    }
+
     function render(template, setting, column_id, fallback_width = "30"){
         if(safe_values?.render_attribute_template == null){
             throw new Error("Open-Deckの安全なtemplate rendererがありません");
         }
-        return safe_values.render_attribute_template(
-            template,
-            render_values(setting, column_id, fallback_width)
+        const normalized = normalize(setting);
+        return with_uid(
+            safe_values.render_attribute_template(
+                template,
+                render_values(normalized, column_id, fallback_width)
+            ),
+            normalized[UID_FIELD]
         );
     }
 
@@ -199,7 +224,9 @@ window.opd_custom_column_settings = (function(){
         let second_rack_ended = false;
         let inherited_width = fallback_width;
 
-        Array.from(profile ?? []).forEach(function(raw_setting){
+        //保存データにIDが無いカラムはここで発行する。描画したIDは属性としてDOMに残り、
+        //読み戻し(read_profile)から本家の保存経路に乗るため、ここで書き込む必要はない
+        migration.assign_uids(profile, create_id).forEach(function(raw_setting){
             const setting = normalize(raw_setting);
             const template_entry = templates?.[setting.type];
             const template = typeof template_entry === "string"
@@ -317,9 +344,26 @@ window.opd_custom_column_settings = (function(){
             .map(read);
     }
 
+    //すでに表示されているカラムのID。追加するカラムのIDを重複させないために使う
+    function collect_uids(doc){
+        const columns = Array.from(doc?.querySelectorAll?.("#opd_main_element div[opd_column_type]") ?? []);
+        const used = new Set();
+        columns.forEach(function(column){
+            const uid = string_value(column.getAttribute?.(UID_ATTRIBUTE));
+            if(uid !== ""){
+                used.add(uid);
+            }
+        });
+        return used;
+    }
+
     return {
         normalize: normalize,
         read: read,
+        collect_uids: collect_uids,
+        issue_uid: migration.issue_uid,
+        reissue_uids: migration.reissue_uids,
+        UID_ATTRIBUTE: UID_ATTRIBUTE,
         read_profile: read_profile,
         profile_summary: profile_summary,
         normalize_explore_title: normalize_explore_title,

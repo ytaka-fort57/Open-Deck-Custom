@@ -26,8 +26,8 @@ export const GOLDEN_COLUMNS = [
     column("empty_column"),
 ];
 
-//タイムラインカラムは型で見分けられないため、タブ保存は位置を鍵にしている。
-//並び替え後の再割り当てを見るには同じ型のカラムが2本要る
+//タイムラインカラムは型で見分けられないため、タブ保存はカラム固有の安定IDを鍵にしている。
+//IDがカラムに追従することを見るには同じ型のカラムが2本要る
 export const TWO_TIMELINE_COLUMNS = [
     column("main_bar_empty_column"),
     column("home", { column_width: "30" }),
@@ -48,6 +48,14 @@ export function storageItems(profiles, settings = {}) {
             name: `e2e-${index}`,
             profile,
         }))),
+    };
+}
+
+//移行前(version 1)の保存。鍵の右側はタイムラインカラムだけを数えた表示位置
+export function legacyTabStateItems(profiles, tabs) {
+    return {
+        ...storageItems(profiles),
+        opd_custom_column_state: JSON.stringify(tabs),
     };
 }
 

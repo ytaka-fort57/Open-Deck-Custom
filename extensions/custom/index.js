@@ -54,11 +54,18 @@
         });
     }
 
-    //このカラムが今どこにあるか。並び替えで動くため、保存のたびに求め直す
-    function current_column_index(iframe){
-        return get_timeline_columns().findIndex(function(column){
+    //このカラムのタブ保存の鍵。
+    //移行後はカラム固有の安定IDなので並び替えでも変わらない。移行前(位置キー)の起動では
+    //表示位置を返すため、並び替えのたびに求め直す必要がある
+    function current_column_key(iframe){
+        const columns = get_timeline_columns();
+        const index = columns.findIndex(function(column){
             return column.querySelector("iframe") === iframe;
         });
+        if(index < 0){
+            return null;
+        }
+        return column_state.column_key(columns[index], index);
     }
 
     //ユーザーがタブを切り替えたら、そのカラムの選択として覚える
@@ -75,11 +82,11 @@
             }
             const label = selectors.tab_label(tab);
             desired.label = label;
-            const column_index = current_column_index(iframe);
-            if(column_index < 0){
+            const column_key = current_column_key(iframe);
+            if(column_key == null){
                 return;
             }
-            column_state.save_tab(profile_index, column_index, label);
+            column_state.save_tab(profile_index, column_key, label);
         }, true);
     }
 
@@ -158,11 +165,11 @@
         if(doc == null){
             return;
         }
-        const column_index = current_column_index(iframe);
-        if(column_index < 0){
+        const column_key = current_column_key(iframe);
+        if(column_key == null){
             return;
         }
-        column_state.get_tab(profile_index, column_index, function(saved_label){
+        column_state.get_tab(profile_index, column_key, function(saved_label){
             const desired = {label: saved_label};
             watch_tab_click(doc, profile_index, iframe, desired);
             apply_saved_tab(doc, desired, iframe);
@@ -174,6 +181,13 @@
         if(columns.length == 0){
             return;
         }
+        //鍵が安定IDか表示位置かが決まる前に仕掛けると、移行後の起動でも位置キーで保存してしまう
+        column_state.when_ready(function(){
+            attach_timeline_columns(columns);
+        });
+    }
+
+    function attach_timeline_columns(columns){
         column_state.get_profile_index(function(profile_index){
             columns.forEach(function(column){
                 const iframe = column.querySelector("iframe");

@@ -1,8 +1,10 @@
 //カスタム版の設定import/exportで共有するスキーマ・検証処理
 window.opd_custom_settings_codec = (function(){
     const safe_values = window.opd_custom_safe_values;
+    const migration = window.opd_custom_column_state_migration;
     const FORMAT = "open-deck-custom-settings";
-    const SCHEMA_VERSION = 1;
+    //1: タブ保存の鍵が表示位置 / 2: カラム固有の安定ID
+    const SCHEMA_VERSION = migration.SCHEMA_VERSION;
     const COLUMN_TYPES = new Set([
         "main_bar_empty_column",
         "empty_column",
@@ -40,7 +42,7 @@ window.opd_custom_settings_codec = (function(){
         if(column.tw_view_mode != null && !["0", "1", "2"].includes(String(column.tw_view_mode))){
             return false;
         }
-        for(const string_field of ["column_save_path", "column_save_title", "column_pinned_path"]){
+        for(const string_field of ["column_save_path", "column_save_title", "column_pinned_path", migration.UID_FIELD]){
             if(column[string_field] != null && !safe_values.is_safe_text(column[string_field], 2048)){
                 return false;
             }
@@ -87,7 +89,11 @@ window.opd_custom_settings_codec = (function(){
 
     //旧形式の省略値を画面側の設定モデルへ揃える。未知の項目は将来互換のため保持する。
     function normalize_column(column){
+        //既知の項目だけを写すため、安定IDを足さないとimportで全カラムのIDが消える
         return Object.assign({}, column, {
+            [migration.UID_FIELD]: column[migration.UID_FIELD] == null
+                ? ""
+                : String(column[migration.UID_FIELD]),
             banner: column.banner === true,
             top_visible: column.top_visible === true,
             tw_view_mode: column.tw_view_mode == null ? "0" : String(column.tw_view_mode),
@@ -129,13 +135,27 @@ window.opd_custom_settings_codec = (function(){
         return true;
     }
 
+    //version 1 は鍵と値だけの平坦なマップ、version 2 は {schema_version, tabs}。
+    //鍵の右側は version 1 が表示位置、version 2 がカラム固有の安定ID
+    function validate_tabs(tabs){
+        if(!is_plain_object(tabs)){
+            return false;
+        }
+        return Object.keys(tabs).every(function(key){
+            return /^\d+:[0-9A-Za-z_-]+$/.test(key) && typeof tabs[key] === "string";
+        });
+    }
+
     function validate_column_state(column_state){
         if(!is_plain_object(column_state)){
             return false;
         }
-        return Object.keys(column_state).every(function(key){
-            return /^\d+:\d+$/.test(key) && typeof column_state[key] === "string";
-        });
+        if(migration.is_migrated(column_state)){
+            return Object.keys(column_state).every(function(key){
+                return key === "schema_version" || key === "tabs";
+            }) && validate_tabs(column_state.tabs);
+        }
+        return validate_tabs(column_state);
     }
 
     function normalize(input_data){
@@ -186,8 +206,17 @@ window.opd_custom_settings_codec = (function(){
         if(!validate_column_state(normalized.column_state)){
             throw new Error("カラムごとのタブ状態の形式が不正です");
         }
+        //version 1 のファイルは読み込み時にID鍵へ移す。移行はデッキ側と同じ変換を通す
+        const migrated = migration.migrate(
+            normalize_profile_store(normalized.profile_store),
+            normalized.column_state,
+            safe_values.create_random_id
+        );
         return Object.assign({}, normalized, {
-            profile_store: normalize_profile_store(normalized.profile_store),
+            profile_store: migrated.profile_store,
+            column_state: migration.is_migrated(migrated.column_state)
+                ? migrated.column_state
+                : migration.wrap_tabs(migration.read_tabs(migrated.column_state)),
         });
     }
 

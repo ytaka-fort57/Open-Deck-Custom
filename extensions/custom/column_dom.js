@@ -38,11 +38,11 @@ window.opd_custom_column_dom = (function(){
         if(add_target_column == null){
             return null;
         }
-        const html = settings_api.render(
-            template,
-            settings_api.new_column_setting(type),
-            create_id()
-        );
+        //安定IDは追加時に発行する。表示中のカラムのIDと重複させない
+        const setting = Object.assign(settings_api.new_column_setting(type), {
+            opd_custom_uid: settings_api.issue_uid(settings_api.collect_uids(doc), create_id),
+        });
+        const html = settings_api.render(template, setting, create_id());
         return insert_before_target(add_target_column, html, reorder_api);
     }
 

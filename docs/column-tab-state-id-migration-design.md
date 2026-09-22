@@ -1,7 +1,8 @@
 # カラムタブ状態の安定ID移行設計 (BL-018)
 
 作成日: 2026-09-22  
-状態: 設計のみ。実装は未着手
+更新日: 2026-09-22  
+状態: 手順1〜6を実装済み。手順7(位置経路と二重読みの削除)だけ残っている
 
 ## 1. 結論
 
@@ -255,6 +256,16 @@ BL-018 の検証とする。
 実ブラウザーでの起動確認は、§6 の「位置経路を落とす条件」として行う。
 BL-018 を verified にする条件には含めない。
 
+### 実施結果(2026-09-22)
+
+- Node テスト: `tests/column_state_migration.test.mjs` を追加。移行の読み替え・冪等性・
+  profile_store 欠損・ID重複・複製時の振り直し・移行失敗時に何も書かないことを固定した。
+  `tests/storage_state.test.mjs` に `update_json_many` と version 2 の import/export を足した。
+  `tests/column_reorder.test.mjs` を追加し、安定ID運用中は付け替えが走らないことを固定した。
+  `node tests/run.mjs` は 163 件通る。
+- E2E: `tests/e2e/tab-restore.spec.mjs` を、並び替え後のリロード・カラム削除・
+  version 1 の保存からの移行の3本へ広げた。`npx playwright test` は 10 件通る。
+
 ## 8. 実装順
 
 1. `storage_repository.update_json_many` を足す(単独でマージできる)。
@@ -268,6 +279,38 @@ BL-018 を verified にする条件には含めない。
 
 1〜3 は保存データを変えないため、いつでも戻せる。4 以降を1つのコミットに
 混ぜない。
+
+### 実装した内容(2026-09-22)
+
+手順1〜6を実装した。ファイルは次のとおり。
+
+| 手順 | 実装 |
+| --- | --- |
+| 1 | `storage_repository.update_json_many` |
+| 2 | `column_settings` の `opd_custom_uid`(normalize / render / read)、`column_dom.add_column` の発行 |
+| 3 | `extensions/custom/column_state_migration.js`(純粋関数。ID発行と移行) |
+| 4 | `column_state.ensure_migrated` / `when_ready` / `column_key`、`content.js` の `ensure_column_state_migrated` |
+| 5 | `index.js` の `current_column_key` |
+| 6 | `settings_codec` の version 2 |
+
+#### 設計からの変更: 手順5の呼び出し削除を手順7へ送る
+
+設計では手順5で `content.js` の付け替え呼び出し5か所を落とすとしていたが、落とさなかった。
+
+§6 の通り、移行に失敗した起動は位置キーのまま動く。その起動では付け替えが要るため、
+呼び出しを先に落とすと失敗時に並び替えでタブ保存が壊れる。代わりに
+`column_reorder.remap_tab_state` の先頭で `column_state.is_stable_id_mode()` を見て、
+安定ID運用中は何もしないようにした。付け替えが走らないという結果は同じで、
+`content.js` への差分も増えない。
+
+呼び出し5か所は、位置経路と二重読みを落とす手順7で一緒に落とす。
+
+### 実装で決めた未決事項(§9)
+
+- 項目名は `opd_custom_uid` とした。本家がカラム設定に項目を足したときに衝突しないことを優先した。
+- IDの長さは `create_random_id` の出力そのまま(base32で10〜11文字)とした。
+  1プロファイルのカラム数はせいぜい数十で、保存サイズは問題にならない。
+- 手順7の時期は実ブラウザー確認の予定次第。BL-018 の検証条件には含めない(§7)。
 
 ## 9. 未決事項
 

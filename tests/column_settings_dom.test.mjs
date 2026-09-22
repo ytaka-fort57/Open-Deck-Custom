@@ -21,14 +21,13 @@ class ColumnDomFixture {
 function loadColumnSettings() {
     const context = { window: {} };
     vm.createContext(context);
-    vm.runInContext(
-        readFileSync("extensions/custom/safe_values.js", "utf8"),
-        context
-    );
-    vm.runInContext(
-        readFileSync("extensions/custom/column_settings.js", "utf8"),
-        context
-    );
+    for (const file of [
+        "extensions/custom/safe_values.js",
+        "extensions/custom/column_state_migration.js",
+        "extensions/custom/column_settings.js",
+    ]) {
+        vm.runInContext(readFileSync(file, "utf8"), context);
+    }
     return context.window.opd_custom_column_settings;
 }
 
@@ -36,7 +35,7 @@ test("column settings reads all supported column DOM variants", () => {
     const settings = loadColumnSettings();
     const fixtures = [
         new ColumnDomFixture("post", { opd_column_width: "31" }),
-        new ColumnDomFixture("home", { opd_column_width: "32" }, {
+        new ColumnDomFixture("home", { opd_column_width: "32", opd_custom_uid: "home-uid" }, {
             ".opd_banner": { checked: true },
             ".opd_top_bar": { checked: true },
             ".opd_tw_view_mode": { value: "1" },
@@ -48,6 +47,7 @@ test("column settings reads all supported column DOM variants", () => {
         }),
         new ColumnDomFixture("explore", {
             opd_column_width: "34",
+            opd_custom_uid: "explore-uid",
             opd_explore_path: "/i/lists/42",
             opd_explore_title: "List 42",
             opd_pinned_path: "/i/lists/99",
@@ -59,22 +59,22 @@ test("column settings reads all supported column DOM variants", () => {
     const actual = Array.from(fixtures, (fixture) => settings.read(fixture));
     assert.deepEqual(JSON.parse(JSON.stringify(actual)), [
         {
-            type: "post", banner: false, top_visible: false, tw_view_mode: "0",
+            type: "post", opd_custom_uid: "", banner: false, top_visible: false, tw_view_mode: "0",
             column_save_path: "", column_save_title: "", column_pinned_path: "",
             auto_reload: null, auto_reload_time: 10000, column_width: "31",
         },
         {
-            type: "home", banner: true, top_visible: true, tw_view_mode: "1",
+            type: "home", opd_custom_uid: "home-uid", banner: true, top_visible: true, tw_view_mode: "1",
             column_save_path: "", column_save_title: "", column_pinned_path: "",
             auto_reload: true, auto_reload_time: 15000, column_width: "32",
         },
         {
-            type: "notification", banner: false, top_visible: false, tw_view_mode: "2",
+            type: "notification", opd_custom_uid: "", banner: false, top_visible: false, tw_view_mode: "2",
             column_save_path: "", column_save_title: "", column_pinned_path: "",
             auto_reload: null, auto_reload_time: 10000, column_width: "33",
         },
         {
-            type: "explore", banner: false, top_visible: false, tw_view_mode: "0",
+            type: "explore", opd_custom_uid: "explore-uid", banner: false, top_visible: false, tw_view_mode: "0",
             column_save_path: "/i/lists/42", column_save_title: "List 42",
             column_pinned_path: "/i/lists/99", auto_reload: false,
             auto_reload_time: 10000, column_width: "34",
@@ -127,6 +127,7 @@ test("normalization and rendering form a safe settings round trip", () => {
 
     assert.deepEqual(JSON.parse(JSON.stringify(normalized)), {
         type: "explore",
+        opd_custom_uid: "",
         banner: false,
         top_visible: false,
         tw_view_mode: "0",
@@ -143,38 +144,59 @@ test("normalization and rendering form a safe settings round trip", () => {
     );
 });
 
-test("profile rendering splits racks and preserves inherited column width", () => {
+test("profile rendering splits racks, preserves inherited width and issues stable ids", () => {
     const settings = loadColumnSettings();
     let nextId = 0;
+    //IDはカラムの数だけ先に配られ、そのあと %column_num% が消費される。
+    //既に保存にあるIDはそのまま使い、新しく配るのは持っていないカラムだけ
     const rendered = settings.render_profile([
-        { type: "home", column_width: "32" },
+        { type: "home", column_width: "32", opd_custom_uid: "kept" },
         { type: "empty_column", column_width: null },
         { type: "explore", column_save_path: "/i/lists/42", column_width: null },
         { type: "second_empty_column", column_width: null },
         { type: "unsupported", column_width: "99" },
     ], {
-        home: { html: "<home id='%column_num%' width='%column_width_num%'></home>" },
-        empty_column: { html: "<empty id='%column_num%' width='%column_width_num%'></empty>" },
-        explore: { html: "<explore id='%column_num%' width='%column_width_num%' path='%column_save_path%'></explore>" },
-        second_empty_column: { html: "<second-empty id='%column_num%' width='%column_width_num%'></second-empty>" },
+        home: { html: "<div opd_column_type='home' id='%column_num%' width='%column_width_num%'></div>" },
+        empty_column: { html: "<div opd_column_type='empty_column' id='%column_num%' width='%column_width_num%'></div>" },
+        explore: { html: "<div opd_column_type='explore' id='%column_num%' width='%column_width_num%' path='%column_save_path%'></div>" },
+        second_empty_column: { html: "<div opd_column_type='second_empty_column' id='%column_num%' width='%column_width_num%'></div>" },
     }, () => `column-${++nextId}`);
 
     assert.equal(
         rendered.first_rack_html,
-        "<home id='column-1' width='32'></home><empty id='column-2' width='32'></empty>"
+        `<div opd_custom_uid="kept" opd_column_type='home' id='column-5' width='32'></div>`
+            + `<div opd_custom_uid="column-1" opd_column_type='empty_column' id='column-6' width='32'></div>`
     );
     assert.equal(
         rendered.second_rack_html,
-        "<explore id='column-3' width='32' path='/i/lists/42'></explore>"
-            + "<second-empty id='column-4' width='32'></second-empty>"
+        `<div opd_custom_uid="column-2" opd_column_type='explore' id='column-7' width='32' path='/i/lists/42'></div>`
+            + `<div opd_custom_uid="column-3" opd_column_type='second_empty_column' id='column-8' width='32'></div>`
     );
     assert.equal(rendered.first_rack_ended, true);
     assert.equal(rendered.second_rack_ended, true);
 });
 
+//IDは属性としてHTMLへ出るため、他の属性値と同じく必ずエスケープして書き出す
+test("a stable id from storage is escaped before it becomes an attribute", () => {
+    const settings = loadColumnSettings();
+    assert.equal(
+        settings.render(
+            "<div opd_column_type='home'></div>",
+            { type: "home", opd_custom_uid: '"><script>' },
+            "col-1"
+        ),
+        `<div opd_custom_uid="&quot;&gt;&lt;script&gt;" opd_column_type='home'></div>`
+    );
+    //IDを持たないカラムは属性ごと出さない
+    assert.equal(
+        settings.render("<div opd_column_type='home'></div>", { type: "home" }, "col-1"),
+        "<div opd_column_type='home'></div>"
+    );
+});
+
 test("profile reading follows visual order for save and rebuild round trips", () => {
     const settings = loadColumnSettings();
-    const home = new ColumnDomFixture("home", { opd_column_width: "32" }, {
+    const home = new ColumnDomFixture("home", { opd_column_width: "32", opd_custom_uid: "home-uid" }, {
         ".opd_banner": { checked: true },
         ".opd_top_bar": { checked: true },
         ".opd_tw_view_mode": { value: "1" },
@@ -183,6 +205,7 @@ test("profile reading follows visual order for save and rebuild round trips", ()
     });
     const explore = new ColumnDomFixture("explore", {
         opd_column_width: "34",
+        opd_custom_uid: "explore-uid",
         opd_explore_path: "/i/lists/42",
         opd_explore_title: "List 42",
         opd_pinned_path: "",
@@ -203,16 +226,18 @@ test("profile reading follows visual order for save and rebuild round trips", ()
 
     const saved = settings.read_profile(document, reorder);
     assert.deepEqual(saved.map((item) => item.type), ["explore", "home"]);
+    //安定IDは表示位置ではなくカラムに属するため、並び替え後の読み取りでも付いて回る
+    assert.deepEqual(saved.map((item) => item.opd_custom_uid), ["explore-uid", "home-uid"]);
 
     let nextId = 0;
     const rebuilt = settings.render_profile(saved, {
-        explore: { html: "<column type='explore' id='%column_num%' path='%column_save_path%'></column>" },
-        home: { html: "<column type='home' id='%column_num%' mode='%column_tw_view_mode%'></column>" },
+        explore: { html: "<div opd_column_type='explore' id='%column_num%' path='%column_save_path%'></div>" },
+        home: { html: "<div opd_column_type='home' id='%column_num%' mode='%column_tw_view_mode%'></div>" },
     }, () => `rebuilt-${++nextId}`);
     assert.equal(
         rebuilt.first_rack_html,
-        "<column type='explore' id='rebuilt-1' path='/i/lists/42'></column>"
-            + "<column type='home' id='rebuilt-2' mode='1'></column>"
+        `<div opd_custom_uid="explore-uid" opd_column_type='explore' id='rebuilt-1' path='/i/lists/42'></div>`
+            + `<div opd_custom_uid="home-uid" opd_column_type='home' id='rebuilt-2' mode='1'></div>`
     );
 });
 
@@ -238,7 +263,7 @@ test("column width presets round-trip between rem values and select indexes", ()
 test("default profile matches the former hand-written settings_init array", () => {
     const context = { window: {}, URL };
     vm.createContext(context);
-    for (const file of ["extensions/custom/safe_values.js", "extensions/custom/column_settings.js", "extensions/custom/settings_codec.js"]) {
+    for (const file of ["extensions/custom/safe_values.js", "extensions/custom/column_state_migration.js", "extensions/custom/column_settings.js", "extensions/custom/settings_codec.js"]) {
         vm.runInContext(readFileSync(file, "utf8"), context);
     }
     const settings = context.window.opd_custom_column_settings;
@@ -246,11 +271,11 @@ test("default profile matches the former hand-written settings_init array", () =
 
     // content.js settings_init に手書きされていた配列(exp_type は未使用のため落とす)
     const expected = [
-        {type:"main_bar_empty_column", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
-        {type:"home", banner:true, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
-        {type:"notification", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", auto_reload:false, auto_reload_time:10000, column_pinned_path:"", column_save_title:"", column_width:null},
-        {type:"explore", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"/explore", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
-        {type:"empty_column", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"main_bar_empty_column", opd_custom_uid:"", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"home", opd_custom_uid:"", banner:true, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"notification", opd_custom_uid:"", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", auto_reload:false, auto_reload_time:10000, column_pinned_path:"", column_save_title:"", column_width:null},
+        {type:"explore", opd_custom_uid:"", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"/explore", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
+        {type:"empty_column", opd_custom_uid:"", banner:false, top_visible:true, tw_view_mode:"0", column_save_path:"", column_save_title:"", column_pinned_path:"", auto_reload:false, auto_reload_time:10000, column_width:null},
     ];
 
     const actual = settings.default_profile();

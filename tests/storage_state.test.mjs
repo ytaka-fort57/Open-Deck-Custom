@@ -18,11 +18,18 @@ const profileStore = [{
     ]
 }];
 
+const CODEC_SOURCES = [
+    "extensions/custom/safe_values.js",
+    "extensions/custom/column_state_migration.js",
+    "extensions/custom/settings_codec.js",
+    "extensions/custom/column_settings.js",
+];
+
 test("settings codec imports old/new formats and rejects malformed state", () => {
     const context = { window: {}, URL };
-    loadScript("extensions/custom/safe_values.js", context);
-    loadScript("extensions/custom/settings_codec.js", context);
-    loadScript("extensions/custom/column_settings.js", context);
+    for (const file of CODEC_SOURCES) {
+        loadScript(file, context);
+    }
     const codec = context.window.opd_custom_settings_codec;
     const columnSettings = context.window.opd_custom_column_settings;
 
@@ -35,8 +42,23 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     });
     const items = codec.build_storage_items(decoded, null, "1.1.3.7");
     assert.equal(JSON.parse(items.opd_settings).last_load_profile, 0);
-    assert.equal(JSON.parse(items.opd_custom_column_state)["0:0"], "Following");
-    assert.equal(codec.create_export(items).schema_version, 1);
+    //version 1 の書き出しは読み込み時に安定ID鍵へ移る。"0:0" は1本目のタイムラインカラムを指す
+    const timeline_uid = decoded.profile_store[0].profile[1].opd_custom_uid;
+    assert.match(timeline_uid, /^[0-9A-Za-z_-]+$/);
+    assert.deepEqual(JSON.parse(items.opd_custom_column_state), {
+        schema_version: 2,
+        tabs: { [`0:${timeline_uid}`]: "Following" },
+    });
+    assert.equal(codec.create_export(items).schema_version, 2);
+    //version 2 は読み直しても鍵もIDも変わらない
+    const reexported = codec.create_export(codec.build_storage_items(
+        codec.decode(codec.create_export(items)), null, "1.1.3.7"
+    ));
+    assert.deepEqual(JSON.parse(JSON.stringify(reexported.opd_custom_column_state)), {
+        schema_version: 2,
+        tabs: { [`0:${timeline_uid}`]: "Following" },
+    });
+    assert.equal(reexported.opd_profile_store[0].profile[1].opd_custom_uid, timeline_uid);
     assert.equal(codec.decode({ row_settings: profileStore[0].profile }).profile_store[0].name, "default");
 
     const legacy_profile_store = [{
@@ -51,6 +73,8 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     }];
     const legacy_decoded = codec.decode(legacy_profile_store);
     const legacy_column = legacy_decoded.profile_store[0].profile[0];
+    //IDを持たない古い書き出しは読み込み時に発行される
+    assert.match(legacy_column.opd_custom_uid, /^[0-9A-Za-z_-]+$/);
     assert.equal(legacy_column.column_save_title, "");
     assert.equal(legacy_column.column_width, "42");
     assert.equal(legacy_column.future_option, "keep-me");
@@ -58,6 +82,7 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
         JSON.parse(JSON.stringify(columnSettings.normalize(legacy_column))),
         {
             type: "explore",
+            opd_custom_uid: legacy_column.opd_custom_uid,
             banner: false,
             top_visible: false,
             tw_view_mode: "0",
@@ -81,6 +106,15 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     assert.throws(() => codec.decode({ opd_profile_store: "{broken" }));
     assert.throws(() => codec.decode([{ name: "bad", profile: [{ type: "unknown" }] }]));
     assert.throws(() => codec.decode({ opd_profile_store: profileStore, opd_custom_column_state: { bad: "x" } }));
+    //version 2 は {schema_version, tabs} 以外の項目を受け付けない
+    assert.throws(() => codec.decode({
+        opd_profile_store: profileStore,
+        opd_custom_column_state: { schema_version: 2, tabs: { "0:a": "x" }, extra: 1 },
+    }));
+    assert.throws(() => codec.decode({
+        opd_profile_store: profileStore,
+        opd_custom_column_state: { schema_version: 2, tabs: { "nope": "x" } },
+    }));
     assert.throws(() => codec.decode([{ name: "bad path", profile: [{ type: "explore", column_save_path: "//evil.example" }] }]));
     assert.throws(() => codec.decode([{ name: "bad text", profile: [{ type: "home", column_save_title: "bad\u0000title" }] }]));
 });
@@ -103,6 +137,7 @@ test("column state serializes concurrent writes and profile remapping", async ()
         setTimeout
     };
     loadScript("extensions/custom/storage_repository.js", context);
+    loadScript("extensions/custom/column_state_migration.js", context);
     loadScript("extensions/custom/column_state.js", context);
     const state = context.window.opd_custom_column_state;
     const call = (operation) => new Promise((resolve) => operation(resolve));
@@ -110,7 +145,7 @@ test("column state serializes concurrent writes and profile remapping", async ()
     await Promise.all([
         call((done) => state.save_tab(0, 0, "Following", done)),
         call((done) => state.save_tab(0, 1, "List", done)),
-        call((done) => state.copy_profile(0, 1, done))
+        call((done) => state.copy_profile(0, 1, null, done))
     ]);
     await call((done) => state.delete_profile(0, done));
 
@@ -172,6 +207,39 @@ test("storage repository preserves concurrent JSON mutations and atomic multi-ke
         });
     });
 
+    stored.opd_settings = JSON.stringify({});
+    //複数キーのread-modify-writeは1つのキュー項目で行う。間に入った書き込みを取りこぼさない
+    const manyUpdate = (mutator) => new Promise((resolve, reject) => {
+        repository.update_json_many(
+            { opd_settings: {}, opd_profile_store: [] },
+            mutator,
+            (error) => { if(error) reject(error); else resolve(); }
+        );
+    });
+    await Promise.all([
+        manyUpdate((values) => ({
+            opd_settings: Object.assign(values.opd_settings, { last_load_profile: 2 }),
+            opd_profile_store: values.opd_profile_store.concat([{ name: "first" }]),
+        })),
+        manyUpdate((values) => ({
+            opd_settings: Object.assign(values.opd_settings, { version: "9.9" }),
+            opd_profile_store: values.opd_profile_store.concat([{ name: "second" }]),
+        })),
+    ]);
+    assert.deepEqual(JSON.parse(stored.opd_settings), { last_load_profile: 2, version: "9.9" });
+    assert.deepEqual(
+        JSON.parse(stored.opd_profile_store).map((profile) => profile.name),
+        ["first", "second"]
+    );
+    //NO_CHANGE は読んだ値をそのまま返し、書き込みを起こさない
+    const writesBefore = setCalls.length;
+    await manyUpdate(() => repository.NO_CHANGE);
+    assert.equal(setCalls.length, writesBefore);
+
+    await assert.rejects(
+        manyUpdate(() => undefined),
+        /更新関数が値を返しませんでした/
+    );
     await assert.rejects(
         update(() => undefined),
         /更新関数が値を返しませんでした/
@@ -187,6 +255,7 @@ test("column reorder remaps selections through the serialized mutation path", ()
     const context = {
         window: { opd_custom_column_state: {
             get_profile_index: (callback) => callback(0),
+            is_stable_id_mode: () => false,
             update_all: (mutator) => { state = mutator(state); }
         } }
     };

@@ -49,9 +49,12 @@ test("column DOM boundary chooses an insertion target and delegates visual reord
         ["move_before", newColumn, target],
     ]);
 
+    //追加するカラムには安定IDを発行して渡す。表示中のIDと重複させない
     const settings = {
         new_column_setting: (type) => ({ type, top_visible: true }),
-        render: (template, setting, id) => `${template}:${setting.type}:${id}`,
+        collect_uids: () => new Set(["taken"]),
+        issue_uid: (used, create_id) => (used.has(create_id()) ? "fresh" : create_id()),
+        render: (template, setting, id) => `${template}:${setting.type}:${setting.opd_custom_uid}:${id}`,
     };
     target.parentElement = { children: [regularColumn, target] };
     const addDocument = { querySelector: () => target };
@@ -61,14 +64,14 @@ test("column DOM boundary chooses an insertion target and delegates visual reord
             "home",
             "<home></home>",
             settings,
-            () => "column-1",
+            () => "taken",
             reorder,
             false
         ),
         newColumn
     );
     assert.deepEqual(calls.slice(2), [
-        ["beforebegin", "<home></home>:home:column-1"],
+        ["beforebegin", "<home></home>:home:fresh:taken"],
         ["move_before", newColumn, target],
     ]);
 });

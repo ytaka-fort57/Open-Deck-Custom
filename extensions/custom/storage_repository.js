@@ -211,6 +211,44 @@ window.opd_custom_storage = (function(){
         }, callback);
     }
 
+    //複数キーのread-modify-writeを1つのキュー項目で行う。
+    //get_json_many と set_json_many を並べると2つのキュー項目になり、その間に入った
+    //書き込みを取りこぼす。複数キーを揃えて書き換える移行のような処理はこちらを使う。
+    //mutatorは {storage_key: value} を受け取り、書き込む {storage_key: value} を返す。
+    function update_json_many(defaults, mutator, callback){
+        const keys = Object.keys(defaults);
+        enqueue_mutation(function(finish){
+            get_raw(keys, function(error, value){
+                if(error != null){
+                    finish(error);
+                    return;
+                }
+                let current;
+                let next;
+                try{
+                    current = {};
+                    keys.forEach(function(key){
+                        current[key] = parse_json(value[key], key, defaults[key]);
+                    });
+                    next = mutator(current);
+                    if(next === undefined){
+                        throw new Error(keys.join(", ") + " の更新関数が値を返しませんでした");
+                    }
+                }catch(update_error){
+                    finish(update_error);
+                    return;
+                }
+                if(next === NO_CHANGE){
+                    finish(null, current);
+                    return;
+                }
+                set_raw(serialize_json_values(next), function(set_error){
+                    finish(set_error, next);
+                });
+            });
+        }, callback);
+    }
+
     function remove(keys, callback){
         enqueue_mutation(function(finish){
             remove_raw(keys, finish);
@@ -229,5 +267,6 @@ window.opd_custom_storage = (function(){
         set_json_many,
         set_raw_items,
         update_json,
+        update_json_many,
     };
 })();

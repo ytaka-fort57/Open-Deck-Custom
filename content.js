@@ -159,9 +159,26 @@ if(location.href == "https://twitter.com/run-opdeck" || location.href == "https:
                     }
                 });
             }
-            run({column_settings: profile_store[last_load_profile].profile});
+            //カラムを描画する前にタブ保存の鍵を安定IDへ移す。描画後に移すと、
+            //移行前の鍵で復元が始まり移行後の保存と競合する
+            ensure_column_state_migrated(function(migrated_profile_store){
+                if(Array.isArray(migrated_profile_store) && migrated_profile_store[last_load_profile]?.profile != undefined){
+                    profile_store = migrated_profile_store;
+                }
+                run({column_settings: profile_store[last_load_profile].profile});
+            });
         });
     }
+}
+//カラムごとのタブ保存を位置キーから安定IDへ移す。移せない場合は保存を書き換えず、
+//位置キーのまま起動する(独自モジュールが読めない環境も同じ扱い)。
+function ensure_column_state_migrated(callback){
+    const state_api = window.opd_custom_column_state;
+    if(state_api == undefined || state_api.ensure_migrated == undefined){
+        callback(null);
+        return;
+    }
+    state_api.ensure_migrated(create_random_id, callback);
 }
 function run(settings){
     //再構築前のカラムが保持していた監視・イベント・自動更新を確実に停止する
@@ -795,11 +812,14 @@ function run(settings){
     document.getElementById("profile_save").addEventListener("click", function(){
         if(confirm(i18n_message("msg_profile_save_confirm"))){
             let profile = read_current_profile();
-            const save_object = {name:"user_profile", profile:profile.column_settings};
+            //複製したカラムは複製元と同じ安定IDを持つため、保存前に振り直す。
+            //uid_map は複製元のIDから新しいIDへの対応で、タブ保存の複製に使う
+            const copied = column_settings.reissue_uids(profile.column_settings, create_random_id);
+            const save_object = {name:"user_profile", profile:copied.profile};
             profile_store.push(save_object);
             const new_profile_index = profile_store.length - 1;
             deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
-                copy_profile_tab_state(last_load_profile, new_profile_index);
+                copy_profile_tab_state(last_load_profile, new_profile_index, copied.uid_map);
                 refresh_profile_list();
             });
         }
@@ -902,10 +922,10 @@ function run(settings){
         reorder_api.remap_after_dom_change(before_sections, document);
     }
 
-    function copy_profile_tab_state(source_profile_index, target_profile_index){
+    function copy_profile_tab_state(source_profile_index, target_profile_index, uid_map){
         const state_api = window.opd_custom_column_state;
         if(state_api != undefined && state_api.copy_profile != undefined){
-            state_api.copy_profile(source_profile_index, target_profile_index);
+            state_api.copy_profile(source_profile_index, target_profile_index, uid_map);
         }
     }
 

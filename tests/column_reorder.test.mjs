@@ -136,3 +136,17 @@ test("a move by position remaps the tab state while keys are positions", () => {
         "1:0": "Other",
     });
 });
+
+test("a move leaves the tab state alone once keys are stable ids", () => {
+    let writes = 0;
+    const reorder = loadReorder({
+        get_profile_index: (callback) => callback(0),
+        is_stable_id_mode: () => true,
+        update_all: () => { writes += 1; },
+    });
+    const { sections } = createDeck(["home", "home", "empty_column"]);
+
+    reorder.move_to(sections[1], 0);
+    //安定IDは位置が変わっても同じカラムを指す。付け替えると逆に別カラムの保存を奪う
+    assert.equal(writes, 0);
+});

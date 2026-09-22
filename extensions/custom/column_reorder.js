@@ -176,7 +176,7 @@ window.opd_custom_column_reorder = (function(){
         });
     }
 
-    //保存したタブをカラムに追従させる。
+    //保存したタブをカラムに追従させる(位置キーで起動したときだけ)。
     //
     //本家のプロファイルから見るとタイムラインカラムはどれも同じ type で区別が付かず、
     //カラムを識別しているのはこちらのタブ保存だけ。位置を鍵にしているため、
@@ -184,6 +184,12 @@ window.opd_custom_column_reorder = (function(){
     function remap_tab_state(before_sections, after_sections){
         const state_api = window.opd_custom_column_state;
         if(state_api == undefined){
+            return;
+        }
+        //安定IDで保存している起動では、位置が変わっても鍵は変わらない。
+        //付け替えると逆に別カラムの保存を奪うため何もしない。
+        //(位置キーのまま起動した場合だけ、以下の付け替えが要る)
+        if(state_api.is_stable_id_mode?.() === true){
             return;
         }
         state_api.get_profile_index(function(profile_index){

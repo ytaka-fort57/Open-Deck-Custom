@@ -29,6 +29,17 @@ export async function savedTabState(storage) {
     return value.opd_custom_column_state == null ? {} : JSON.parse(value.opd_custom_column_state);
 }
 
+//移行後の保存は {schema_version, tabs}。鍵の右側はカラム固有の安定ID
+export async function savedTabs(storage) {
+    const state = await savedTabState(storage);
+    return state.tabs == null ? state : state.tabs;
+}
+
+//表示中のカラムに付いている安定ID。保存の鍵と突き合わせる
+export async function columnUid(page, sectionId) {
+    return page.locator(`#${sectionId} div[opd_column_type]`).getAttribute("opd_custom_uid");
+}
+
 //カラムiframeのheadにある拡張のstyleを属性ごとに集める。1本ずつであることと本文を同時に見る
 export function frameStyleTexts(frame) {
     return frame.evaluate(() => Object.fromEntries(
@@ -44,6 +55,7 @@ export function rackSections(page, rackSelector = "#first_rack_element") {
     return page.locator(`${rackSelector} > section`).evaluateAll((sections) => sections.map((section) => ({
         id: section.id,
         type: section.querySelector("div[opd_column_type]")?.getAttribute("opd_column_type"),
+        uid: section.querySelector("div[opd_column_type]")?.getAttribute("opd_custom_uid"),
         width: section.querySelector("div[opd_column_type]")?.getAttribute("opd_column_width"),
         order: section.style.order,
     })));
