@@ -127,3 +127,14 @@ test("許可リスト外・必須ファイル欠落・manifest重複を契約違
   assert.ok(checkEntries(chromium, [...base, base.find((entry) => entry.name === "manifest.json")]).some((error) => /manifest\.json の数が不正です: 2/.test(error)));
   assert.deepEqual(compareEntries(base, base.filter((entry) => entry.name !== "content.js")), ["欠落: content.js"]);
 });
+
+test("Chromium版は動作に必要な最小バージョンを宣言する", () => {
+  const base = collectEntries(chromium);
+  const manifestEntry = base.find((entry) => entry.name === "manifest.json");
+  const manifest = JSON.parse(manifestEntry.data.toString("utf8"));
+  //DNR の requestDomains / initiatorDomains は 101、文章校正の CSS :has は 105 以降
+  assert.ok(Number(manifest.minimum_chrome_version) >= 105);
+  delete manifest.minimum_chrome_version;
+  const without = base.map((entry) => entry === manifestEntry ? { name: "manifest.json", data: Buffer.from(JSON.stringify(manifest)) } : entry);
+  assert.ok(checkEntries(chromium, without).includes("manifest.json に minimum_chrome_version がありません"));
+});

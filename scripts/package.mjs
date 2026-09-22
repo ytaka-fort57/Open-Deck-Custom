@@ -44,7 +44,7 @@ export const TARGETS = [
     name: "chromium",
     manifestSource: "manifest.json",
     manifestVersion: 3,
-    requiredKeys: ["action", "host_permissions"],
+    requiredKeys: ["action", "host_permissions", "minimum_chrome_version"],
     forbiddenKeys: ["browser_action", "browser_specific_settings"]
   },
   {
