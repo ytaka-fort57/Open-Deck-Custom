@@ -1,6 +1,6 @@
 # Open-Deck Custom 検証手順
 
-更新日: 2026-09-21
+更新日: 2026-09-22
 
 本家更新の移植、リファクタ、不具合修正後は、手作業の確認前に共通回帰テストを実行する。
 
@@ -76,6 +76,7 @@ npm run test:e2e
 | `profile-switch` | プロファイル切替での再構築、`last_load_profile`保存、切替元プロファイルの保存が壊れないこと |
 | `tab-restore` | 選択タブの保存、再読み込み後の復元、並び替えに追従する保存鍵の付け替え |
 | `media-viewer` | 引用内メディアの選択、ビューアー表示、`ArrowLeft` / `ArrowRight` / `Escape` |
+| `column-add-shift` | 追加ボタンのShift併用で先頭へ、通常クリックで空カラム直前へ入ること、その並びが保存・再構築されること |
 
 カラムごとの戻るは`column_history.js`が400ms周期でiframeのURLを見て履歴を積む。
 この状態はDOM・URL・storageのどこにも出ないため、E2Eは遷移前に監視周期分だけ待ち、
@@ -151,5 +152,8 @@ Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで
 - 戻る際にカラムが再読み込みされていないか(擬似popstateで戻れていれば再読み込みは起きない)
 - ラックをまたいでカラムを移動した後のBackspace、ピン留めリストのタブ復元
 - メディアビューアーの画像・動画・引用投稿
-- 文章校正APIの実通信
+- 文章校正APIの実通信と、校正結果の投稿欄への貼り付け
+- カラムの自動更新(時間指定と手動リロード)。helper注入は`helper_injector.inject`へ統一され、
+  トークンは`opd_column_reload_init` / `opd_text_review_init`で渡す。E2Eが通るのは
+  `media_viewer_block`の経路だけで、この2つはfixtureに実装が無く自動検査できない
 - Firefox Manifest V2での主要操作（使用予定なしのため対象外）
