@@ -816,27 +816,19 @@ function run(settings){
         }
         if(last_load_profile != delete_num){
             if(confirm(i18n_message("msg_profile_delete_confirm", [delete_num]))){
-                let after_profile_num = null;
                 profile_store.splice(delete_num, 1);
+                //一覧を詰めたのと同じ同期区間で現在番号と表示を補正する。保存完了を待つと、
+                //その間の自動保存が詰めた後の配列を補正前の番号で書き換える
+                const after_profile_num = last_load_profile < delete_num ? last_load_profile : Math.max(last_load_profile - 1, 0);
+                last_load_profile = after_profile_num;
+                refresh_profile_list(after_profile_num);
+                //タブ状態の番号の詰め直しを、補正後の番号でのタブ保存より先に書き込みキューへ積む
+                delete_profile_tab_state(delete_num);
                 deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
-                    delete_profile_tab_state(delete_num);
-                    //
-                    if(last_load_profile<delete_num){
-                        after_profile_num = last_load_profile;
-                    }else{
-                        after_profile_num = last_load_profile - 1;
-                    }
-                    if(after_profile_num < 0){
-                        after_profile_num = 0;
-                    }
-                    last_load_profile = after_profile_num;
-                    //
                     deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
                         settings.last_load_profile = after_profile_num;
                         return settings;
-                    }, function(){
-                            refresh_profile_list(after_profile_num);
-                    });
+                    }, function(){});
                 });
             }
         }else{
@@ -1019,6 +1011,11 @@ function read_current_profile(){
 }
 //現在のプロファイルへカラム構成を保存する。
 function save_current_profile(profile_num){
+    //存在しない番号へ書くと例外になり、ずれた番号なら別のプロファイルを上書きする
+    if(profile_store?.[profile_num] == null){
+        console.error("Open-Deck profile could not be saved: unknown profile", profile_num);
+        return;
+    }
     const settings_array = read_current_profile();
     const save_object = {name:"user_profile", profile:settings_array.column_settings};
     Object.assign(profile_store[profile_num], save_object);
