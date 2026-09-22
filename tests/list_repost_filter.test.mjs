@@ -174,3 +174,94 @@ test("paid partnership posts are classified independently of repost metadata", (
     assert.equal(filter.has_paid_partnership(article({ textContent: "通常の投稿" })), false);
     assert.equal(filter.has_paid_partnership({}), false);
 });
+
+function loadFilterWithTimers(){
+    const timers = { started: 0, cleared: 0 };
+    let tick_callback = null;
+    const context = {
+        URL,
+        console: { warn() {} },
+        setInterval: (callback) => {
+            timers.started += 1;
+            tick_callback = callback;
+            return 1;
+        },
+        clearInterval: () => {
+            timers.cleared += 1;
+            tick_callback = null;
+        },
+        setTimeout: () => 1,
+        clearTimeout: () => {},
+        MutationObserver: class {
+            observe(){}
+            disconnect(){}
+        },
+    };
+    context.window = { opd_custom_column_dom: { is_frame_loaded: () => true } };
+    vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/list_repost_filter.js", "utf8"), context);
+    return {
+        filter: context.window.opd_custom_list_repost_filter,
+        timers,
+        tick: () => tick_callback?.(),
+    };
+}
+
+function frameDocument(){
+    return {
+        documentElement: {},
+        querySelector: () => null,
+        querySelectorAll: () => [],
+    };
+}
+
+function listColumn(href){
+    const doc = frameDocument();
+    const attributes = {};
+    const iframe = {
+        contentDocument: doc,
+        contentWindow: { location: { href } },
+        getAttribute: (name) => attributes[name] ?? null,
+        setAttribute: (name, value) => { attributes[name] = value; },
+        addEventListener: () => {},
+    };
+    return {
+        iframe,
+        querySelector: (selector) => selector === "iframe" ? iframe : null,
+        getAttribute: (name) => name === "opd_column_type" ? "home" : null,
+    };
+}
+
+test("all list columns share a single URL-check timer that stops with the last column", () => {
+    const { filter, timers, tick } = loadFilterWithTimers();
+    const columns = [
+        listColumn("https://x.com/i/lists/1"),
+        listColumn("https://x.com/i/lists/2"),
+    ];
+    const disposers = [];
+    const lifecycle = {
+        register_column_resource: (unused_iframe, unused_key, dispose) => {
+            disposers.push(dispose);
+        },
+    };
+    const deck = { querySelectorAll: () => columns };
+
+    filter.setup(deck, lifecycle);
+    // One interval for any number of columns, instead of one per column.
+    assert.equal(timers.started, 1);
+    assert.equal(timers.cleared, 0);
+
+    // The shared tick keeps refreshing every column.
+    tick();
+    assert.equal(timers.cleared, 0);
+
+    // Removing one column leaves the timer running for the rest.
+    disposers[0]();
+    tick();
+    assert.equal(timers.cleared, 0);
+
+    // The timer is released once the last column is gone.
+    disposers[1]();
+    tick();
+    assert.equal(timers.cleared, 1);
+});

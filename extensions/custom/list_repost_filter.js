@@ -27,6 +27,26 @@ window.opd_custom_list_repost_filter = (function(){
     ]);
 
     const frame_states = new WeakMap();
+    const PATH_INTERVAL_MS = 1000;
+    //URL確認中のカラム。カラム数だけタイマーを持たず、1本のタイマーで全カラムを回す
+    const watched_states = new Set();
+    let path_timer = null;
+
+    //全カラムのURLを1本のタイマーで確認する。対象が無くなったらタイマーを止める
+    function start_path_watch(){
+        if(path_timer != null){
+            return;
+        }
+        path_timer = setInterval(function(){
+            watched_states.forEach(function(state){
+                state.refresh();
+            });
+            if(watched_states.size === 0){
+                clearInterval(path_timer);
+                path_timer = null;
+            }
+        }, PATH_INTERVAL_MS);
+    }
 
     function is_list_path(pathname){
         return typeof pathname === "string" && LIST_PATH_RE.test(pathname);
@@ -283,9 +303,7 @@ window.opd_custom_list_repost_filter = (function(){
 
     function dispose_state(state){
         state.observer?.disconnect();
-        if(state.path_timer != null){
-            clearInterval(state.path_timer);
-        }
+        watched_states.delete(state);
         if(state.refresh_timer != null){
             clearTimeout(state.refresh_timer);
             state.refresh_timer = null;
@@ -322,7 +340,6 @@ window.opd_custom_list_repost_filter = (function(){
             doc,
             path: "",
             observer: null,
-            path_timer: null,
             refresh_timer: null,
             refresh: null,
             schedule_refresh: null,
@@ -362,7 +379,8 @@ window.opd_custom_list_repost_filter = (function(){
                 attributeFilter: ["aria-selected"],
             });
         }
-        state.path_timer = setInterval(state.refresh, 1000);
+        watched_states.add(state);
+        start_path_watch();
         frame_states.set(iframe, state);
         lifecycle.register_column_resource(iframe, RESOURCE_KEY, function(){
             if(frame_states.get(iframe) === state){

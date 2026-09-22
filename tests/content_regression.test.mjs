@@ -283,3 +283,18 @@ test("small utilities have a single implementation", () => {
         assert.doesNotMatch(source, /function is_loaded\(iframe\)/);
     }
 });
+
+test("periodic work is shared instead of allocated per column", () => {
+    const indexJs = readFileSync("extensions/custom/index.js", "utf8");
+    const columnHistory = readFileSync("extensions/custom/column_history.js", "utf8");
+    const listRepostFilter = readFileSync("extensions/custom/list_repost_filter.js", "utf8");
+
+    //デッキ側のMutationObserverは冪等な全体走査をまとめてから呼ぶ
+    assert.match(indexJs, /new MutationObserver\(schedule_setup\)/);
+    assert.match(indexJs, /function schedule_setup\(\)/);
+
+    //周期処理はカラムごとに持たず、モジュールごとに1本へまとめる
+    for (const source of [columnHistory, listRepostFilter]) {
+        assert.equal(source.match(/setInterval\(/g)?.length, 1);
+    }
+});

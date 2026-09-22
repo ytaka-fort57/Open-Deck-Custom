@@ -6,21 +6,27 @@ import vm from "node:vm";
 function loadHistory() {
     let timer_callback = null;
     let now = 1000;
+    const timers = { started: 0, cleared: 0 };
     const context = {
         URL,
         console: { warn: () => {} },
         Date: { now: () => now },
         setInterval: (callback) => {
+            timers.started += 1;
             timer_callback = callback;
             return 1;
         },
-        clearInterval: () => {},
+        clearInterval: () => {
+            timers.cleared += 1;
+            timer_callback = null;
+        },
         window: {},
     };
     vm.createContext(context);
     vm.runInContext(readFileSync("extensions/custom/column_history.js", "utf8"), context);
     return {
         history: context.window.opd_custom_column_history,
+        timers,
         tick: () => timer_callback?.(),
         advance: (ms) => {
             now += ms;
@@ -267,4 +273,38 @@ test("a back is confirmed once the rendered view changes", () => {
 
     assert.equal(history.can_back(frame), false);
     assert.equal(frame.contentWindow.location.href, "https://x.com/home");
+});
+
+test("all columns are watched by a single timer that stops once they are gone", () => {
+    const { history, timers, tick } = loadHistory();
+    const first = createFrame("https://x.com/home");
+    const second = createFrame("https://x.com/explore");
+    history.track(first);
+    history.track(second);
+
+    // One interval for any number of columns, instead of one per column.
+    assert.equal(timers.started, 1);
+
+    first.set_url("https://x.com/user/status/10");
+    second.set_url("https://x.com/user/status/20");
+    tick();
+    assert.equal(history.can_back(first), true);
+    assert.equal(history.can_back(second), true);
+
+    // A removed column stops being watched without affecting the others.
+    first.isConnected = false;
+    tick();
+    assert.equal(history.can_back(first), false);
+    assert.equal(history.can_back(second), true);
+    assert.equal(timers.cleared, 0);
+
+    // The timer is released once no column is left.
+    second.isConnected = false;
+    tick();
+    assert.equal(timers.cleared, 1);
+
+    // Tracking a column again restarts the timer.
+    const third = createFrame("https://x.com/home");
+    history.track(third);
+    assert.equal(timers.started, 2);
 });

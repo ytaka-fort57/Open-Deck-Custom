@@ -11,6 +11,9 @@ window.opd_custom_column_history = (function(){
     const BACK_CONFIRMATION_COUNT = 2;
     const MEDIA_ROUTE_RE = /(?:^|\/)status\/[^/]+\/(?:photo|video)\/\d+\/?$/i;
     const stacks = new WeakMap();
+    //監視中のiframe。カラム数だけタイマーを持たず、1本のタイマーで全カラムを回す
+    const watched = new Set();
+    let watch_timer = null;
 
     //カラムのURL。記録する価値のないものはnullを返す
     function current_url(iframe){
@@ -79,83 +82,104 @@ window.opd_custom_column_history = (function(){
         if(first_url != null && !is_media_route_url(first_url)){
             state.stack.push({url: first_url, route_state: current_state(iframe)});
         }
-        const timer = setInterval(function(){
-            if(!iframe.isConnected){
-                clearInterval(timer);
-                stacks.delete(iframe);
-                return;
-            }
-            const url = current_url(iframe);
-            if(url == null){
-                //実ナビゲーションでの戻る中は一時的に参照できなくなる。
-                //読み込みが戻ってこない場合に戻る操作を封じたままにしないため、
-                //十分に待っても参照できないときは待ちを解く
-                if(state.pending_back != null
-                    && Date.now() - state.pending_back.started_at >= BACK_ABANDON_TIMEOUT_MS){
-                    state.pending_back = null;
+        watched.add(iframe);
+        start_watching();
+    }
+
+    //全カラムを1本のタイマーで回す。追跡対象が無くなったらタイマーを止める
+    function start_watching(){
+        if(watch_timer != null){
+            return;
+        }
+        watch_timer = setInterval(function(){
+            watched.forEach(function(iframe){
+                const state = stacks.get(iframe);
+                if(state == null || !iframe.isConnected){
+                    watched.delete(iframe);
+                    stacks.delete(iframe);
+                    return;
                 }
-                return;
-            }
-
-            // Xのpopstate処理は非同期。戻る処理中の中間URLを履歴へ戻すと、
-            // メディアURLなどを何度も戻るループが発生するため、完了まで記録しない。
-            if(state.pending_back != null){
-                const pending = state.pending_back;
-                const elapsed = Date.now() - pending.started_at;
-                const timed_out = elapsed >= BACK_SETTLE_TIMEOUT_MS;
-                //実ナビゲーションで戻した場合、描画はそのURLの読み込み結果そのものなので
-                //手掛かりの比較は要らない
-                if(url === pending.target_url && (pending.navigated || has_rendered(iframe, pending))){
-                    pending.confirmations += 1;
-                    if(pending.confirmations >= BACK_CONFIRMATION_COUNT){
-                        const target_index = last_index_of_url(state.stack, pending.target_url);
-                        state.stack = target_index >= 0
-                            ? state.stack.slice(0, target_index + 1)
-                            : [{url: pending.target_url, route_state: pending.route_state}];
-                        state.pending_back = null;
-                    }
-                }else if(url === pending.target_url){
-                    // URLは目的地だが描画が変わっていない。擬似popstateでは戻せない
-                    // ケースなので、戻り先URLを実際に読み込ませて確実に戻す。
-                    pending.confirmations = 0;
-                    if(!pending.navigated && elapsed >= BACK_FALLBACK_MS){
-                        pending.navigated = navigate_to_target(iframe, pending);
-                    }
-                    // 文書を参照できない場合は実ナビゲーションもできない。履歴を削ると
-                    // 次の戻るが1つ飛ばしになるため、URLだけ元へ戻して retry させる。
-                    if(!pending.navigated && timed_out){
-                        rollback(iframe, pending);
-                        state.pending_back = null;
-                    }
-                }else{
-                    // Xが別のURLへ動いた場合は、その結果へ履歴を合わせる。
-                    // 履歴を捨てると以降そのカラムで戻れなくなるため、繋ぎ直すだけにする。
-                    pending.confirmations = 0;
-                    if(timed_out){
-                        resync(state, url, current_state(iframe));
-                        state.pending_back = null;
-                    }
-                }
-                return;
-            }
-
-            // メディアURLはX標準のjoint historyで処理する。独自スタックへ
-            // 混ぜると、標準の戻る後に同じメディアURLへ再び戻ってしまう。
-            if(is_media_route_url(url)){
-                return;
-            }
-
-            const top = state.stack[state.stack.length - 1];
-            if(top != null && top.url === url){
-                //同じ画面のままXがstateを差し替える場合があるため、控えを更新する
-                top.route_state = current_state(iframe);
-                return;
-            }
-            state.stack.push({url: url, route_state: current_state(iframe)});
-            if(state.stack.length > HISTORY_LIMIT){
-                state.stack.shift();
+                watch(iframe, state);
+            });
+            if(watched.size === 0){
+                clearInterval(watch_timer);
+                watch_timer = null;
             }
         }, WATCH_INTERVAL_MS);
+    }
+
+    //1カラム分の1周期。URLの変化を履歴へ反映し、戻る処理の完了を待つ
+    function watch(iframe, state){
+        const url = current_url(iframe);
+        if(url == null){
+            //実ナビゲーションでの戻る中は一時的に参照できなくなる。
+            //読み込みが戻ってこない場合に戻る操作を封じたままにしないため、
+            //十分に待っても参照できないときは待ちを解く
+            if(state.pending_back != null
+                && Date.now() - state.pending_back.started_at >= BACK_ABANDON_TIMEOUT_MS){
+                state.pending_back = null;
+            }
+            return;
+        }
+
+        // Xのpopstate処理は非同期。戻る処理中の中間URLを履歴へ戻すと、
+        // メディアURLなどを何度も戻るループが発生するため、完了まで記録しない。
+        if(state.pending_back != null){
+            const pending = state.pending_back;
+            const elapsed = Date.now() - pending.started_at;
+            const timed_out = elapsed >= BACK_SETTLE_TIMEOUT_MS;
+            //実ナビゲーションで戻した場合、描画はそのURLの読み込み結果そのものなので
+            //手掛かりの比較は要らない
+            if(url === pending.target_url && (pending.navigated || has_rendered(iframe, pending))){
+                pending.confirmations += 1;
+                if(pending.confirmations >= BACK_CONFIRMATION_COUNT){
+                    const target_index = last_index_of_url(state.stack, pending.target_url);
+                    state.stack = target_index >= 0
+                        ? state.stack.slice(0, target_index + 1)
+                        : [{url: pending.target_url, route_state: pending.route_state}];
+                    state.pending_back = null;
+                }
+            }else if(url === pending.target_url){
+                // URLは目的地だが描画が変わっていない。擬似popstateでは戻せない
+                // ケースなので、戻り先URLを実際に読み込ませて確実に戻す。
+                pending.confirmations = 0;
+                if(!pending.navigated && elapsed >= BACK_FALLBACK_MS){
+                    pending.navigated = navigate_to_target(iframe, pending);
+                }
+                // 文書を参照できない場合は実ナビゲーションもできない。履歴を削ると
+                // 次の戻るが1つ飛ばしになるため、URLだけ元へ戻して retry させる。
+                if(!pending.navigated && timed_out){
+                    rollback(iframe, pending);
+                    state.pending_back = null;
+                }
+            }else{
+                // Xが別のURLへ動いた場合は、その結果へ履歴を合わせる。
+                // 履歴を捨てると以降そのカラムで戻れなくなるため、繋ぎ直すだけにする。
+                pending.confirmations = 0;
+                if(timed_out){
+                    resync(state, url, current_state(iframe));
+                    state.pending_back = null;
+                }
+            }
+            return;
+        }
+
+        // メディアURLはX標準のjoint historyで処理する。独自スタックへ
+        // 混ぜると、標準の戻る後に同じメディアURLへ再び戻ってしまう。
+        if(is_media_route_url(url)){
+            return;
+        }
+
+        const top = state.stack[state.stack.length - 1];
+        if(top != null && top.url === url){
+            //同じ画面のままXがstateを差し替える場合があるため、控えを更新する
+            top.route_state = current_state(iframe);
+            return;
+        }
+        state.stack.push({url: url, route_state: current_state(iframe)});
+        if(state.stack.length > HISTORY_LIMIT){
+            state.stack.shift();
+        }
     }
 
     function last_index_of_url(stack, url){

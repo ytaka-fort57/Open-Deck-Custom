@@ -261,15 +261,33 @@
         }
     }
 
-    //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
-    const observer = new MutationObserver(function(){
+    function setup_all(){
         add_menu_button();
         setup_timeline_columns();
         setup_column_keys();
         setup_list_repost_filter();
         setup_short_post_filter();
         column_reorder.setup(document);
-    });
+    }
+
+    //本家とXの描画は短時間に大量のMutationを発生させる。どの処理も冪等な全体走査
+    //なので、同一バースト内の呼び出しを1回へまとめる。MutationObserver自体は
+    //マイクロタスク単位でしかまとめないため、タスクをまたぐ連続描画には効かない。
+    //requestAnimationFrameは背面タブで止まりカラム追加を取りこぼすため使わない。
+    const SETUP_DEBOUNCE_MS = 50;
+    let setup_timer = null;
+    function schedule_setup(){
+        if(setup_timer != null){
+            return;
+        }
+        setup_timer = setTimeout(function(){
+            setup_timer = null;
+            setup_all();
+        }, SETUP_DEBOUNCE_MS);
+    }
+
+    //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
+    const observer = new MutationObserver(schedule_setup);
     observer.observe(document.documentElement, {childList: true, subtree: true});
     add_menu_button();
     setup_timeline_columns();
