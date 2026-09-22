@@ -7,6 +7,7 @@ function loadFilter(){
     const context = { URL, console: { warn() {} } };
     context.window = {};
     vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/short_post_filter.js", "utf8"), context);
     return context.window.opd_custom_short_post_filter;
 }
@@ -165,6 +166,7 @@ test("multiple frames share one path timer and release it after disposal", () =>
     context.window = {};
     vm.createContext(context);
     vm.runInContext(readFileSync("extensions/custom/column_dom.js", "utf8"), context);
+    vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/short_post_filter.js", "utf8"), context);
 
     const disposers = new Map();

@@ -6,6 +6,7 @@ window.opd_custom_list_repost_filter = (function(){
     const FRAME_ATTR = "opd_custom_list_repost_filter_attached";
     const RESOURCE_KEY = "list-repost-filter";
     const column_dom = window.opd_custom_column_dom;
+    const profile_key_from_href = window.opd_custom_x_profile_url.profile_key_from_href;
     const LIST_PATH_RE = /^\/i\/lists\/[^/]+\/?$/i;
     const HOME_NON_LIST_TAB_LABELS = new Set([
         "おすすめ", "フォロー中", "for you", "following"
@@ -21,10 +22,6 @@ window.opd_custom_list_repost_filter = (function(){
         'a[aria-label*="Profile"]',
         'a[aria-label*="プロフィール"]',
     ];
-    const EXCLUDED_PROFILE_PATHS = new Set([
-        "home", "explore", "search", "notifications", "messages", "settings",
-        "compose", "login", "signup", "i", "intent", "hashtag"
-    ]);
 
     const frame_states = new WeakMap();
     const PATH_INTERVAL_MS = 1000;
@@ -59,35 +56,6 @@ window.opd_custom_list_repost_filter = (function(){
         }
         const label = normalize_display_name(selected_tab.textContent);
         return label !== "" && !HOME_NON_LIST_TAB_LABELS.has(label);
-    }
-
-    function profile_key_from_href(href){
-        if(typeof href !== "string" || href.length === 0){
-            return null;
-        }
-        let url;
-        try{
-            url = new URL(href, "https://x.com");
-        }catch(error){
-            return null;
-        }
-        if(url.hostname !== "x.com" && url.hostname !== "twitter.com"){
-            return null;
-        }
-        const parts = url.pathname.split("/").filter(Boolean);
-        if(parts.length !== 1){
-            return null;
-        }
-        let key;
-        try{
-            key = decodeURIComponent(parts[0]);
-        }catch(error){
-            return null;
-        }
-        if(key.length === 0 || EXCLUDED_PROFILE_PATHS.has(key.toLowerCase())){
-            return null;
-        }
-        return key.toLowerCase();
     }
 
     function first_profile_key(node){

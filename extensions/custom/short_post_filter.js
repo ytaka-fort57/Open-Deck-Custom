@@ -5,6 +5,7 @@ window.opd_custom_short_post_filter = (function(){
     const FRAME_ATTR = "opd_custom_short_post_filter_attached";
     const RESOURCE_KEY = "short-post-filter";
     const column_dom = window.opd_custom_column_dom;
+    const profile_key_from_href = window.opd_custom_x_profile_url.profile_key_from_href;
     const PATH_INTERVAL_MS = 1000;
     const SHORT_TEXT_MAX = 30;
     const REPEAT_WINDOW_MS = 30 * 60 * 1000;
@@ -20,10 +21,6 @@ window.opd_custom_short_post_filter = (function(){
         "is.gd",
         "buff.ly",
         "rb.gy",
-    ]);
-    const EXCLUDED_PROFILE_PATHS = new Set([
-        "home", "explore", "search", "notifications", "messages", "settings",
-        "compose", "login", "signup", "i", "intent", "hashtag",
     ]);
     const DEFAULT_CONFIG = Object.freeze({
         enabled: true,
@@ -132,35 +129,6 @@ window.opd_custom_short_post_filter = (function(){
             }
         }
         return { detected: false, host: null, expanded_host: null };
-    }
-
-    function profile_key_from_href(href){
-        if(typeof href !== "string" || href === ""){
-            return null;
-        }
-        let url;
-        try{
-            url = new URL(href, "https://x.com");
-        }catch(error){
-            return null;
-        }
-        if(url.hostname !== "x.com" && url.hostname !== "twitter.com"){
-            return null;
-        }
-        const parts = url.pathname.split("/").filter(Boolean);
-        if(parts.length !== 1){
-            return null;
-        }
-        let key;
-        try{
-            key = decodeURIComponent(parts[0]);
-        }catch(error){
-            return null;
-        }
-        if(key === "" || EXCLUDED_PROFILE_PATHS.has(key.toLowerCase())){
-            return null;
-        }
-        return key.toLowerCase();
     }
 
     function profile_key_from_article(article){

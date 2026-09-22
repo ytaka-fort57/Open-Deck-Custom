@@ -7,6 +7,7 @@ function loadFilter(){
     const context = { URL, console: { warn() {} } };
     context.window = {};
     vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/list_repost_filter.js", "utf8"), context);
     return context.window.opd_custom_list_repost_filter;
 }
@@ -199,6 +200,7 @@ function loadFilterWithTimers(){
     };
     context.window = { opd_custom_column_dom: { is_frame_loaded: () => true } };
     vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/list_repost_filter.js", "utf8"), context);
     return {
         filter: context.window.opd_custom_list_repost_filter,
