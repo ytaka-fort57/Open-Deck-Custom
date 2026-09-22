@@ -10,8 +10,8 @@
 カラム固有の安定ID `profile_index:column_uid` へ移す。
 
 安定IDはカラム設定の一項目として本家の `opd_profile_store` に載せる(方式B)。
-IDの発行・読み書きは `extensions/custom/` 側で完結させ、本家ファイルの
-テンプレートには手を入れない。
+IDの発行・読み書きは `extensions/custom/` 側で完結させ、カラムのHTMLテンプレート
+(現在は `extensions/custom/column_template.js`)にはIDのプレースホルダーを足さない。
 
 プロファイル番号の部分は位置のまま残す。プロファイルは本家が配列で持つため、
 番号を安定IDにすると `opd_profile_store` の構造自体を変えることになり、
@@ -86,8 +86,9 @@ DOMを動かさず flex の `order` だけを変えるため、DOM順ではな�
   付け替えが要らない。
 - 利点: 本家ファイルへ**コードの差分を足さない**。ID発行は
   `column_settings.render_profile` / `column_dom.add_column` の中(いずれも
-  `extensions/custom/`)で行い、描画後に属性を書く。テンプレート文字列
-  (`content.js:215-221`)へプレースホルダーを足す必要はない。
+  `extensions/custom/`)で行い、描画後に属性を書く。テンプレート
+  (当時は `content.js` 内。BL-051 で `extensions/custom/column_template.js` へ移設)へ
+  プレースホルダーを足す必要はない。
 - 欠点: 本家の保存データに独自項目が増える。本家が同じ名前の項目を後から
   足すと衝突する。項目名は本家の `column_` 系と衝突しないよう
   `opd_custom_uid` とする。

@@ -213,6 +213,7 @@ tests/
       x-router.js
       x-media-props.js
     open-deck-profile.spec.mjs
+    column-add-shift.spec.mjs
     column-cross-rack.spec.mjs
     column-back.spec.mjs
     profile-switch.spec.mjs
@@ -335,10 +336,11 @@ golden pathとは別のspecとして追加した。実X依存のシナリオは�
 
 | 項目 | spec | 補足 |
 | --- | --- | --- |
+| カラム追加の挿入位置 | `column-add-shift.spec.mjs` | 4種類の追加ボタンで、通常クリックは空カラムの直前、Shift併用は先頭へ入り、再読み込み後も同じ順で復元されること |
 | cross-rack移動 | `column-cross-rack.spec.mjs` | 2段表示の追加、`DragEvent`で本家のdropハンドラーへ乗せる。ラックをまたぐ移動はDOM移動を伴い、そのカラムのiframeだけが作り直される点も仕様として固定した |
-| プロファイル切替 | `profile-switch.spec.mjs` | 切替後の再構築、`last_load_profile`保存、切替元プロファイルの保存が壊れないこと |
+| プロファイル切替 | `profile-switch.spec.mjs` | 切替後の再構築、`last_load_profile`保存、切替元プロファイルの保存が壊れないこと。表示中より前のプロファイルを削除した後も、タブ保存とプロファイル保存が詰めた後の番号へ向くこと |
 | 戻る / Backspace | `column-back.spec.mjs` | fixtureへ最小のルーターを置き、`pushState`とpopstate描画を再現する |
-| タブ復元 | `tab-restore.spec.mjs` | タイムラインカラム2本で、保存鍵の付け替えまで確認する |
+| タブ復元 | `tab-restore.spec.mjs` | タイムラインカラム2本で、保存鍵の付け替えまで確認する。ホーム以外へ遷移した先のタブ操作が保存・再選択の対象にならないこと |
 | 引用メディア選択 | `media-viewer.spec.mjs` | props形状の選び方はNodeテストで固定済みのため、注入・token・ビューアー表示・キー操作の経路を見る |
 
 fixtureのHTMLは`<!--opd-script:名前.js-->`を`tests/e2e/pages/`の同名スクリプトへ差し替えて組み立てる。
