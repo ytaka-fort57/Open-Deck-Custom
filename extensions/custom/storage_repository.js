@@ -4,6 +4,8 @@ window.opd_custom_storage = (function(){
         SETTINGS: "opd_settings",
         PROFILE_STORE: "opd_profile_store",
         COLUMN_STATE: "opd_custom_column_state",
+        //設定インポートの完了を開いているデッキへ知らせる目印。値はインポート時刻
+        IMPORTED_AT: "opd_custom_imported_at",
     });
     const STORAGE_SCHEMA_VERSION = 1;
     const NO_CHANGE = Symbol("opd_custom_storage_no_change");
@@ -175,6 +177,12 @@ window.opd_custom_storage = (function(){
         }, callback);
     }
 
+    //storage.onChanged の変更が設定インポートによるものか。
+    //デッキ自身の保存は目印を書かないため、自分の書き込みには反応しない
+    function is_import_change(changes, area_name){
+        return area_name === "local" && changes != null && changes[KEYS.IMPORTED_AT] != null;
+    }
+
     function set_raw_items(items, callback){
         const storage_items = Object.assign({}, items);
         enqueue_mutation(function(finish){
@@ -257,6 +265,7 @@ window.opd_custom_storage = (function(){
 
     return {
         KEYS,
+        is_import_change,
         NO_CHANGE,
         STORAGE_SCHEMA_VERSION,
         get_json,

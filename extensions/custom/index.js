@@ -306,6 +306,14 @@
         }, SETUP_DEBOUNCE_MS);
     }
 
+    //デッキは起動時に読んだプロファイル一覧をメモリに持ち、変更のたびに全体を書き戻す。
+    //開いたまま設定がインポートされたら、その内容を上書きする前に読み込み直す
+    chrome.storage.onChanged.addListener(function(changes, area_name){
+        if(window.opd_custom_storage.is_import_change(changes, area_name)){
+            location.reload();
+        }
+    });
+
     //サイドバーとカラムは本家の初期化完了後に生成されるため、生成を監視して処理する
     const observer = new MutationObserver(schedule_setup);
     observer.observe(document.documentElement, {childList: true, subtree: true});

@@ -22,13 +22,15 @@ window.addEventListener("load", function(){
                     value[storage.KEYS.SETTINGS],
                     chrome.runtime.getManifest().version
                 );
-                //3キーを一度に更新し、途中失敗で設定が半分だけ変わらないようにする
+                //開いているデッキはこの目印で読み込み直し、古いメモリ内容で上書きしない
+                storage_items[storage.KEYS.IMPORTED_AT] = String(Date.now());
+                //全キーを一度に更新し、途中失敗で設定が半分だけ変わらないようにする
                 storage.set_raw_items(storage_items, function(write_error){
                     if(write_error != null){
                         set_status("インポートできません: " + write_error.message, true);
                         return;
                     }
-                    set_status("インポートが完了しました。Open-Deckの画面を再読み込みしてください。", false);
+                    set_status("インポートが完了しました。開いているOpen-Deckの画面は自動で読み込み直します。", false);
                 });
             }catch(error){
                 set_status("インポートできません: " + error.message, true);

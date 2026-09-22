@@ -272,3 +272,16 @@ test("column reorder remaps selections through the serialized mutation path", ()
         "1:0": "Other"
     });
 });
+
+test("only a settings import marks a storage change as an import", () => {
+    const context = { window: {}, chrome: { runtime: {}, storage: { local: {} } } };
+    loadScript("extensions/custom/storage_repository.js", context);
+    const storage = context.window.opd_custom_storage;
+    const marker = storage.KEYS.IMPORTED_AT;
+    assert.equal(storage.is_import_change({ [marker]: { newValue: "1" } }, "local"), true);
+    //デッキ自身の保存は目印を書かないので、読み込み直しの対象にならない
+    assert.equal(storage.is_import_change({ [storage.KEYS.PROFILE_STORE]: { newValue: "[]" } }, "local"), false);
+    assert.equal(storage.is_import_change({ [marker]: { newValue: "1" } }, "sync"), false);
+    assert.equal(storage.is_import_change(null, "local"), false);
+    assert.equal(storage.is_import_change(undefined, "local"), false);
+});
