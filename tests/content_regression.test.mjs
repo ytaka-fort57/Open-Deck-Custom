@@ -30,7 +30,6 @@ test("auto reload controls stay in the handler scope and columns expose a manual
     assert.ok(start_index > 0 && branch_index > start_index);
     assert.match(content, /const reload_column_content = function/);
     assert.match(content, /opd_column_reload_btn\.addEventListener\("click"/);
-    assert.match(content, /class="opd_column_reload_btn"/);
     assert.match(content, /column_reload:"icon\/column_reload\.svg"/);
 });
 

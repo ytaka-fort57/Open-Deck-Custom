@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
+import vm from "node:vm";
 
 const root = process.cwd();
 const excludedDirectories = new Set([
@@ -113,20 +114,35 @@ test("manifests and locale files are valid and complete", () => {
 
 test("content.js column templates take their labels from _locales", () => {
     const content = readFileSync(join(root, "content.js"), "utf8");
-    const start = content.indexOf("let default_element = {");
-    const end = content.indexOf("};", start);
-    assert.ok(start > 0 && end > start);
-    const templates = content.slice(start, end);
-    assert.doesNotMatch(templates, /[぀-ゟ゠-ヿ一-鿿]/);
+    assert.match(content, /let default_element = window\.opd_custom_column_template\.build\(i18n_message,/);
+
+    //テンプレートは文言をすべて t() から受け取り、日本語を直書きしない。
+    const templateFile = "extensions/custom/column_template.js";
+    const templateSource = readFileSync(join(root, templateFile), "utf8");
+    const code = templateSource.split("\n").filter((line) => !line.trim().startsWith("//")).join("\n");
+    assert.doesNotMatch(code, /[぀-ゟ゠-ヿ一-鿿]/);
+    const context = { window: {} };
+    vm.createContext(context);
+    vm.runInContext(templateSource, context);
+    const used = new Set();
+    const built = context.window.opd_custom_column_template.build(
+        (key) => { used.add(key); return `[${key}]`; },
+        (path) => path,
+        { column_add_1: "a.svg", column_add_2: "b.svg" }
+    );
+    assert.doesNotMatch(Object.values(built).map((item) => item.html).join(""), /[぀-ゟ゠-ヿ一-鿿]/);
     for (const key of [
         "ui_column_close_title", "ui_column_pin_toggle_title", "ui_column_post_title",
         "ui_column_timeline_title", "ui_column_notifications_title", "ui_column_explore_title",
         "ui_empty_column_message", "ui_second_empty_column_message"
     ]) {
-        assert.ok(templates.includes(`i18n_message("${key}")`), `content.js: missing ${key}`);
+        assert.ok(used.has(key), `${templateFile}: missing ${key}`);
     }
 
     const ja = JSON.parse(readFileSync(join(root, "_locales/ja/messages.json"), "utf8"));
+    for (const key of used) {
+        assert.ok(key in ja, `${templateFile}: missing locale key ${key}`);
+    }
     for (const file of ["extensions/custom/column_reorder.js", "extensions/custom/index.js"]) {
         const source = readFileSync(join(root, file), "utf8");
         const keys = [...source.matchAll(/chrome\.i18n\.getMessage\("([^"]+)"\)/g)].map((m) => m[1]);
