@@ -6,7 +6,7 @@ import { find_out_of_scope_calls } from "./scope_lint.mjs";
 
 const root = process.cwd();
 const excluded_directories = new Set([
-    ".git", ".agents", ".claude", ".firefox-dev", "package", "package_tmp", "node_modules", "tests"
+    ".git", ".agents", ".claude", ".firefox-dev", "package", "package_tmp", "node_modules", "tests", "playwright-report", "test-results"
 ]);
 
 function walk(directory) {

@@ -7,7 +7,7 @@ import vm from "node:vm";
 
 const root = process.cwd();
 const excludedDirectories = new Set([
-    ".git", ".agents", ".claude", ".firefox-dev", "package", "package_tmp", "node_modules"
+    ".git", ".agents", ".claude", ".firefox-dev", "package", "package_tmp", "node_modules", "playwright-report", "test-results"
 ]);
 
 function walk(directory) {
