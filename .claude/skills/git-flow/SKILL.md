@@ -16,7 +16,7 @@ origin/Release     本家追従用。独自変更を直接入れない
 origin/custom      カスタム版の統合ブランチ。作業ブランチはここから切る
 feature/*          機能追加
 fix/*              不具合修正
-sync/upstream      本家更新を custom へ取り込む一時ブランチ
+codex/upstream-port-YYYYMMDD  本家更新の意味を custom へ再実装する作業ブランチ(merge しない)
 ```
 
 `upstream` へ push しない。変更の送信先は常に `origin`。
@@ -34,7 +34,7 @@ git switch -c fix/xxx     # または feature/xxx
 - メッセージは日本語。1行目は `種別: 要約`（`feat:` `fix:` `docs:` `chore:`）
 - 何をしたかではなく、なぜそうしたかを本文に書く
 - 小さい単位で分ける。別事象を1つのコミットに混ぜない
-- 末尾に共著者行を付ける
+- 末尾に共著者行を付ける。モデル名は会話で指示された共著者行をそのまま使い、ここに固定しない
 
 ```bash
 git add <path>
@@ -43,7 +43,7 @@ fix: 要約
 
 なぜこの変更が必要かを書く。
 
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Co-Authored-By: <指示された共著者行>
 EOF
 ```
 
@@ -64,18 +64,25 @@ git push origin custom
 
 ## 本家の更新を取り込む
 
+`upstream/Release` を `custom` へ merge / cherry-pick しない。カスタム側の構造差が大きいため、
+変更意図を読み、必要な部分だけを現在の設計へ再実装する。手順の正本は
+[docs/open-deck-fork-project-setup.md の「16. 本家更新をレビューして意味移植する」](../../../docs/open-deck-fork-project-setup.md)。
+
 ```bash
-git fetch upstream
-git switch Release
-git merge --ff-only upstream/Release
-git push origin Release
-git switch -c sync/upstream custom
-git merge Release
+git fetch upstream Release
+base=$(tr -d '[:space:]' < .github/upstream-base)
+latest=$(git rev-parse upstream/Release)
+git log --reverse --oneline "$base..$latest"
+git diff --name-status "$base..$latest"
 ```
 
-競合しやすいのは `manifest.json` と `manifest_firefox.json` の content script 配列。
-独自の入口（`extensions/custom/*`）が消えていないか必ず確認する。
+1. 各コミットを「採用」「対応不要」「既に独自実装済み」に分類する
+2. 採用分は `custom` から `codex/upstream-port-YYYYMMDD` を切り、関連テストを足してから意味だけを再実装する
+3. `.\verify.ps1`(または `./verify.sh`)を通す
+4. 同じ変更で `.github/upstream-base` を `$latest` へ進め、[docs/upstream-port-log.md](../../../docs/upstream-port-log.md) へ全コミットの判断理由を追記する
+
 独自コードは `extensions/custom/` に隔離してあるため、本家ファイルの変更は最小に保つ。
+本家ファイルの構造整理(関数移動・死コード削除)も upstream-port-log.md に残す。
 
 ## 注意
 
