@@ -131,9 +131,19 @@ joint session historyを1つ戻す。戻る対象は「押したカラム」で�
 
 出力ZIPは`package/`へ作成される。開発用ディレクトリ、文書、置換前のFirefox manifestが入っていないことも自動確認する。
 
+ZIPの組み立てと検査は`scripts/package.mjs`が正本で、`verify.ps1` / `verify.sh`はどちらも
+`node scripts/package.mjs build`と`node scripts/package.mjs check`を呼ぶだけにしている。`check`は次を確かめる。
+
+- ZIPの中身が現在のソースから組み立てた内容とentry単位で一致する(前回のZIPにだけあったentryが残っていない)
+- Chromium版の`manifest.json`が`manifest_version` 3と`action` / `host_permissions`を持つ
+- Firefox版の`manifest.json`が`manifest_version` 2と`browser_action` / `browser_specific_settings`を持つ
+
+ZIP名は`Open-Deck_chromium_<version>.zip` / `Open-Deck_firefox_<version>.zip`で、OSによらず同じになる。
+組み立て結果の契約は`tests/package.test.mjs`も`node tests/run.mjs`から検査する。
+
 ## Linux / GitHub Actionsでの必須検証
 
-Node.js、`zip`、`unzip`が必要。
+Node.jsだけが必要。ZIPはzlibで書き出すため、`zip` / `unzip`コマンドには依存しない。
 
 ```bash
 chmod +x package.sh verify.sh

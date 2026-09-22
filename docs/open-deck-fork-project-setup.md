@@ -26,7 +26,8 @@
 - Chromium 用は `manifest.json`（Manifest V3）
 - Firefox 用は `manifest_firefox.json`（Manifest V2）。ただし本プロジェクトでは使用予定がない
 - `package.ps1` を実行すると、Chromium 版と Firefox 版の ZIP が `package/` に作られる
-- Firefox 版の作成時は、スクリプトが一時領域で `manifest_firefox.json` を `manifest.json` に置き換える
+- Firefox 版の作成時は、`manifest_firefox.json` の内容を ZIP 内の `manifest.json` として書き込む
+  (カスタム版では組み立てを `scripts/package.mjs` に一本化し、`package.ps1` / `package.sh` はそれを呼ぶだけにしている)
 - ライセンスは MIT。ただし、フォーク版にも元の `LICENSE` と著作権表示を残す
 
 したがって、初期段階では Node.js や `npm install` は不要です。
@@ -199,8 +200,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\package.ps1
 出力例:
 
 ```text
-package\Open-Deck_Firefox_1_1_3_7.zip
-package\Open-Deck_Chromium_1_1_3_7.zip
+package\Open-Deck_chromium_1_1_3_7.zip
+package\Open-Deck_firefox_1_1_3_7.zip
 ```
 
 バージョン部分は実行時の `manifest.json` によって変わります。
@@ -208,7 +209,7 @@ package\Open-Deck_Chromium_1_1_3_7.zip
 Firefox 開発用に展開します。
 
 ```powershell
-$FirefoxZip = Get-ChildItem .\package\Open-Deck_Firefox_*.zip |
+$FirefoxZip = Get-ChildItem .\package\Open-Deck_firefox_*.zip |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1
 
@@ -227,7 +228,7 @@ Expand-Archive -Path $FirefoxZip.FullName -DestinationPath .\.firefox-dev
 
 ## 12. 開発用ファイルを Git 管理から除外する
 
-本家の `.gitignore` はすでに `package` を除外しています。`package_tmp` は正常終了時に削除されます。Firefox のローカル展開先だけを追加で除外します。
+本家の `.gitignore` はすでに `package` を除外しています。カスタム版の `scripts/package.mjs` は `package_tmp` を作りません。Firefox のローカル展開先だけを追加で除外します。
 
 ```gitignore
 .firefox-dev/
