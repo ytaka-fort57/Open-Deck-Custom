@@ -49,6 +49,28 @@ test("video selection prefers the highest bitrate HTTPS MP4 regardless of array 
     assert.equal(safe.select_video_variant_url([]), null);
 });
 
+test("media URL resolution is shared by preview and download inputs", () => {
+    const safe = loadSafeValues();
+    assert.equal(
+        safe.resolve_media_url({type: "photo", media_url_https: "https://pbs.twimg.com/media/file.jpg?format=jpg&name=small"}),
+        "https://pbs.twimg.com/media/file.jpg?format=jpg&name=orig"
+    );
+    assert.equal(
+        safe.resolve_media_url({
+            type: "video",
+            video_info: {variants: [
+                {content_type: "video/mp4", bitrate: 256000, url: "https://video.example/low.mp4"},
+                {content_type: "video/mp4", bitrate: 2176000, url: "https://video.example/high.mp4"},
+            ]},
+        }),
+        "https://video.example/high.mp4"
+    );
+    assert.equal(safe.resolve_media_url({type: "photo", media_url_https: "http://pbs.twimg.com/file.jpg"}), null);
+    assert.equal(safe.resolve_media_url({type: "video", video_info: {variants: []}}), null);
+    assert.equal(safe.resolve_media_url({type: "unknown", media_url_https: "https://example.com/file"}), null);
+    assert.equal(safe.resolve_media_url(null), null);
+});
+
 //DOM要素の一時IDとカラムの安定IDはどちらもこの1本から出す。暗号用途ではない
 test("random ids are non-empty, attribute-safe and practically unique", () => {
     const safeValues = loadSafeValues();

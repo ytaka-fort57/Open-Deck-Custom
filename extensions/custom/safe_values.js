@@ -82,6 +82,25 @@ window.opd_custom_safe_values = (function(){
         return selectable[0]?.url ?? null;
     }
 
+    //表示と保存でURL選択・安全化が分岐しないよう、media入力の解決をここで完結させる。
+    function resolve_media_url(media){
+        let raw_url = null;
+        if(["animated_gif", "video"].includes(media?.type)){
+            raw_url = select_video_variant_url(media.video_info?.variants);
+        }else if(media?.type === "photo"){
+            raw_url = media.media_url_https;
+        }
+
+        const normalized_url = normalize_https_url(raw_url);
+        if(normalized_url == null || media?.type !== "photo"){
+            return normalized_url;
+        }
+
+        const photo_url = new URL(normalized_url);
+        photo_url.searchParams.set("name", "orig");
+        return photo_url.href;
+    }
+
     return {
         create_random_id,
         escape_html_attribute,
@@ -90,5 +109,6 @@ window.opd_custom_safe_values = (function(){
         is_safe_x_path,
         normalize_https_url,
         select_video_variant_url,
+        resolve_media_url,
     };
 })();

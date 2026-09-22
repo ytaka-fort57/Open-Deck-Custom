@@ -5,24 +5,8 @@ class OpdExtMediaViewer {
             let current_media_idx = pre_index;
             const media_viewer_div = document.createElement("div");
             const media_viewer_dialog = document.createElement("dialog");
-            const safe_values = window.opd_custom_safe_values;
-            const mediaURL = (info) => {
-                let raw_url = null;
-                if (["animated_gif", "video"].includes(info?.type)) {
-                    return safe_values.select_video_variant_url(info.video_info?.variants);
-                }else if(info?.type === "photo"){
-                    raw_url = info.media_url_https;
-                }
-                const normalized_url = safe_values.normalize_https_url(raw_url);
-                if(normalized_url == null || info?.type !== "photo"){
-                    return normalized_url;
-                }
-                const photo_url = new URL(normalized_url);
-                photo_url.searchParams.set("name", "orig");
-                return photo_url.href;
-            };
             const createMediaElement = (info) => {
-                const source = mediaURL(info);
+                const source = window.opd_custom_safe_values.resolve_media_url(info);
                 if(source == null){
                     return null;
                 }
@@ -186,22 +170,10 @@ class OpdExtMediaViewer {
             }
         }
         this.DownloadMedia = async (media) => {
-            let raw_media_src = null;
-            if (["animated_gif","video"].includes(media?.type)) {
-                raw_media_src = window.opd_custom_safe_values.select_video_variant_url(media.video_info?.variants);
-            }
-            if (media?.type === "photo") {
-                raw_media_src = media.media_url_https;
-            }
-            const normalized_media_src = window.opd_custom_safe_values.normalize_https_url(raw_media_src);
-            if(normalized_media_src == null){
+            const media_src = window.opd_custom_safe_values.resolve_media_url(media);
+            if(media_src == null){
                 return;
             }
-            const media_url = new URL(normalized_media_src);
-            if(media?.type === "photo"){
-                media_url.searchParams.set("name", "orig");
-            }
-            const media_src = media_url.href;
             const res = await fetch(media_src);
             const blob = await res.blob();
 
