@@ -42,6 +42,16 @@ class Rack {
         this.children.push(section);
         return section;
     }
+
+    insertBefore(section, target) {
+        const source = section.parentElement;
+        if (source != null) {
+            source.children.splice(source.children.indexOf(section), 1);
+        }
+        section.parentElement = this;
+        this.children.splice(this.children.indexOf(target), 0, section);
+        return section;
+    }
 }
 
 function createDeck(firstRackTypes, secondRackTypes = []) {
@@ -105,18 +115,23 @@ test("a move reports the new visual order to the save boundary", () => {
     assert.deepEqual(events, ["opd_custom_column_reordered"]);
 });
 
-test("a cross-rack drop is handed back to the native drop handler", () => {
+test("a cross-rack drop moves the section and renumbers the target rack", () => {
     const reorder = loadReorder();
-    const { sections } = createDeck(["home", "empty_column"], ["home", "second_empty_column"]);
+    const { sections, racks } = createDeck(["home", "home", "empty_column"], ["home", "second_empty_column"]);
+    const [first, second, , third, secondEmpty] = sections;
 
-    //段をまたぐ移動は order では表現できないため false を返し、本家のDOM移動に任せる
-    assert.equal(reorder.move_before(sections[0], sections[2]), false);
-    assert.deepEqual(orderOf(sections), ["", "", "", ""]);
     //同じ段なら order だけで入れ替える
-    assert.equal(reorder.move_before(sections[1], sections[0]), true);
-    assert.deepEqual(orderOf(sections.slice(0, 2)), ["1", "0"]);
-    assert.equal(reorder.move_before(sections[0], sections[0]), false);
-    assert.equal(reorder.move_before(null, sections[0]), false);
+    assert.equal(reorder.move_before(second, first), true);
+    assert.deepEqual(orderOf([first, second]), ["1", "0"]);
+
+    //移動元の order(1) が移動先のカラム(order なし)より後ろでも、落とした位置の前に入る
+    assert.equal(reorder.move_before(first, third), true);
+    assert.equal(first.parentElement, racks["#second_rack_element"]);
+    assert.ok(!racks["#first_rack_element"].children.includes(first));
+    assert.deepEqual(orderOf([first, third, secondEmpty]), ["0", "1", "2"]);
+
+    assert.equal(reorder.move_before(first, first), false);
+    assert.equal(reorder.move_before(null, first), false);
 });
 
 test("a move by position remaps the tab state while keys are positions", () => {

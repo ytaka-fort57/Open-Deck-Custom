@@ -948,8 +948,9 @@ function run(settings){
                 if(dr_elem != null){
                     const timeline_before = ev.opd_custom_tab_remap === true ? null : snapshot_timeline_state();
                     const reorder_api = window.opd_custom_column_reorder;
-                    const moved_without_dom_change = reorder_api?.move_before?.(dr_elem, this) === true;
-                    if(!moved_without_dom_change){
+                    //段をまたぐ移動もmove_beforeがDOM移動とorderの振り直しまで行う
+                    const moved = reorder_api?.move_before?.(dr_elem, this) === true;
+                    if(!moved){
                         this.parentNode.insertBefore(dr_elem, this);
                     }
                     remap_timeline_state(timeline_before);
