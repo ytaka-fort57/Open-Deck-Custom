@@ -10,9 +10,9 @@
 
 ## 件数
 
-- 総数 70 / 未了 9（抑止中・実質終了を除く）
-- 優先度（未了）: P1 0 / P2 2 / P3 7
-- 状態: discovered 2 / triaged 10 / in-progress 0 / monitoring 0 / verified 55 / wont-fix 3
+- 総数 70 / 未了 8（抑止中・実質終了を除く）
+- 優先度（未了）: P1 0 / P2 2 / P3 6
+- 状態: discovered 2 / triaged 9 / in-progress 0 / monitoring 0 / verified 56 / wont-fix 3
 - 未了項目の滞留（updatedAt からの中央値）: 1 日
 
 ## 30 日以上動いていない P1
