@@ -14,6 +14,27 @@ window.opd_custom_column_dom = (function(){
         }
     }
 
+    //カラム内の入力欄に今もフォーカスがあるか。
+    //入力中のカラムが閉じられたり再読み込みされたりすると focusout が届かないため、
+    //イベントで立てた状態を実際のフォーカスで確かめる
+    function has_column_text_focus(doc){
+        const frame = doc?.activeElement;
+        if(frame?.tagName !== "IFRAME"){
+            return false;
+        }
+        try{
+            const element = frame.contentDocument?.activeElement;
+            return element != null && (
+                element.isContentEditable === true ||
+                element.getAttribute?.("contenteditable") === "true" ||
+                element.tagName === "INPUT" ||
+                element.tagName === "TEXTAREA"
+            );
+        }catch(error){
+            return false;
+        }
+    }
+
     function get_add_target(doc, is_shift_pressed){
         const empty_column = doc?.querySelector?.(".dsp_column_emptycolumn");
         const rack = empty_column?.parentElement;
@@ -59,6 +80,7 @@ window.opd_custom_column_dom = (function(){
         add_column,
         dispose_and_remove,
         get_add_target,
+        has_column_text_focus,
         insert_before_target,
         is_frame_loaded,
     };

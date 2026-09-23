@@ -155,3 +155,21 @@ test("frame readiness accepts only a loaded http document", () => {
         get contentDocument() { throw new Error("cross origin"); },
     }), false);
 });
+
+test("column text focus is judged by the live focus, not by the last focus event", () => {
+    const columnDom = loadColumnDom();
+    const frameWith = (element) => ({ tagName: "IFRAME", contentDocument: { activeElement: element } });
+    const editable = { tagName: "DIV", getAttribute: (name) => name === "contenteditable" ? "true" : null };
+
+    for (const element of [editable, { tagName: "INPUT" }, { tagName: "TEXTAREA" }, { tagName: "DIV", isContentEditable: true }]) {
+        assert.equal(columnDom.has_column_text_focus({ activeElement: frameWith(element) }), true, element.tagName);
+    }
+    //入力中のカラムを閉じると、フォーカスはカラム外へ移るか何も残らない
+    assert.equal(columnDom.has_column_text_focus({ activeElement: null }), false);
+    assert.equal(columnDom.has_column_text_focus({ activeElement: { tagName: "BODY" } }), false);
+    assert.equal(columnDom.has_column_text_focus({ activeElement: frameWith({ tagName: "BODY", getAttribute: () => null }) }), false);
+    assert.equal(columnDom.has_column_text_focus({ activeElement: { tagName: "IFRAME", contentDocument: null } }), false);
+    //クロスオリジンへ遷移したiframeは contentDocument 参照が投げる
+    const crossOrigin = { tagName: "IFRAME", get contentDocument() { throw new Error("SecurityError"); } };
+    assert.equal(columnDom.has_column_text_focus({ activeElement: crossOrigin }), false);
+});

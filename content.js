@@ -991,9 +991,14 @@ function run(settings){
     }
     //自動更新許可を取得する関数
     function is_auto_update(){
-        //テキスト入力フォーカス中
+        //テキスト入力フォーカス中。入力中のカラムが消えると focusout が届かないため、
+        //実際のフォーカスが残っていなければ状態を戻す
         if(column_auto_update_state.text_focus.active){
-            return false;
+            if(column_dom.has_column_text_focus(document)){
+                return false;
+            }
+            column_auto_update_state.text_focus.date = 0;
+            column_auto_update_state.text_focus.active = false;
         }
         //メディアビューワー表示中
         if(column_auto_update_state.media_viewer.active){

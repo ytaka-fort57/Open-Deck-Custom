@@ -283,3 +283,8 @@ test("periodic work is shared instead of allocated per column", () => {
         assert.doesNotMatch(source, /state\.path_timer/);
     }
 });
+
+test("auto update re-checks the live text focus before staying paused", () => {
+    //入力中のカラムが消えると focusout が届かず、イベントの状態だけでは自動更新が止まり続ける(BL-065)
+    assert.match(content, /function is_auto_update\(\)\{[\s\S]*?text_focus\.active\)\{\s*if\(column_dom\.has_column_text_focus\(document\)\)\{\s*return false;[\s\S]*?text_focus\.active = false;/);
+});
