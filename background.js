@@ -123,34 +123,47 @@ chrome.webRequest.onHeadersReceived.addListener(function (resp) {
 ] }, ['responseHeaders']);
 
 
+const DNR_REMOVE_FRAME_HEADERS = {
+    type: "modifyHeaders",
+    responseHeaders: [
+        {
+            header: "Content-Security-Policy",
+            operation: "remove"
+        },
+        {
+            header: "X-Frame-Options",
+            operation: "remove"
+        }
+    ]
+};
+
 function update_dnr(){
+    //CSPを外すのはデッキのカラム(sub_frame)とデッキ本体のページだけにし、
+    //通常閲覧のx.comではX自身のCSPを残す
     const dnr_rules = [
         {
             id : 1,
             priority: 1,
-            action: {
-                type: "modifyHeaders",
-                responseHeaders: [
-                    {
-                        header: "Content-Security-Policy",
-                        operation: "remove"
-                    },
-                    {
-                        header: "X-Frame-Options",
-                        operation: "remove"
-                    }
-                ]
-            },
+            action: DNR_REMOVE_FRAME_HEADERS,
             condition : {
                 requestDomains: ["x.com", "twitter.com"],
                 initiatorDomains: [EXTENSION_DOMAIN, "x.com", "twitter.com"],
-                resourceTypes: ["main_frame", "sub_frame", "xmlhttprequest", "script", "stylesheet"]
+                resourceTypes: ["sub_frame"]
+            }
+        },
+        {
+            id : 2,
+            priority: 1,
+            action: DNR_REMOVE_FRAME_HEADERS,
+            condition : {
+                regexFilter: "^https://(x|twitter)\\.com/run-opdeck$",
+                resourceTypes: ["main_frame"]
             }
         },
     ];
-    
+
     return chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: [1],
+        removeRuleIds: [1, 2],
         addRules: dnr_rules,
     });
 }

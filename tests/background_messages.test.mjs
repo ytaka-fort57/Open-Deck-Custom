@@ -8,6 +8,7 @@ function loadBackground() {
     let reloadCount = 0;
     let fetchCount = 0;
     let headerFilter;
+    let dnrUpdate;
     const context = {
         URL,
         AbortController,
@@ -26,7 +27,7 @@ function loadBackground() {
                 onInstalled: { addListener() {} },
                 onMessage: { addListener: (listener) => { messageListener = listener; } },
             },
-            declarativeNetRequest: { updateDynamicRules: async () => {} },
+            declarativeNetRequest: { updateDynamicRules: async (update) => { dnrUpdate = update; } },
             storage: { local: { set: (value, callback) => callback() } },
             webRequest: { onHeadersReceived: { addListener: (_listener, filter) => { headerFilter = filter; } } },
         },
@@ -38,6 +39,7 @@ function loadBackground() {
         getReloadCount: () => reloadCount,
         getFetchCount: () => fetchCount,
         getHeaderFilter: () => headerFilter,
+        getDnrUpdate: () => dnrUpdate,
     };
 }
 
@@ -75,5 +77,29 @@ test("API limit monitoring covers both x.com and twitter.com timelines", () => {
         for (const name of ["SearchTimeline", "HomeLatestTimeline", "HomeTimeline"]) {
             assert.ok(urls.includes(`*://${host}/i/api/graphql/*/${name}*`), `${host} ${name}`);
         }
+    }
+});
+
+test("CSP removal is limited to deck columns and the deck page itself", async () => {
+    const background = loadBackground();
+    const ok = await new Promise((resolve) => background.send({ message: "dnr_upd" }, { id: "self-extension" }, resolve));
+    assert.equal(ok, true);
+    const { removeRuleIds, addRules } = background.getDnrUpdate();
+    assert.deepEqual([...removeRuleIds].sort(), [...addRules.map((rule) => rule.id)].sort());
+
+    const mainFrameRules = addRules.filter((rule) => rule.condition.resourceTypes.includes("main_frame"));
+    assert.equal(mainFrameRules.length, 1);
+    const { condition } = mainFrameRules[0];
+    assert.deepEqual([...condition.resourceTypes], ["main_frame"]);
+    const deckPage = new RegExp(condition.regexFilter);
+    for (const url of ["https://x.com/run-opdeck", "https://twitter.com/run-opdeck"]) {
+        assert.ok(deckPage.test(url), url);
+    }
+    for (const url of ["https://x.com/home", "https://x.com/run-opdeck/status/1", "https://x.com/run-opdeck?x=1", "https://x.com/user/run-opdeck", "https://evil.example/https://x.com/run-opdeck"]) {
+        assert.ok(!deckPage.test(url), url);
+    }
+
+    for (const rule of addRules.filter((rule) => rule !== mainFrameRules[0])) {
+        assert.deepEqual([...rule.condition.resourceTypes], ["sub_frame"]);
     }
 });
