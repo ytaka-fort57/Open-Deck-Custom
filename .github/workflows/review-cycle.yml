@@ -17,6 +17,13 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+      - name: review-kit(private)を取得できるようにする
+        env:
+          TOKEN: ${{ secrets.REVIEW_KIT_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "https://github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "ssh://git@github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "git@github.com:ytaka-fort57/review-kit"
       - run: npm ci
       - name: Deterministic review checks
         run: |
@@ -50,12 +57,22 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+      - name: review-kit(private)を取得できるようにする
+        env:
+          TOKEN: ${{ secrets.REVIEW_KIT_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "https://github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "ssh://git@github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "git@github.com:ytaka-fort57/review-kit"
+      - name: Install the trusted engine from the base branch
+        working-directory: ${{ runner.temp }}/autofix-gate
+        run: npm ci --ignore-scripts
       - name: Check autofix scope and size
         env:
           REVIEW_REPO_ROOT: ${{ github.workspace }}
           REVIEW_CONFIG_FILE: ${{ runner.temp }}/autofix-gate/review.config.json
         run: >-
-          node "$RUNNER_TEMP/autofix-gate/scripts/review-cli.mjs" autofix gate
+          node "$RUNNER_TEMP/autofix-gate/node_modules/review-kit/bin/review-kit.mjs" review autofix gate
           --base "origin/$GITHUB_BASE_REF"
           --policy "$RUNNER_TEMP/autofix-gate/review/autofix-policy.json"
           --findings "$RUNNER_TEMP/autofix-gate/docs/backlog/findings.jsonl"
@@ -73,6 +90,13 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+      - name: review-kit(private)を取得できるようにする
+        env:
+          TOKEN: ${{ secrets.REVIEW_KIT_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "https://github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "ssh://git@github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "git@github.com:ytaka-fort57/review-kit"
       - run: npm ci
       - run: npm run review -- health
       - name: Open a report update PR when needed

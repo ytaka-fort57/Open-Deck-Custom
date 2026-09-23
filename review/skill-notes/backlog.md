@@ -1,0 +1,7 @@
+- 運用ルールは `docs/backlog/README.md`、共通の運用ルールは `node_modules/review-kit/docs/operations.md`。
+- `--app` の意味: `content` = 本家 `content.js` / `custom` = `extensions/custom/` / `helper` = 本家 `extensions/*.js` と iframe 注入 helper / `background` = `background.js` / `tests` / `docs` / `config` = manifest・package・verify・CI。
+- `--verification-required` の `manual` / `both` は、ログイン済み X の実ブラウザーを見ないと判定できない項目にだけ付ける。Node テストと Playwright E2E(ローカル fixture)で判定できる項目は `code`。
+- 元文書の例: `--source-document docs/code-audit-2026-09-18.md#R-11`。
+- `content.js` の行番号は本家更新と分割で大きくずれる。着手時に `npm run backlog:update -- BL-0NN --evidence …` で取り直す。
+- 本家ファイルの死コード削除・関数移動は `docs/upstream-port-log.md` にも残す。
+- `docs/backlog.md` は索引であり、個別の残課題を書き足さない。

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "paths": {
     "lenses": "review/lenses.jsonl",
     "findings": "docs/backlog/findings.jsonl",
@@ -11,9 +11,48 @@
   },
   "vocabulary": {
     "findingIdPrefix": "BL",
-    "categories": ["uiux", "architecture", "persistence", "release", "validation", "security", "performance", "feature", "i18n"],
-    "components": ["content", "custom", "helper", "background", "tests", "docs", "config"],
-    "areas": ["interaction", "state", "responsive", "accessibility", "visual", "copy", "navigation", "layout", "feedback", "performance", "architecture", "persistence", "migration", "release", "validation", "security", "i18n", "lifecycle", "history", "css"]
+    "categories": [
+      "uiux",
+      "architecture",
+      "persistence",
+      "release",
+      "validation",
+      "security",
+      "performance",
+      "feature",
+      "i18n"
+    ],
+    "components": [
+      "content",
+      "custom",
+      "helper",
+      "background",
+      "tests",
+      "docs",
+      "config"
+    ],
+    "areas": [
+      "interaction",
+      "state",
+      "responsive",
+      "accessibility",
+      "visual",
+      "copy",
+      "navigation",
+      "layout",
+      "feedback",
+      "performance",
+      "architecture",
+      "persistence",
+      "migration",
+      "release",
+      "validation",
+      "security",
+      "i18n",
+      "lifecycle",
+      "history",
+      "css"
+    ]
   },
   "limits": {
     "maxFindingsPerRun": 5,
@@ -24,5 +63,39 @@
   "verification": [
     "npm run test:unit",
     "npm run backlog:validate -- --report"
-  ]
+  ],
+  "exclude": [
+    "playwright-report/**",
+    "test-results/**",
+    "package/**"
+  ],
+  "checks": {
+    "builtin": [
+      "hardcoded-path",
+      "docs-links",
+      "evidence-stale"
+    ],
+    "scopes": {
+      "hardcoded-path": [
+        "*.js",
+        "extensions/**/*.js",
+        "scripts/**/*.mjs"
+      ]
+    }
+  },
+  "skills": {
+    "targets": [
+      "claude",
+      "agents"
+    ],
+    "scriptPrefix": "backlog",
+    "notes": "review/skill-notes"
+  },
+  "defaults": {
+    "category": "architecture",
+    "verificationRequired": "code"
+  },
+  "labels": {
+    "reportTitle": "残課題レポート"
+  }
 }

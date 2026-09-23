@@ -34,6 +34,13 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: review-kit(private)を取得できるようにする
+        env:
+          TOKEN: ${{ secrets.REVIEW_KIT_TOKEN }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "https://github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "ssh://git@github.com/ytaka-fort57/review-kit"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/ytaka-fort57/review-kit".insteadOf "git@github.com:ytaka-fort57/review-kit"
       - name: Install Dependencies
         run: npm ci
 

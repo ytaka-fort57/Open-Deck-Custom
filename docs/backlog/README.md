@@ -1,9 +1,10 @@
 # 残課題バックログの運用
 
 正本は `findings.jsonl`、人が読む一覧は `report.md`。`report.md` は CLI で生成し、直接編集しない。
-フィールド定義は [schema.md](schema.md)、エージェント向け手順は `.claude/skills/backlog/SKILL.md`。
-仕組みは `ai_usage_dashboard` の `ux-backlog` を移植したもので、置き場所と ID 接頭辞(`BL-`)と
-`app` 軸だけを本リポジトリに合わせている。
+フィールド定義は [schema.md](schema.md)、エージェント向け手順は `.claude/skills/backlog/SKILL.md`(`npx review-kit skills install` で生成)。
+仕組みは共通パッケージ [review-kit](https://github.com/ytaka-fort57/review-kit) で、本リポジトリの差分は
+`review.config.json`(置き場所、ID 接頭辞 `BL-`、語彙、既定値)と `review/`(レンズ、自動修正方針、スキルの固有注意)にだけある。
+仕組み自体の改善はこのリポジトリではなく review-kit で行う。
 
 ## 基本操作
 
@@ -29,7 +30,7 @@ npm run backlog:validate -- --report
 ```powershell
 npm run backlog:add -- --input findings-draft.json --dry-run
 npm run backlog:add -- --input findings-draft.json
-Get-Content findings-draft.json -Raw | node scripts/backlog.mjs add --input -
+Get-Content findings-draft.json -Raw | node node_modules/review-kit/bin/review-kit.mjs backlog add --input -
 npm run backlog:show -- BL-001
 npm run backlog:show -- BL-001 --ascii
 ```
@@ -54,10 +55,10 @@ E2E(Playwright + ローカル `x.com` fixture)は `code` 側の検証として�
 - `findings.jsonl` は CLI 経由で更新する
 - ロックファイル(`findings.jsonl.lock`)が残っている場合は、保持プロセスを確認してから解除する
 - `report.md` が古い場合は `npm run backlog:report` で再生成する
-- `node tests/run.mjs`(`tests/backlog.test.mjs`)が正本と `report.md` の整合を検査する。
+- `node tests/run.mjs`(`tests/review_contract.test.mjs`)が正本と `report.md` の整合と、生成スキルのずれを検査する。
   `verify.ps1` / `verify.sh` の前に `npm run backlog:validate -- --report` を通す
 - 監査文書の内容を一括で 1 件へ詰め込まず、利用者影響・責務ごとに分ける
-- 運用上の不整合を見つけたら、該当案件の `workNotes` に条件と対応を残し、再発条件は `tests/backlog.test.mjs` に回帰テストとして追加する
+- 運用上の不整合を見つけたら、該当案件の `workNotes` に条件と対応を残し、仕組み側の再発条件は review-kit に回帰テストとして追加する
 - 本家(`kawa-nobu/Open-Deck`)由来のファイルを直す項目は、`app: content` / `helper` を付け、
   削除・移動した箇所を [upstream-port-log.md](../upstream-port-log.md) に残す
 

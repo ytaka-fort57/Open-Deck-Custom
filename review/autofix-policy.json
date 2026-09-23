@@ -1,5 +1,5 @@
 {
-  "$comment": "Open-Deck 自動修正ゲート。初回試験では docs-link だけを許可し、方針・CI・エンジン自身は変更不可。",
+  "$comment": "Open-Deck 自動修正ゲート。初回試験では docs-link だけを許可し、方針・CI・エンジン(node_modules/review-kit とその版を決める package.json / lockfile)は変更不可。",
   "baseBranch": "custom",
   "branchPrefix": "autofix/",
   "maxOpenBranches": 1,
@@ -18,7 +18,9 @@
     "package-lock.json",
     ".github/**",
     ".githooks/**",
+    ".agents/skills/backlog/**",
     ".agents/skills/review-*/**",
+    ".claude/skills/backlog/**",
     ".claude/skills/review-*/**",
     "docs/dev/automated-review-cycle-runbook.md",
     "manifest.json",
@@ -27,10 +29,9 @@
     "extensions/custom/storage_repository.js",
     "extensions/custom/safe_values.js",
     "review.config.json",
-    "review/autofix-policy.json",
-    "scripts/review-*.mjs",
-    "tests/review/**",
-    "tests/review_port.test.mjs"
+    "review/**",
+    "node_modules/**",
+    "tests/review_contract.test.mjs"
   ],
   "classes": {
     "docs-link": {

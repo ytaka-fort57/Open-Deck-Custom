@@ -2,7 +2,7 @@
 
 > `npm run review -- health` が生成。直接編集しない。
 
-生成日: 2026-09-22
+生成日: 2026-09-23
 
 ## 通知
 
@@ -10,10 +10,10 @@
 
 ## 件数
 
-- 総数 44 / 未了 1（抑止中・実質終了を除く）
-- 優先度（未了）: P1 0 / P2 1 / P3 0
-- 状態: discovered 1 / triaged 3 / in-progress 0 / monitoring 0 / verified 38 / wont-fix 2
-- 未了項目の滞留（updatedAt からの中央値）: 0 日
+- 総数 70 / 未了 9（抑止中・実質終了を除く）
+- 優先度（未了）: P1 0 / P2 2 / P3 7
+- 状態: discovered 2 / triaged 10 / in-progress 0 / monitoring 0 / verified 55 / wont-fix 3
+- 未了項目の滞留（updatedAt からの中央値）: 1 日
 
 ## 30 日以上動いていない P1
 
@@ -21,14 +21,18 @@
 
 ## 実画面確認の借金（manual 未検証）
 
-該当なし
+| ID | タイトル |
+|---|---|
+| BL-058 | ヘッダー削除ルールが main_frame を含み、通常閲覧の x.com でもCSPを外している |
+| BL-059 | host_permissions と web_accessible_resources が必要以上に広い |
+| BL-065 | 入力フォーカス中にカラムが消えると自動更新が止まったままになる疑い |
 
 ## レンズ
 
 | ID | 周期 | 最終実行 | 経過 | 期限 | 実行回数 | 登録数 | 備考 |
 |---|---|---|---|---|---|---|---|
-| LENS-check-docs-links | weekly | 2026-09-21 | 1 日 | — | 2 | 2 |  |
-| LENS-check-path | on-change | 2026-09-19 | 3 日 | 到来 | 1 | 0 |  |
+| LENS-check-docs-links | weekly | 2026-09-21 | 2 日 | — | 2 | 2 |  |
+| LENS-check-path | on-change | 2026-09-19 | 4 日 | 到来 | 1 | 0 |  |
 | LENS-check-evidence | weekly | 未実行 | — | 到来 | 0 | 0 |  |
 | LENS-test-quality | monthly | 未実行 | — | 到来 | 0 | 0 |  |
 | LENS-docs-drift | monthly | 未実行 | — | 到来 | 0 | 0 |  |

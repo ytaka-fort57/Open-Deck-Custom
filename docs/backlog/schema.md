@@ -1,9 +1,11 @@
 # 残課題スキーマ
 
+共通の定義は `node_modules/review-kit/docs/schema.md`。ここには本リポジトリの語彙と固有の注意を書く。
+
 ## 固定値
 
 - `category`: `uiux`、`architecture`、`persistence`、`release`、`validation`、`security`、`performance`、`feature`、`i18n`
-- `app`: `content`、`custom`、`helper`、`background`、`tests`、`docs`、`config`(`scripts/backlog.mjs` の `APP_VALUES`)
+- `app`: `content`、`custom`、`helper`、`background`、`tests`、`docs`、`config`(`review.config.json` の `vocabulary.components`)
 - `area`: `interaction`、`state`、`responsive`、`accessibility`、`visual`、`copy`、`navigation`、`layout`、`feedback`、`performance`、`architecture`、`persistence`、`migration`、`release`、`validation`、`security`、`i18n`、`lifecycle`、`history`、`css`
 - `priority`: `P1`、`P2`、`P3`
 - `status`: `discovered`、`triaged`、`in-progress`、`monitoring`、`verified`、`wont-fix`
@@ -66,5 +68,5 @@
 同じ内容を再登録しようとしても新規追加しない(`report.md` の「抑止中」節に出る)。
 
 同一性の判定は `category` + `app` + 正規化したタイトル + 根拠ファイルの集合から導出する
-fingerprint による(`scripts/backlog.mjs` の `computeFingerprint`)。**行番号は含めない**ため、
+fingerprint による(review-kit の `computeFingerprint`)。**行番号は含めない**ため、
 コミットで行がずれても同じ発見事項とみなす。fingerprint はレコードに保存せず、毎回計算する。

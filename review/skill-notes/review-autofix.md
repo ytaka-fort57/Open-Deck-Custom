@@ -1,0 +1,2 @@
+- 基点ブランチは `custom`。現在の試験対象は `docs-link` 区分だけ。
+- 運用境界は `docs/dev/automated-review-cycle-runbook.md`。
