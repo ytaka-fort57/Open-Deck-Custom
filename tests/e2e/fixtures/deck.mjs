@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { implementationConstant } from "./implementation-constants.mjs";
 
 //デッキを開く。結果はDOM・URL・storageからだけ観測し、拡張内部の変数は参照しない
 export async function openDeck(context, storage, items) {
@@ -111,7 +112,7 @@ export async function navigateColumn(frame, path) {
 //独自履歴はiframeのURLを周期監視して積む(column_history.js の WATCH_INTERVAL_MS)。
 //現在地が1度も記録される前に遷移させると、そのカラムは戻り先を持たないまま進んでしまう。
 //スタックはDOM・URL・storageのどれにも出ないため、観測できる代わりに監視周期分を待つ。
-const HISTORY_WATCH_INTERVAL_MS = 400;
+const HISTORY_WATCH_INTERVAL_MS = implementationConstant("extensions/custom/column_history.js", "WATCH_INTERVAL_MS");
 
 export async function waitForColumnHistoryBaseline(page) {
     await page.waitForTimeout(HISTORY_WATCH_INTERVAL_MS * 3);

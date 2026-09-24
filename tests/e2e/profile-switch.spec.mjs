@@ -35,17 +35,14 @@ test("switching profiles rebuilds the deck without corrupting the other profile"
     await expect(page.locator('#first_rack_element div[opd_column_type="explore"]')).toHaveAttribute("opd_explore_path", "/i/lists/42");
     await expect(page.locator('#first_rack_element div[opd_column_type="home"] .opd_a_reload_time_setting')).toHaveValue("15");
 
-    //並び替えの保存リスナーは run() ごとに増えない。切替を2回行った後の並び替え1回で
-    //opd_profile_store の書き込みが1回だけであることを storage.onChanged で見る
-    const profileStoreWrites = await storage.watch("opd_profile_store");
+    //切替を2回行った後でも、並び替えは1回で保存される。
+    //保存リスナーが run() ごとに増えないことはここでは数えない。storage.onChanged は同じ値の
+    //書き込みを通知しないため、重複した保存を外から観測できない。登録が run() の外で1回だけで
+    //あることは content_regression.test.mjs で固定している
     await page.locator('div[opd_column_type="home"] .opd_custom_move_right').click();
     await expect.poll(() => visualTypes(page)).toEqual(["explore", "home", "empty_column"]);
     await expect.poll(async () => (await savedProfiles(storage))[0].profile.map((item) => item.type))
         .toEqual(["main_bar_empty_column", "explore", "home", "empty_column"]);
-    //直列化された保存が追加で走るなら、この待ちの間に2回目の onChanged が届く
-    await page.waitForTimeout(500);
-    expect(await profileStoreWrites.count(), "opd_profile_store writes per reorder").toBe(1);
-    await profileStoreWrites.close();
 
     //再読み込み後も最後に開いたプロファイルが、並び替え後の順で復元される
     await page.reload();

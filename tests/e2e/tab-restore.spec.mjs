@@ -1,6 +1,7 @@
 import { test, expect } from "./fixtures/extension-context.mjs";
 import { TWO_TIMELINE_COLUMNS, legacyTabStateItems, storageItems } from "./fixtures/storage-fixtures.mjs";
 import { frameForSection, openDeck, rackSections, savedTabs, visualTypes } from "./fixtures/deck.mjs";
+import { implementationConstant } from "./fixtures/implementation-constants.mjs";
 
 const SELECTED_TAB = '[role="tab"][aria-selected="true"]';
 
@@ -139,8 +140,9 @@ test("tabs on pages other than the home timeline neither overwrite nor get re-se
     await frame.locator('[role="tab"]', { hasText: "おすすめ" }).click();
     await expect(frame.locator(SELECTED_TAB)).toHaveText("おすすめ");
 
-    //再選択の監視は1秒周期のため、2周期以上待っても押し戻されず、保存も変わらないことを見る
-    await page.waitForTimeout(2500);
+    //再選択の監視周期(index.js の enforce_tab)の2周期以上待っても押し戻されず、保存も変わらないことを見る
+    const enforceIntervalMs = implementationConstant("extensions/custom/index.js", "INTERVAL_MS");
+    await page.waitForTimeout(enforceIntervalMs * 2.5);
     await expect(frame.locator(SELECTED_TAB)).toHaveText("おすすめ");
     expect(await savedTabs(storage)).toEqual({ [`0:${uid}`]: "フォロー中" });
 
