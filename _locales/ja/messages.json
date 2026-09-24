@@ -146,6 +146,9 @@
   "msg_profile_init_completed": {
     "message": "初期化が完了しました"
   },
+  "msg_profile_save_failed": {
+    "message": "プロファイルを保存できませんでした。\n再読み込みすると、直前のカラム構成の変更が失われる可能性があります"
+  },
   "msg_settings_auto_repair": {
     "message": "破損した設定データの自動修復を行いました\n再読み込みします"
   },

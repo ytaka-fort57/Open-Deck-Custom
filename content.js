@@ -18,6 +18,10 @@ let last_load_profile = 0;
 let is_removed_default_style = false;
 const deck_lifecycle = window.opd_custom_lifecycle;
 const deck_storage = window.opd_custom_storage;
+//プロファイル保存の失敗は再読み込み後にレイアウトが消えるまで気づけないため、最初の1回を知らせる
+const report_profile_save_failure = deck_storage.create_save_failure_reporter("Open-Deck profile", function(){
+    alert(i18n_message("msg_profile_save_failed"));
+});
 const deck_safe_values = window.opd_custom_safe_values;
 //ランダムID作成(text_review と実体を共通化)
 const create_random_id = deck_safe_values.create_random_id;
@@ -314,7 +318,7 @@ function run(settings){
                     deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
                         settings.last_load_profile = index;
                         return settings;
-                    });
+                    }, report_profile_save_failure);
                     const profile_settings = {column_settings:profile_store[index].profile};
                     run(profile_settings);
                 }
@@ -794,7 +798,8 @@ function run(settings){
             const save_object = {name:"user_profile", profile:copied.profile};
             profile_store.push(save_object);
             const new_profile_index = profile_store.length - 1;
-            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
+            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function (error) {
+                report_profile_save_failure(error);
                 copy_profile_tab_state(last_load_profile, new_profile_index, copied.uid_map);
                 refresh_profile_list();
             });
@@ -826,11 +831,12 @@ function run(settings){
                 refresh_profile_list(after_profile_num);
                 //タブ状態の番号の詰め直しを、補正後の番号でのタブ保存より先に書き込みキューへ積む
                 delete_profile_tab_state(delete_num);
-                deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
+                deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function (error) {
+                    report_profile_save_failure(error);
                     deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
                         settings.last_load_profile = after_profile_num;
                         return settings;
-                    }, function(){});
+                    }, report_profile_save_failure);
                 });
             }
         }else{
@@ -1027,8 +1033,7 @@ function save_current_profile(profile_num){
     const settings_array = read_current_profile();
     const save_object = {name:"user_profile", profile:settings_array.column_settings};
     Object.assign(profile_store[profile_num], save_object);
-    deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function () {
-    });
+    deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, report_profile_save_failure);
 }
 //独自の左右・表示順コントロールはDOMを差し替えずstyle.orderだけを変える。
 //並び替え完了通知を本家の保存境界へ接続する。run() 内で登録するとプロファイル切替の

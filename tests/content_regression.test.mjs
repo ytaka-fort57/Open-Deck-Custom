@@ -288,3 +288,9 @@ test("auto update re-checks the live text focus before staying paused", () => {
     //入力中のカラムが消えると focusout が届かず、イベントの状態だけでは自動更新が止まり続ける(BL-065)
     assert.match(content, /function is_auto_update\(\)\{[\s\S]*?text_focus\.active\)\{\s*if\(column_dom\.has_column_text_focus\(document\)\)\{\s*return false;[\s\S]*?text_focus\.active = false;/);
 });
+
+test("profile saves do not discard storage errors", () => {
+    //保存コールバックでエラー引数を捨てると、容量超過などの失敗に利用者が気づけない(BL-064)
+    assert.doesNotMatch(content, /deck_storage\.(set_json|update_json)\(deck_storage\.KEYS\.PROFILE_STORE, profile_store, function \(\)/);
+    assert.doesNotMatch(content, /deck_storage\.update_json\(deck_storage\.KEYS\.SETTINGS, \{\}, function\(settings\)\{[^}]*?return settings;\s*\}(\)|, function\(\)\{\}\))/);
+});

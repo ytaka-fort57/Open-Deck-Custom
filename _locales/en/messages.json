@@ -146,6 +146,9 @@
   "msg_profile_init_completed": {
     "message": "Initialization completed."
   },
+  "msg_profile_save_failed": {
+    "message": "The profile could not be saved.\nRecent column layout changes may be lost after reloading."
+  },
   "msg_settings_auto_repair": {
     "message": "Corrupted settings data has been repaired.\nThe page will be reloaded."
   },

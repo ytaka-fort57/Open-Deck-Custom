@@ -285,3 +285,27 @@ test("only a settings import marks a storage change as an import", () => {
     assert.equal(storage.is_import_change(null, "local"), false);
     assert.equal(storage.is_import_change(undefined, "local"), false);
 });
+
+test("save failure reporter logs every failure and notifies only once", () => {
+    const errors = [];
+    const context = {
+        window: {},
+        chrome: { runtime: {}, storage: { local: {} } },
+        console: { error: (...args) => errors.push(args) },
+    };
+    loadScript("extensions/custom/storage_repository.js", context);
+    const notified = [];
+    const report = context.window.opd_custom_storage.create_save_failure_reporter("profile", (error) => notified.push(error.message));
+
+    //成功時は何もしない
+    assert.equal(report(null), false);
+    assert.equal(report(undefined), false);
+    assert.equal(errors.length, 0);
+    assert.deepEqual(notified, []);
+
+    //失敗は毎回記録し、利用者への通知は最初の1回だけ
+    assert.equal(report(new Error("QUOTA_BYTES quota exceeded")), true);
+    assert.equal(report(new Error("second")), true);
+    assert.equal(errors.length, 2);
+    assert.deepEqual(notified, ["QUOTA_BYTES quota exceeded"]);
+});

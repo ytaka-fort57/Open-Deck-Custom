@@ -183,6 +183,23 @@ window.opd_custom_storage = (function(){
         return area_name === "local" && changes != null && changes[KEYS.IMPORTED_AT] != null;
     }
 
+    //保存コールバックへ渡す失敗の受け口を作る。失敗は毎回 console.error に残し、
+    //利用者への通知は最初の1回だけにする(自動保存のたびに通知が重ならないように)
+    function create_save_failure_reporter(label, notify_once){
+        let is_notified = false;
+        return function(error){
+            if(error == null){
+                return false;
+            }
+            console.error(label + " could not be saved:", error);
+            if(!is_notified){
+                is_notified = true;
+                notify_once(error);
+            }
+            return true;
+        };
+    }
+
     function set_raw_items(items, callback){
         const storage_items = Object.assign({}, items);
         enqueue_mutation(function(finish){
@@ -265,6 +282,7 @@ window.opd_custom_storage = (function(){
 
     return {
         KEYS,
+        create_save_failure_reporter,
         is_import_change,
         NO_CHANGE,
         STORAGE_SCHEMA_VERSION,
