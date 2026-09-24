@@ -16,6 +16,7 @@
     "backlog:update": "review-kit backlog update",
     "backlog:verify": "review-kit backlog verify",
     "backlog:suppress": "review-kit backlog suppress",
+    "backlog:preflight": "review-kit backlog preflight",
     "backlog:report": "review-kit backlog report",
     "backlog:validate": "review-kit backlog validate",
     "review:lenses": "review-kit review cycle lenses",
@@ -32,6 +33,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "review-kit": "github:ytaka-fort57/review-kit#v0.1.1"
+    "review-kit": "github:ytaka-fort57/review-kit#v0.3.0"
   }
 }
