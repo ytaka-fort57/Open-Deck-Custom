@@ -182,3 +182,25 @@ test("deck CSS is packaged and loaded as a web-accessible stylesheet", () => {
         assert.ok(webAccessibleResources(manifest).includes("deck.css"), `${manifestName}: missing deck.css`);
     }
 });
+
+// ホスト権限はDNR・webRequest・content script が使う X と、文章校正APIだけに限る。
+// 画像ダウンロードは content script から pbs.twimg.com を取るが、Xのオリジンが CORS で許可されているため権限は要らない。
+test("host permissions are limited to X and the text review API", () => {
+    const expected = ["https://*.twitter.com/*", "https://*.x.com/*", "https://opd.kwdev-sys.com/*"];
+    const chromium = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
+    const firefox = JSON.parse(readFileSync(join(root, "manifest_firefox.json"), "utf8"));
+    assert.deepEqual([...chromium.host_permissions].sort(), expected);
+    // Firefox (MV2) はホスト権限を permissions に並べる。
+    assert.deepEqual(firefox.permissions.filter((permission) => permission.includes("://")).sort(), expected);
+});
+
+// content script として読み込むファイルは、ページから参照させる必要がない。
+test("content script files are not web accessible", () => {
+    for (const manifestName of ["manifest.json", "manifest_firefox.json"]) {
+        const manifest = JSON.parse(readFileSync(join(root, manifestName), "utf8"));
+        const resources = new Set(webAccessibleResources(manifest));
+        for (const script of manifest.content_scripts[0].js) {
+            assert.ok(!resources.has(script), `${manifestName}: ${script} is web accessible`);
+        }
+    }
+});

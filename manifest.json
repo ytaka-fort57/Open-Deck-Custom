@@ -9,10 +9,9 @@
     "128" : "icon.png"
   },
   "host_permissions": [
-    "*://*.twitter.com/*",
-    "*://*.twimg.com/*",
-    "*://*.x.com/*",
-    "*://*.kwdev-sys.com/*"
+    "https://*.twitter.com/*",
+    "https://*.x.com/*",
+    "https://opd.kwdev-sys.com/*"
   ],
   "permissions" : ["storage","webRequest","declarativeNetRequest"],
   "background" : {"service_worker" : "background.js"},
@@ -29,7 +28,6 @@
     "extensions/text_review_helper.js",
     "extensions/auto_reload_helper.js",
     "extensions/media_viewer_block_helper.js",
-    "extensions/media_viewer/media_viewer.js",
     "icon.png", 
     "icon/logo_icon.svg",
     "profile_debug.html",
