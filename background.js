@@ -18,7 +18,9 @@ chrome.runtime.onMessage.addListener(
         if(request.message === "dnr_upd"){
             (async () => {
                 try {
-                    await update_dnr();
+                    //デッキ本体のページから来たときだけ、そのタブをカラム用ルールの対象にする
+                    const is_deck_tab = sender.tab != null && sender.frameId === 0 && is_deck_url(sender.url);
+                    await update_dnr(is_deck_tab ? sender.tab.id : undefined);
                     console.log("dnr_update_ok");
                     sendResponse(true);
                 } catch(e) {
@@ -137,37 +139,107 @@ const DNR_REMOVE_FRAME_HEADERS = {
     ]
 };
 
-function update_dnr(){
-    //CSPを外すのはデッキのカラムとデッキ本体のページだけにする。
-    //ただし x.com では X のサービスワーカー(sw.js)がカラムの iframe 遷移を中継するため、
-    //ネットワーク上の要求は sub_frame ではなく xmlhttprequest / other になる。
-    //sub_frame だけではカラムが X-Frame-Options で表示できないので、この2種も含める。
-    //(サービスワーカーを通る通常閲覧のページでもCSPが外れうる。BL-058)
-    const dnr_rules = [
+//デッキ本体のURL(extensions/custom/deck_url.js と同じく、サブドメイン・末尾スラッシュ1つ・クエリを許す)
+const DECK_URL_REGEX = "^https://([^/?#]+\\.)?(x|twitter)\\.com/run-opdeck/?(\\?.*)?$";
+const DNR_DECK_PAGE_RULE_ID = 2;
+const DNR_DECK_FRAME_RULE_ID = 10;
+const DNR_DECK_WORKER_RULE_ID = 11;
+//タブに属さない要求(サービスワーカーの fetch など)の tabId
+const TAB_ID_NONE = chrome.tabs?.TAB_ID_NONE ?? -1;
+
+function is_deck_url(url){
+    return typeof url === "string" && new RegExp(DECK_URL_REGEX, "i").test(url);
+}
+
+//CSPを外すのはデッキ本体のページと、デッキを開いているタブのカラムだけにする。
+//x.com では X のサービスワーカー(sw.js)がカラムの iframe 遷移を中継するため、
+//ネットワーク上の要求は sub_frame ではなく tabId のない xmlhttprequest / other になる。
+//タブでは絞れないので、この要求を対象にするルールはデッキのタブが開いている間だけ置く。
+//(その間はサービスワーカーを通る通常閲覧のページでもCSPが外れうる。BL-058)
+function update_dnr(deck_tab_id){
+    return run_dnr_task(async () => {
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            //1 は以前の版が置いていた、タブを問わないカラム用ルール
+            removeRuleIds: [1, DNR_DECK_PAGE_RULE_ID],
+            addRules: [{
+                id : DNR_DECK_PAGE_RULE_ID,
+                priority: 1,
+                action: DNR_REMOVE_FRAME_HEADERS,
+                condition : {
+                    regexFilter: DECK_URL_REGEX,
+                    resourceTypes: ["main_frame", "xmlhttprequest", "other"]
+                }
+            }],
+        });
+        const tab_ids = new Set(await get_deck_tab_ids());
+        if(Number.isInteger(deck_tab_id) && deck_tab_id >= 0){
+            tab_ids.add(deck_tab_id);
+        }
+        await set_deck_tab_ids([...tab_ids]);
+    });
+}
+
+function release_deck_tab(tab_id){
+    return run_dnr_task(async () => {
+        const tab_ids = await get_deck_tab_ids();
+        if(tab_ids.includes(tab_id)){
+            await set_deck_tab_ids(tab_ids.filter((id) => id !== tab_id));
+        }
+    });
+}
+
+//デッキのタブの一覧はセッションルール自体に持たせ、サービスワーカーが止まっても失わないようにする
+async function get_deck_tab_ids(){
+    const rules = await chrome.declarativeNetRequest.getSessionRules();
+    const rule = rules.find((rule) => rule.id === DNR_DECK_FRAME_RULE_ID);
+    return rule?.condition?.tabIds ?? [];
+}
+
+function set_deck_tab_ids(tab_ids){
+    const add_rules = tab_ids.length === 0 ? [] : [
         {
-            id : 1,
+            id : DNR_DECK_FRAME_RULE_ID,
             priority: 1,
             action: DNR_REMOVE_FRAME_HEADERS,
             condition : {
                 requestDomains: ["x.com", "twitter.com"],
                 initiatorDomains: [EXTENSION_DOMAIN, "x.com", "twitter.com"],
-                resourceTypes: ["sub_frame", "xmlhttprequest", "other"]
+                resourceTypes: ["sub_frame"],
+                tabIds: tab_ids
             }
         },
         {
-            id : 2,
+            id : DNR_DECK_WORKER_RULE_ID,
             priority: 1,
             action: DNR_REMOVE_FRAME_HEADERS,
             condition : {
-                //deck_url.js と同じく、サブドメイン・末尾スラッシュ1つ・クエリを許す
-                regexFilter: "^https://([^/?#]+\\.)?(x|twitter)\\.com/run-opdeck/?(\\?.*)?$",
-                resourceTypes: ["main_frame"]
+                requestDomains: ["x.com", "twitter.com"],
+                initiatorDomains: ["x.com", "twitter.com"],
+                resourceTypes: ["xmlhttprequest", "other"],
+                tabIds: [TAB_ID_NONE]
             }
         },
     ];
-
-    return chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: [1, 2],
-        addRules: dnr_rules,
+    return chrome.declarativeNetRequest.updateSessionRules({
+        removeRuleIds: [DNR_DECK_FRAME_RULE_ID, DNR_DECK_WORKER_RULE_ID],
+        addRules: add_rules,
     });
 }
+
+//読んでから書き戻すため、ルールの更新は1つずつ順に行う
+let dnr_task_queue = Promise.resolve();
+function run_dnr_task(task){
+    const result = dnr_task_queue.then(task);
+    dnr_task_queue = result.catch(() => {});
+    return result;
+}
+
+chrome.tabs?.onRemoved?.addListener((tab_id) => {
+    release_deck_tab(tab_id).catch((e) => console.error("dnr release failed->", e));
+});
+//デッキ以外へ移動したタブを外す。URLが読めないページ(他サイト)もデッキではない
+chrome.tabs?.onUpdated?.addListener((tab_id, change_info, tab) => {
+    if(change_info.status === "loading" && !is_deck_url(change_info.url ?? tab?.url)){
+        release_deck_tab(tab_id).catch((e) => console.error("dnr release failed->", e));
+    }
+});
