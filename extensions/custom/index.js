@@ -3,7 +3,7 @@
 (function(){
     //本家と同じく、デッキ本体のURLでのみ動かす
     //このスクリプトは各カラムのiframe(通常のx.comページ)にも読み込まれるため必須
-    if(location.href != "https://x.com/run-opdeck" && location.href != "https://twitter.com/run-opdeck"){
+    if(!window.opd_custom_deck_url.is_deck_url(location.href)){
         return;
     }
 

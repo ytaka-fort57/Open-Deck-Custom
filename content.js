@@ -96,7 +96,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
   });
 //
-if(location.href == "https://twitter.com/run-opdeck" || location.href == "https://x.com/run-opdeck"){
+if(window.opd_custom_deck_url.is_deck_url(location.href)){
     chrome.runtime.sendMessage({message: "dnr_upd"}).then((value)=>{
         init();
     });
