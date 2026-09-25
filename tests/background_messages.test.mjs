@@ -92,14 +92,16 @@ test("CSP removal is limited to deck columns and the deck page itself", async ()
     const { condition } = mainFrameRules[0];
     assert.deepEqual([...condition.resourceTypes], ["main_frame"]);
     const deckPage = new RegExp(condition.regexFilter);
-    for (const url of ["https://x.com/run-opdeck", "https://twitter.com/run-opdeck"]) {
+    for (const url of ["https://x.com/run-opdeck", "https://twitter.com/run-opdeck", "https://x.com/run-opdeck/", "https://x.com/run-opdeck?mx=1", "https://www.x.com/run-opdeck"]) {
         assert.ok(deckPage.test(url), url);
     }
-    for (const url of ["https://x.com/home", "https://x.com/run-opdeck/status/1", "https://x.com/run-opdeck?x=1", "https://x.com/user/run-opdeck", "https://evil.example/https://x.com/run-opdeck"]) {
+    for (const url of ["https://x.com/home", "https://x.com/run-opdeck/status/1", "https://x.com/run-opdeckx", "https://x.com/user/run-opdeck", "https://evil.example/https://x.com/run-opdeck", "https://evilx.com/run-opdeck", "http://x.com/run-opdeck"]) {
         assert.ok(!deckPage.test(url), url);
     }
 
+    //カラムは X のサービスワーカー経由で xmlhttprequest / other として取得される
     for (const rule of addRules.filter((rule) => rule !== mainFrameRules[0])) {
-        assert.deepEqual([...rule.condition.resourceTypes], ["sub_frame"]);
+        assert.deepEqual([...rule.condition.resourceTypes].sort(), ["other", "sub_frame", "xmlhttprequest"]);
+        assert.ok(!rule.condition.resourceTypes.includes("main_frame"));
     }
 });

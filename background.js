@@ -138,8 +138,11 @@ const DNR_REMOVE_FRAME_HEADERS = {
 };
 
 function update_dnr(){
-    //CSPを外すのはデッキのカラム(sub_frame)とデッキ本体のページだけにし、
-    //通常閲覧のx.comではX自身のCSPを残す
+    //CSPを外すのはデッキのカラムとデッキ本体のページだけにする。
+    //ただし x.com では X のサービスワーカー(sw.js)がカラムの iframe 遷移を中継するため、
+    //ネットワーク上の要求は sub_frame ではなく xmlhttprequest / other になる。
+    //sub_frame だけではカラムが X-Frame-Options で表示できないので、この2種も含める。
+    //(サービスワーカーを通る通常閲覧のページでもCSPが外れうる。BL-058)
     const dnr_rules = [
         {
             id : 1,
@@ -148,7 +151,7 @@ function update_dnr(){
             condition : {
                 requestDomains: ["x.com", "twitter.com"],
                 initiatorDomains: [EXTENSION_DOMAIN, "x.com", "twitter.com"],
-                resourceTypes: ["sub_frame"]
+                resourceTypes: ["sub_frame", "xmlhttprequest", "other"]
             }
         },
         {
@@ -156,7 +159,8 @@ function update_dnr(){
             priority: 1,
             action: DNR_REMOVE_FRAME_HEADERS,
             condition : {
-                regexFilter: "^https://(x|twitter)\\.com/run-opdeck$",
+                //deck_url.js と同じく、サブドメイン・末尾スラッシュ1つ・クエリを許す
+                regexFilter: "^https://([^/?#]+\\.)?(x|twitter)\\.com/run-opdeck/?(\\?.*)?$",
                 resourceTypes: ["main_frame"]
             }
         },
