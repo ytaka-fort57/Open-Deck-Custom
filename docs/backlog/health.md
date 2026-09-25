@@ -6,15 +6,13 @@
 
 ## 通知
 
-| 種別 | 対象 | 内容 |
-|---|---|---|
-| lens-failing | LENS-extension-contract | 3 サイクル連続で完了していない（RUN-2026-09-22-01, RUN-2026-09-22-02, RUN-2026-09-25-02） |
+該当なし
 
 ## 件数
 
-- 総数 73 / 未了 11（抑止中・実質終了を除く）
-- 優先度（未了）: P1 0 / P2 4 / P3 7
-- 状態: discovered 5 / triaged 9 / in-progress 0 / monitoring 0 / verified 56 / wont-fix 3
+- 総数 75 / 未了 13（抑止中・実質終了を除く）
+- 優先度（未了）: P1 0 / P2 5 / P3 8
+- 状態: discovered 7 / triaged 9 / in-progress 0 / monitoring 0 / verified 56 / wont-fix 3
 - 未了項目の滞留（updatedAt からの中央値）: 3 日
 
 ## 30 日以上動いていない P1
@@ -37,13 +35,15 @@
 | LENS-check-path | on-change | 2026-09-19 | 6 日 | 到来 | 1 | 0 |  |
 | LENS-check-evidence | weekly | 2026-09-25 | 0 日 | — | 1 | 0 |  |
 | LENS-test-quality | monthly | 2026-09-25 | 0 日 | — | 1 | 3 |  |
-| LENS-docs-drift | monthly | 未実行 | — | 到来 | 1 | 0 |  |
-| LENS-extension-contract | monthly | 未実行 | — | 到来 | 3 | 1 |  |
+| LENS-docs-drift | monthly | 2026-09-25 | 0 日 | — | 2 | 1 |  |
+| LENS-extension-contract | monthly | 2026-09-25 | 0 日 | — | 4 | 2 |  |
 
 ## 直近のサイクル
 
 | runId | レンズ | 開始 | 結果 | 走査 | 登録 | 再検出 |
 |---|---|---|---|---|---|---|
+| RUN-2026-09-25-06 | LENS-extension-contract | 2026-09-25 05:35 | ok | 68 | BL-075 | — |
+| RUN-2026-09-25-05 | LENS-docs-drift | 2026-09-25 05:35 | ok | 25 | BL-074 | — |
 | RUN-2026-09-25-04 | LENS-test-quality | 2026-09-25 04:43 | ok | 41 | BL-071 BL-072 BL-073 | — |
 | RUN-2026-09-25-03 | LENS-docs-drift | 2026-09-25 04:43 | failed | 25 | — | — |
 | RUN-2026-09-25-02 | LENS-extension-contract | 2026-09-25 04:43 | failed | 20 | — | — |
@@ -52,7 +52,6 @@
 | RUN-2026-09-22-01 | LENS-extension-contract | 2026-09-22 13:33 | failed | 65 | BL-044 | — |
 | RUN-2026-09-21-02 | LENS-check-docs-links | 2026-09-21 11:25 | empty | 4 | — | — |
 | RUN-2026-09-21-01 | LENS-check-docs-links | 2026-09-21 11:11 | ok | 29 | BL-034 BL-035 | — |
-| RUN-2026-09-19-01 | LENS-check-path | 2026-09-19 13:08 | empty | 30 | — | — |
 
 ## 自動修正
 
