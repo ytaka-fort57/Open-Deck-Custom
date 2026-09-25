@@ -2,18 +2,20 @@
 
 > `npm run review -- health` が生成。直接編集しない。
 
-生成日: 2026-09-23
+生成日: 2026-09-25
 
 ## 通知
 
-該当なし
+| 種別 | 対象 | 内容 |
+|---|---|---|
+| lens-failing | LENS-extension-contract | 3 サイクル連続で完了していない（RUN-2026-09-22-01, RUN-2026-09-22-02, RUN-2026-09-25-02） |
 
 ## 件数
 
-- 総数 70 / 未了 8（抑止中・実質終了を除く）
-- 優先度（未了）: P1 0 / P2 2 / P3 6
-- 状態: discovered 2 / triaged 9 / in-progress 0 / monitoring 0 / verified 56 / wont-fix 3
-- 未了項目の滞留（updatedAt からの中央値）: 1 日
+- 総数 73 / 未了 11（抑止中・実質終了を除く）
+- 優先度（未了）: P1 0 / P2 4 / P3 7
+- 状態: discovered 5 / triaged 9 / in-progress 0 / monitoring 0 / verified 56 / wont-fix 3
+- 未了項目の滞留（updatedAt からの中央値）: 3 日
 
 ## 30 日以上動いていない P1
 
@@ -31,17 +33,21 @@
 
 | ID | 周期 | 最終実行 | 経過 | 期限 | 実行回数 | 登録数 | 備考 |
 |---|---|---|---|---|---|---|---|
-| LENS-check-docs-links | weekly | 2026-09-21 | 2 日 | — | 2 | 2 |  |
-| LENS-check-path | on-change | 2026-09-19 | 4 日 | 到来 | 1 | 0 |  |
-| LENS-check-evidence | weekly | 未実行 | — | 到来 | 0 | 0 |  |
-| LENS-test-quality | monthly | 未実行 | — | 到来 | 0 | 0 |  |
-| LENS-docs-drift | monthly | 未実行 | — | 到来 | 0 | 0 |  |
-| LENS-extension-contract | monthly | 未実行 | — | 到来 | 2 | 1 |  |
+| LENS-check-docs-links | weekly | 2026-09-21 | 4 日 | — | 2 | 2 |  |
+| LENS-check-path | on-change | 2026-09-19 | 6 日 | 到来 | 1 | 0 |  |
+| LENS-check-evidence | weekly | 2026-09-25 | 0 日 | — | 1 | 0 |  |
+| LENS-test-quality | monthly | 2026-09-25 | 0 日 | — | 1 | 3 |  |
+| LENS-docs-drift | monthly | 未実行 | — | 到来 | 1 | 0 |  |
+| LENS-extension-contract | monthly | 未実行 | — | 到来 | 3 | 1 |  |
 
 ## 直近のサイクル
 
 | runId | レンズ | 開始 | 結果 | 走査 | 登録 | 再検出 |
 |---|---|---|---|---|---|---|
+| RUN-2026-09-25-04 | LENS-test-quality | 2026-09-25 04:43 | ok | 41 | BL-071 BL-072 BL-073 | — |
+| RUN-2026-09-25-03 | LENS-docs-drift | 2026-09-25 04:43 | failed | 25 | — | — |
+| RUN-2026-09-25-02 | LENS-extension-contract | 2026-09-25 04:43 | failed | 20 | — | — |
+| RUN-2026-09-25-01 | LENS-check-evidence | 2026-09-25 04:38 | empty | 1 | — | — |
 | RUN-2026-09-22-02 | LENS-extension-contract | 2026-09-22 13:34 | failed | 8 | — | — |
 | RUN-2026-09-22-01 | LENS-extension-contract | 2026-09-22 13:33 | failed | 65 | BL-044 | — |
 | RUN-2026-09-21-02 | LENS-check-docs-links | 2026-09-21 11:25 | empty | 4 | — | — |
