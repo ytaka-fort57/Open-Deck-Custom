@@ -7,7 +7,7 @@ const SCRIPT_PLACEHOLDER = /<!--opd-script:([a-z0-9._-]+)-->/g;
 const fixtureByPath = new Map([
     ["/run-opdeck", "run-opdeck.html"],
     ["/home", "home.html"],
-    ["/intent/tweet", "home.html"],
+    ["/intent/tweet", "post.html"],
     ["/notifications", "notifications.html"],
     ["/explore", "explore.html"],
     ["/i/lists/42", "list.html"],
@@ -38,6 +38,7 @@ export async function installXRoutes(context) {
     const pages = new Map();
     const navigationCounts = new Map();
     const blockedRequests = [];
+    const textReviewRequests = [];
     for (const [path, filename] of fixtureByPath) {
         pages.set(path, await readPage(filename));
     }
@@ -75,9 +76,37 @@ export async function installXRoutes(context) {
             });
             return;
         }
+        if (url.href === "https://opd.kwdev-sys.com/api/opd/text_review/review") {
+            const payload = request.postDataJSON();
+            textReviewRequests.push(payload);
+            if (payload?.text === "fixture failure") {
+                await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
+                return;
+            }
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json; charset=utf-8",
+                body: JSON.stringify({
+                    indications: [{
+                        offset: 1,
+                        length: 1,
+                        message: "replace b",
+                        relevant_part: { problem: "b", after: "" },
+                        params: { suggests: ["B"] },
+                    }, {
+                        offset: 2,
+                        length: 1,
+                        message: "replace c",
+                        relevant_part: { problem: "c", after: "" },
+                        params: { suggests: ["C"] },
+                    }],
+                }),
+            });
+            return;
+        }
         blockedRequests.push(request.url());
         await route.abort("blockedbyclient");
     });
 
-    return { navigationCounts, blockedRequests };
+    return { navigationCounts, blockedRequests, textReviewRequests };
 }

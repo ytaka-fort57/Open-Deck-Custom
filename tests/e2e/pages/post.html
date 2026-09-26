@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Post</title>
+<style>
+[data-testid="progressBar-bar"] { background-color: rgb(29, 155, 240); }
+</style>
+</head>
+<body>
+<div id="react-root">
+  <main data-testid="primaryColumn">
+    <div tabindex="0" aria-label="Post">
+      <div data-testid="progressBar-bar"></div>
+      <div id="opd_fixture_editor" contenteditable="true" data-testid="tweetTextarea_0"></div>
+      <div data-testid="toolBar"></div>
+    </div>
+  </main>
+</div>
+<script>
+const editor = document.getElementById("opd_fixture_editor");
+editor.__reactProps$fixture = {
+    children: {
+        props: {
+            editor: {
+                _onPaste(event) {
+                    editor.textContent = event.clipboardData.getData("text/plain");
+                    editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+                },
+            },
+        },
+    },
+};
+</script>
+</body>
+</html>
