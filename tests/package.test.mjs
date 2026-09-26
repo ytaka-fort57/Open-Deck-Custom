@@ -12,6 +12,7 @@ import {
   collectEntries,
   compareEntries,
   createZip,
+  manifestReferences,
   readVersion,
   readZip,
   zipName
@@ -118,6 +119,55 @@ test("manifestが入れ替わっていないZIPは検証に失敗する", () => 
   writeFileSync(join(outDir, zipName(firefox, version)), createZip(collectEntries(chromium)));
   await assert.rejects(checkPackages({ outDir }), /Open-Deck_firefox_.*契約を満たしません[\s\S]*manifest_version/);
 }));
+
+test("manifestが参照するファイルを同梱していないZIPは両ターゲットで検証に失敗する", () => withOutDir(async (outDir) => {
+  const version = readVersion();
+  assert.equal(PACKAGE_ENTRIES.includes("outside"), false);
+
+  for (const target of TARGETS) {
+    await buildPackages({ outDir });
+    const file = join(outDir, zipName(target, version));
+    const entries = readZip(readFileSync(file));
+    const manifestEntry = entries.find((entry) => entry.name === "manifest.json");
+    const manifest = JSON.parse(manifestEntry.data.toString("utf8"));
+    manifest.content_scripts[0].js.push("outside/options_page.js");
+    const missingReference = entries.map((entry) => entry === manifestEntry
+      ? { ...entry, data: Buffer.from(JSON.stringify(manifest)) }
+      : entry);
+    writeFileSync(file, createZip(missingReference));
+
+    await assert.rejects(
+      checkPackages({ outDir }),
+      /manifest\.json の参照先がありません: outside\/options_page\.js/
+    );
+  }
+}));
+
+test("manifestのパッケージ内参照をMV2・MV3の各形式から列挙する", () => {
+  assert.deepEqual(manifestReferences({
+    icons: { 16: "/root-icon.png" },
+    background: { service_worker: "worker.js", scripts: ["background-a.js"] },
+    action: { default_popup: "popup.html", default_icon: { 32: "action-32.png" } },
+    browser_action: { default_popup: "browser-popup.html", default_icon: "browser-icon.png" },
+    content_scripts: [{ js: ["content.js"], css: ["content.css"] }],
+    web_accessible_resources: [
+      "mv2-resource.js",
+      { resources: ["mv3-resource.js"] }
+    ]
+  }), [
+    "root-icon.png",
+    "worker.js",
+    "background-a.js",
+    "popup.html",
+    "action-32.png",
+    "browser-popup.html",
+    "browser-icon.png",
+    "content.js",
+    "content.css",
+    "mv2-resource.js",
+    "mv3-resource.js"
+  ]);
+});
 
 test("許可リスト外・必須ファイル欠落・manifest重複を契約違反として返す", () => {
   const base = collectEntries(chromium);

@@ -192,6 +192,36 @@ export function readZip(buffer) {
   return entries;
 }
 
+// manifest が拡張機能パッケージ内のファイルとして参照するパスを列挙する。
+// MV2 / MV3 と default_icon の文字列 / サイズ別オブジェクトの差をここで吸収する。
+export function manifestReferences(manifest) {
+  const references = [];
+  const add = (value) => {
+    if (typeof value === "string" && value.length > 0) references.push(value.replace(/^\/+/, ""));
+  };
+  const addIcons = (value) => {
+    if (typeof value === "string") add(value);
+    else if (value && typeof value === "object") Object.values(value).forEach(add);
+  };
+
+  addIcons(manifest.icons);
+  add(manifest.background?.service_worker);
+  (manifest.background?.scripts ?? []).forEach(add);
+  for (const action of [manifest.action, manifest.browser_action]) {
+    add(action?.default_popup);
+    addIcons(action?.default_icon);
+  }
+  for (const contentScript of manifest.content_scripts ?? []) {
+    (contentScript.js ?? []).forEach(add);
+    (contentScript.css ?? []).forEach(add);
+  }
+  for (const resource of manifest.web_accessible_resources ?? []) {
+    if (typeof resource === "string") add(resource);
+    else (resource?.resources ?? []).forEach(add);
+  }
+  return [...new Set(references)];
+}
+
 // ZIPの中身がターゲットの契約を満たすかを検査し、違反を配列で返す。
 export function checkEntries(target, entries) {
   const errors = [];
@@ -227,6 +257,10 @@ export function checkEntries(target, entries) {
   }
   for (const key of target.forbiddenKeys) {
     if (key in manifest) errors.push(`manifest.json に別ターゲットの ${key} があります`);
+  }
+  const packagedNames = new Set(names);
+  for (const reference of manifestReferences(manifest)) {
+    if (!packagedNames.has(reference)) errors.push(`manifest.json の参照先がありません: ${reference}`);
   }
   return errors;
 }
