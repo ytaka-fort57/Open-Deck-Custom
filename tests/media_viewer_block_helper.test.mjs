@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 function loadHelper(){
     let click_listener = null;
+    let init_listener = null;
     const dispatched = [];
     const parent_document = {
         dispatchEvent: (event) => dispatched.push(JSON.parse(event.detail)),
@@ -14,6 +15,8 @@ function loadHelper(){
             addEventListener: (type, listener) => {
                 if(type === "click"){
                     click_listener = listener;
+                }else if(type === "opd_send_media_info_init"){
+                    init_listener = listener;
                 }
             },
         },
@@ -27,7 +30,7 @@ function loadHelper(){
     };
     vm.createContext(context);
     vm.runInContext(readFileSync("extensions/media_viewer_block_helper.js", "utf8"), context);
-    return { click_listener, dispatched };
+    return { click_listener, init_listener, dispatched };
 }
 
 function eventFor(path){
@@ -111,6 +114,48 @@ function quotedMediaEvent({ compact = false } = {}){
     };
 }
 
+function directMediaEvent({ altKey = false, legacy = false, matching = true } = {}){
+    const media = [
+        { media_url_https: "https://x.com/direct-first.jpg" },
+        { media_url_https: "https://x.com/direct-current.jpg" },
+    ];
+    const root_props = react_props({
+        children: [
+            null,
+            legacy ? null : { props: { children: [{ props: { mediaDetails: media } }] } },
+            legacy ? { props: { tweet: { extended_entities: { media } } } } : null,
+        ],
+    });
+    let stopped = false;
+    let link_clicked = false;
+    const link = { click: () => { link_clicked = true; } };
+    const cell = {};
+    const image = {
+        src: matching ? "https://x.com/direct-current?format=jpg" : "https://x.com/not-in-media.jpg",
+        getAttribute: () => null,
+        querySelector: () => null,
+        closest: (selector) => {
+            if(selector === 'div[tabindex="0"][role="link"]') return null;
+            if(selector === 'img, div[data-testid="videoComponent"]') return image;
+            if(selector === 'div[aria-labelledby][id]') return root_props;
+            if(selector === 'div[data-testid="cellInnerDiv"]') return cell;
+            if(selector === 'a[href]') return link;
+            return null;
+        },
+    };
+    return {
+        altKey,
+        target: image,
+        composedPath: () => [image],
+        preventDefault: () => { stopped = true; },
+        stopPropagation: () => { stopped = true; },
+        stopImmediatePropagation: () => { stopped = true; },
+        wasStopped: () => stopped,
+        wasLinkClicked: () => link_clicked,
+        media,
+    };
+}
+
 test("video playback clicks are left to X instead of opening the media viewer", () => {
     const { click_listener } = loadHelper();
     const video_event = eventFor([{ tagName: "VIDEO" }]);
@@ -142,4 +187,39 @@ test("quoted media is found when a compact column changes the React children lay
     assert.equal(dispatched.length, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(dispatched[0].media_info)), event.quoted_media);
     assert.equal(dispatched[0].selected_index, 1);
+});
+
+test("direct post media and the initialized token are sent with the selected index", () => {
+    const { click_listener, init_listener, dispatched } = loadHelper();
+    const event = directMediaEvent();
+
+    init_listener({ detail: JSON.stringify({ token: "viewer-token" }) });
+    click_listener(event);
+
+    assert.equal(dispatched.length, 1);
+    assert.equal(dispatched[0].token, "viewer-token");
+    assert.deepEqual(JSON.parse(JSON.stringify(dispatched[0].media_info)), event.media);
+    assert.equal(dispatched[0].selected_index, 1);
+});
+
+test("direct post media falls back to extended_entities and index zero when the URL does not match", () => {
+    const { click_listener, dispatched } = loadHelper();
+    const event = directMediaEvent({ legacy: true, matching: false });
+
+    click_listener(event);
+
+    assert.equal(dispatched.length, 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(dispatched[0].media_info)), event.media);
+    assert.equal(dispatched[0].selected_index, 0);
+});
+
+test("Alt-click leaves media viewer dispatch disabled and follows the media link", () => {
+    const { click_listener, dispatched } = loadHelper();
+    const event = directMediaEvent({ altKey: true });
+
+    click_listener(event);
+
+    assert.equal(dispatched.length, 0);
+    assert.equal(event.wasStopped(), true);
+    assert.equal(event.wasLinkClicked(), true);
 });

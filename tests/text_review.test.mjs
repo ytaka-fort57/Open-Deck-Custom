@@ -105,8 +105,15 @@ test("preview model and selected application are DOM-free", () => {
 });
 
 test("review UI keeps selection and apply communication wired to the pure model", async () => {
-    const { review } = createReview(async () => false);
-    review.CreateRandomID = () => "fixed";
+    const { review, document } = createReview(async () => false);
+    review.Init(
+        { contentWindow: { document, location: { pathname: "/" } } },
+        { text_review: "text.svg", hashtag_restore: "tag.svg" },
+        "ja"
+    );
+    assert.equal(review.opd_text_review_token, "token");
+    let nextId = 0;
+    review.CreateRandomID = () => `fixed${++nextId}`;
     review.ReviewRquest = async () => ({
         indications: [{
             offset: 1,
@@ -114,15 +121,24 @@ test("review UI keeps selection and apply communication wired to the pure model"
             message: "replace",
             relevant_part: { problem: "b", after: "" },
             params: { suggests: ["B"] },
+        }, {
+            offset: 2,
+            length: 1,
+            message: "replace",
+            relevant_part: { problem: "c", after: "" },
+            params: { suggests: ["C"] },
         }],
     });
 
     const listeners = new Map();
-    const checkbox = {
+    const checkboxes = new Map(["fixed1", "fixed2"].map(id => [id, {
         checked: false,
-        addEventListener(type, callback) { listeners.set(`checkbox:${type}`, callback); },
-        click() {},
-    };
+        addEventListener(type, callback) { listeners.set(`${id}:${type}`, callback); },
+        click() {
+            this.checked = !this.checked;
+            listeners.get(`${id}:change`)({ target: this });
+        },
+    }]));
     const problem = {
         scrollIntoView() {},
         setAttribute() {},
@@ -131,14 +147,15 @@ test("review UI keeps selection and apply communication wired to the pure model"
     const selectedButton = {
         addEventListener(type, callback) { listeners.set(`selected:${type}`, callback); },
     };
-    const allButton = { addEventListener() {} };
+    const allButton = { addEventListener(type, callback) { listeners.set(`all:${type}`, callback); } };
     const panel = {
         textContent: "",
         html: "",
         insertAdjacentHTML(position, html) { this.html += html; },
         querySelector(selector) {
-            if(selector === "#opd_text_review_iid_fixed") return checkbox;
-            if(selector === "#opd_text_review_problem_id_fixed") return problem;
+            const checkboxId = /^#opd_text_review_iid_(fixed[12])$/.exec(selector)?.[1];
+            if(checkboxId) return checkboxes.get(checkboxId);
+            if(/^#opd_text_review_problem_id_fixed[12]$/.test(selector)) return problem;
             if(selector === "#opd_text_review_apply_selected") return selectedButton;
             if(selector === "#opd_text_review_apply_all") return allButton;
             return null;
@@ -148,15 +165,23 @@ test("review UI keeps selection and apply communication wired to the pure model"
     const columnWindow = { document: { dispatchEvent(event) { dispatched.push(event); } } };
 
     await review.Review("abc", panel, columnWindow);
-    assert.match(panel.html, /opd_text_review_problem_id_fixed/);
-    checkbox.checked = true;
-    listeners.get("checkbox:change")({ target: checkbox });
+    assert.match(panel.html, /opd_text_review_problem_id_fixed1/);
+    checkboxes.get("fixed1").click();
     listeners.get("selected:click")({});
     assert.equal(dispatched.length, 1);
     assert.equal(dispatched[0].type, "opd_text_review_apply");
     assert.deepEqual(JSON.parse(dispatched[0].detail), {
         text: "aBc",
-        token: null,
+        token: "token",
+        is_firefox: false,
+    });
+    listeners.get("all:click")({});
+    assert.equal(dispatched.length, 2);
+    assert.equal(checkboxes.get("fixed1").checked, true);
+    assert.equal(checkboxes.get("fixed2").checked, true);
+    assert.deepEqual(JSON.parse(dispatched[1].detail), {
+        text: "aBC",
+        token: "token",
         is_firefox: false,
     });
 });
