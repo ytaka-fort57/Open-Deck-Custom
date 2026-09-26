@@ -1,6 +1,6 @@
 # Open-Deck Custom 検証手順
 
-更新日: 2026-09-22
+更新日: 2026-09-26
 
 本家更新の移植、リファクタ、不具合修正後は、手作業の確認前に共通回帰テストを実行する。
 
@@ -12,11 +12,17 @@ JSON・参照ファイル・許可リストの自動検査だけは、配布定�
 
 ## 高速なコード回帰
 
-Node.jsの標準機能だけを使用する。npm installは不要。
+Node.js 20以上と、private repositoryの`review-kit`を取得できるGitHub認証が必要。
+新しいcloneでは、先にlockfileどおりの依存を取得する。
 
 ```powershell
+npm ci
 node tests/run.mjs
 ```
+
+`node tests/run.mjs`には`review-kit`を使う台帳・生成スキルの契約テストが含まれるため、
+`node_modules`がない状態では成功しない。GitHub Actionsでは`REVIEW_KIT_TOKEN` secretを使い、
+ローカルでは`ytaka-fort57/review-kit`を取得できる既存のGitHub HTTPSまたはSSH認証を使う。
 
 確認内容:
 
@@ -143,14 +149,17 @@ ZIP名は`Open-Deck_chromium_<version>.zip` / `Open-Deck_firefox_<version>.zip`�
 
 ## Linux / GitHub Actionsでの必須検証
 
-Node.jsだけが必要。ZIPはzlibで書き出すため、`zip` / `unzip`コマンドには依存しない。
+Node.js 20以上、npm、private repositoryの`review-kit`を取得できるGitHub認証が必要。
+ZIPはzlibで書き出すため、`zip` / `unzip`コマンドには依存しない。
 
 ```bash
+npm ci
 chmod +x package.sh verify.sh
 ./verify.sh
 ```
 
-Release workflowも同じ`verify.sh`を実行するため、ローカルとCIで検証条件が分岐しない。
+Release workflowも`REVIEW_KIT_TOKEN`で`npm ci`を実行してから同じ`verify.sh`を実行するため、
+ローカルとCIで検証条件が分岐しない。
 
 ## 実ブラウザーで残る確認
 
