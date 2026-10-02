@@ -6,6 +6,7 @@ window.opd_custom_list_repost_filter = (function(){
     const FRAME_ATTR = "opd_custom_list_repost_filter_attached";
     const RESOURCE_KEY = "list-repost-filter";
     const column_dom = window.opd_custom_column_dom;
+    const load_nudge = window.opd_custom_timeline_load_nudge;
     const profile_key_from_href = window.opd_custom_x_profile_url.profile_key_from_href;
     const LIST_PATH_RE = /^\/i\/lists\/[^/]+\/?$/i;
     const HOME_NON_LIST_TAB_LABELS = new Set([
@@ -251,7 +252,7 @@ window.opd_custom_list_repost_filter = (function(){
 
     function apply_filter(doc, options = {}){
         if(typeof doc?.querySelectorAll !== "function"){
-            return;
+            return [];
         }
         ensure_style(doc);
         clear_hidden(doc);
@@ -259,18 +260,25 @@ window.opd_custom_list_repost_filter = (function(){
         const include_reply_filter = options.include_reply_filter !== false;
         const profile_key = include_reply_filter ? current_profile_key(doc) : null;
         const articles = doc.querySelectorAll('article[data-testid="tweet"]');
+        const targets = [];
         articles.forEach(function(article){
             if(include_existing_filters && (is_same_author_repost(article) || has_paid_partnership(article))){
-                get_hide_target(article).classList.add(HIDDEN_CLASS);
+                const target = get_hide_target(article);
+                target.classList.add(HIDDEN_CLASS);
+                targets.push(target);
             }
             if(include_reply_filter && profile_key != null && is_reply_to_current_user(article, profile_key)){
-                get_hide_target(article).classList.add(HIDDEN_REPLY_CLASS);
+                const target = get_hide_target(article);
+                target.classList.add(HIDDEN_REPLY_CLASS);
+                targets.push(target);
             }
         });
+        return targets;
     }
 
     function dispose_state(state){
         state.observer?.disconnect();
+        load_nudge.cancel(state.doc);
         watched_states.delete(state);
         if(state.refresh_timer != null){
             clearTimeout(state.refresh_timer);
@@ -317,10 +325,10 @@ window.opd_custom_list_repost_filter = (function(){
             const include_existing_filters = is_list_path(state.path) || is_home_list_tab(doc);
             const include_reply_filter = should_apply_reply_filter(column_type, state.path, doc);
             if(include_existing_filters || include_reply_filter){
-                apply_filter(doc, {
+                load_nudge.request(doc, apply_filter(doc, {
                     include_existing_filters,
                     include_reply_filter,
-                });
+                }));
             }else{
                 clear_hidden(doc);
             }

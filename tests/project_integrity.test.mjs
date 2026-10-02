@@ -90,6 +90,12 @@ test("manifests and locale files are valid and complete", () => {
         assert.ok(scripts.indexOf("extensions/custom/text_review_model.js") < scripts.indexOf("extensions/text_review.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_dom.js") < scripts.indexOf("extensions/custom/column_frame_css.js"));
         assert.ok(scripts.indexOf("extensions/custom/column_frame_css.js") < scripts.indexOf("content.js"));
+        assert.ok(
+            scripts.indexOf("extensions/custom/timeline_load_nudge.js") >= 0
+            && scripts.indexOf("extensions/custom/timeline_load_nudge.js") < scripts.indexOf("extensions/custom/list_repost_filter.js")
+            && scripts.indexOf("extensions/custom/timeline_load_nudge.js") < scripts.indexOf("extensions/custom/short_post_filter.js"),
+            `${manifestName}: timeline_load_nudge.js must load before the feed filters`
+        );
         //lifecycle は3モジュールの合成点なので、合成される側が先に読み込まれていなければ undefined を参照する
         for (const source of [
             "extensions/custom/column_resource_registry.js",

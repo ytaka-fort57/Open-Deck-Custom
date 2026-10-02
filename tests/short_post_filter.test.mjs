@@ -110,6 +110,7 @@ test("the DOM filter hides only the repeated post after the second observation",
     const second = article({ body: "続きはこちら 200", postId: "2" });
     const result = filter.apply_filter(documentFor([first, second]), { now: 1000 });
     assert.equal(result.hidden, 1);
+    assert.equal(result.targets.length, 1);
     assert.equal(first.classList.contains("opd_custom_short_post_filter_hidden"), false);
     assert.equal(second.classList.contains("opd_custom_short_post_filter_hidden"), true);
 });
@@ -167,6 +168,7 @@ test("multiple frames share one path timer and release it after disposal", () =>
     vm.createContext(context);
     vm.runInContext(readFileSync("extensions/custom/column_dom.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
+    vm.runInContext(readFileSync("extensions/custom/timeline_load_nudge.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/short_post_filter.js", "utf8"), context);
 
     const disposers = new Map();
@@ -213,4 +215,58 @@ test("multiple frames share one path timer and release it after disposal", () =>
     disposers.get(frames[1])();
     intervals[0]();
     assert.deepEqual(cleared, [1]);
+});
+
+test("hiding a post on an active timeline asks for another page load", () => {
+    const requests = [];
+    const context = {
+        URL,
+        console: { warn() {} },
+        setInterval: () => 1,
+        clearInterval() {},
+        setTimeout: () => 1,
+        clearTimeout() {},
+        MutationObserver: class {
+            observe() {}
+            disconnect() {}
+        },
+    };
+    context.window = {
+        opd_custom_column_dom: { is_frame_loaded: () => true },
+        opd_custom_timeline_load_nudge: {
+            request(doc, targets) {
+                requests.push({ doc, targets });
+                return true;
+            },
+            cancel() {},
+        },
+    };
+    vm.createContext(context);
+    vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
+    vm.runInContext(readFileSync("extensions/custom/short_post_filter.js", "utf8"), context);
+
+    const post = article({
+        body: "続きはこちら ↓",
+        links: [link("https://t.co/abc", { title: "https://example.com/long" })],
+        postId: "9",
+    });
+    const doc = documentFor([post]);
+    const attributes = new Set();
+    const iframe = {
+        contentDocument: doc,
+        contentWindow: { location: { href: "https://x.com/home" } },
+        getAttribute: (name) => attributes.has(name) ? "true" : null,
+        setAttribute: (name) => attributes.add(name),
+        addEventListener() {},
+    };
+    context.window.opd_custom_short_post_filter.setup({
+        querySelectorAll: () => [{ querySelector: () => iframe }],
+    }, {
+        register_column_resource() {},
+    });
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].doc, doc);
+    assert.equal(requests[0].targets.length, 1);
+    assert.equal(post.classList.contains("opd_custom_short_post_filter_hidden"), true);
 });

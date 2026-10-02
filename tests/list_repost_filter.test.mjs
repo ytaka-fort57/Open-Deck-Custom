@@ -168,6 +168,25 @@ test("reply handle fallback is fail-open when the target link is unavailable", (
     ), false);
 });
 
+test("apply_filter returns the cells it hides", () => {
+    const filter = loadFilter();
+    const classes = new Set();
+    const post = article({ textContent: "有料パートナーシップ" });
+    post.classList = {
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name),
+        contains: (name) => classes.has(name),
+    };
+    const doc = {
+        head: { querySelector: () => null, appendChild() {} },
+        createElement: () => ({ setAttribute() {}, textContent: "" }),
+        querySelectorAll: (selector) => selector === 'article[data-testid="tweet"]' ? [post] : [],
+    };
+    const targets = filter.apply_filter(doc, { include_reply_filter: false });
+    assert.equal(targets.length, 1);
+    assert.equal(classes.has("opd_custom_same_author_repost"), true);
+});
+
 test("paid partnership posts are classified independently of repost metadata", () => {
     const filter = loadFilter();
     assert.equal(filter.has_paid_partnership(article({ textContent: "有料パートナーシップ" })), true);
@@ -201,6 +220,7 @@ function loadFilterWithTimers(){
     context.window = { opd_custom_column_dom: { is_frame_loaded: () => true } };
     vm.createContext(context);
     vm.runInContext(readFileSync("extensions/custom/x_profile_url.js", "utf8"), context);
+    vm.runInContext(readFileSync("extensions/custom/timeline_load_nudge.js", "utf8"), context);
     vm.runInContext(readFileSync("extensions/custom/list_repost_filter.js", "utf8"), context);
     return {
         filter: context.window.opd_custom_list_repost_filter,

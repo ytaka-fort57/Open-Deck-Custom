@@ -5,6 +5,7 @@ window.opd_custom_short_post_filter = (function(){
     const FRAME_ATTR = "opd_custom_short_post_filter_attached";
     const RESOURCE_KEY = "short-post-filter";
     const column_dom = window.opd_custom_column_dom;
+    const load_nudge = window.opd_custom_timeline_load_nudge;
     const profile_key_from_href = window.opd_custom_x_profile_url.profile_key_from_href;
     const PATH_INTERVAL_MS = 1000;
     const SHORT_TEXT_MAX = 30;
@@ -312,7 +313,7 @@ window.opd_custom_short_post_filter = (function(){
 
     function apply_filter(doc, options = {}){
         if(typeof doc?.querySelectorAll !== "function"){
-            return { hidden: 0, entries: [] };
+            return { hidden: 0, entries: [], targets: [] };
         }
         const config = Object.assign({}, DEFAULT_CONFIG, options.config ?? {});
         const now = Number.isFinite(options.now) ? options.now : Date.now();
@@ -324,19 +325,21 @@ window.opd_custom_short_post_filter = (function(){
         entries.forEach(function(features){
             features.repeated = record_repeat(features, now, config);
         });
-        let hidden = 0;
+        const targets = [];
         entries.forEach(function(features){
             if(!should_hide(features, config)){
                 return;
             }
-            get_hide_target(features.article).classList.add(HIDDEN_CLASS);
-            hidden += 1;
+            const target = get_hide_target(features.article);
+            target.classList.add(HIDDEN_CLASS);
+            targets.push(target);
         });
-        return { hidden, entries };
+        return { hidden: targets.length, entries, targets };
     }
 
     function dispose_state(state){
         state.observer?.disconnect();
+        load_nudge.cancel(state.doc);
         watched_states.delete(state);
         if(state.refresh_timer != null){
             clearTimeout(state.refresh_timer);
@@ -386,7 +389,7 @@ window.opd_custom_short_post_filter = (function(){
         state.refresh = function(){
             state.path = get_document_path(iframe);
             if(should_apply_path(state.path)){
-                apply_filter(doc);
+                load_nudge.request(doc, apply_filter(doc).targets);
             }else{
                 clear_hidden(doc);
             }
