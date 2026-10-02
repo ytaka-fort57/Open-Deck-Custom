@@ -1,6 +1,6 @@
 # Open-Deck Custom 検証手順
 
-更新日: 2026-09-26
+更新日: 2026-10-03
 
 本家更新の移植、リファクタ、不具合修正後は、手作業の確認前に共通回帰テストを実行する。
 
@@ -130,6 +130,7 @@ joint session historyを1つ戻す。戻る対象は「押したカラム」で�
 ## Windowsでの必須検証
 
 回帰テストに加え、Chromium / Firefox ZIPを作成して許可リストを検査する。
+`.\verify.ps1` は先頭で `node tests/run.mjs` を実行する。新しいcloneでは、先に「高速なコード回帰」の `npm ci` を済ませる。
 
 ```powershell
 .\verify.ps1
