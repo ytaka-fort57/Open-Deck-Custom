@@ -114,8 +114,32 @@ test("manifests and locale files are valid and complete", () => {
     assert.match(upstreamBase, /^[0-9a-f]{40}$/);
     const upstreamWorkflow = readFileSync(join(root, ".github/workflows/sync-upstream.yml"), "utf8");
     assert.match(upstreamWorkflow, /issues: write/);
-    assert.match(upstreamWorkflow, /gh issue (create|edit)/);
+    assert.match(upstreamWorkflow, /repos\/\$\{GITHUB_REPOSITORY\}\/issues/);
+    assert.doesNotMatch(upstreamWorkflow, /\bgh issue (?:create|edit)\b/);
     assert.doesNotMatch(upstreamWorkflow, /\bgit merge(?:\s|$)|\bgit push(?:\s|$)|\bgh pr(?:\s|$)/m);
+});
+
+test("pull requests run the Windows package check and every action is pinned", () => {
+    const workflowDir = join(root, ".github/workflows");
+    const workflows = readdirSync(workflowDir).filter((name) => name.endsWith(".yml") || name.endsWith(".yaml"));
+    assert.ok(workflows.length >= 5);
+    for (const name of workflows) {
+        const source = readFileSync(join(workflowDir, name), "utf8");
+        const uses = [...source.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)].map((match) => match[1]);
+        assert.ok(uses.length > 0, `${name}: no actions`);
+        for (const action of uses) {
+            assert.match(action, /@[0-9a-f]{40}$/, `${name}: ${action}`);
+        }
+    }
+
+    const e2e = readFileSync(join(workflowDir, "e2e.yml"), "utf8");
+    const windowsJob = e2e.split(/\n {2}e2e:/)[0];
+    assert.match(windowsJob, /windows-unit-package:/);
+    assert.match(windowsJob, /if: github\.event_name == 'pull_request'/);
+    assert.match(windowsJob, /runs-on: windows-latest/);
+    assert.match(windowsJob, /node tests\/run\.mjs/);
+    assert.match(windowsJob, /node scripts\/package\.mjs build/);
+    assert.match(windowsJob, /node scripts\/package\.mjs check/);
 });
 
 test("content.js column templates take their labels from _locales", () => {

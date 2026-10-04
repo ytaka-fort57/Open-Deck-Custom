@@ -99,17 +99,19 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Issue の作成は GraphQL の createIssue を使わない。
+          # この公開フォークではジョブに Issues: write があってもその mutation が拒否される。
           title="chore: upstream Release の変更をレビュー"
-          existing="$(gh issue list \
-            --state open \
-            --search "$title in:title" \
-            --json number,title \
-            --jq '.[] | select(.title == "chore: upstream Release の変更をレビュー") | .number' \
-            | head -n 1)"
+          query="repo:${GITHUB_REPOSITORY} is:issue is:open in:title ${title}"
+          existing="$(gh api --method GET search/issues -f q="$query" \
+            --jq '.items[] | [.number, .title] | @tsv' \
+            | awk -F '\t' -v title="$title" '$2 == title { print $1; exit }')"
 
+          payload="$RUNNER_TEMP/upstream-issue.json"
+          jq -n --rawfile body "$REPORT_PATH" --arg title "$title" '{title:$title, body:$body}' > "$payload"
           if [ -z "$existing" ]; then
-            gh issue create --title "$title" --body-file "$REPORT_PATH"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues" --input "$payload" --jq .html_url
           else
-            gh issue edit "$existing" --body-file "$REPORT_PATH"
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${existing}" --input "$payload" --jq .html_url
             echo "既存のレビューIssue #$existing を更新しました"
           fi
