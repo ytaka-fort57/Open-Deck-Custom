@@ -42,10 +42,15 @@ window.opd_custom_settings_codec = (function(){
         if(column.tw_view_mode != null && !["0", "1", "2"].includes(String(column.tw_view_mode))){
             return false;
         }
-        for(const string_field of ["column_save_path", "column_save_title", "column_pinned_path", migration.UID_FIELD]){
+        for(const string_field of ["column_save_path", "column_save_title", "column_pinned_path"]){
             if(column[string_field] != null && !safe_values.is_safe_text(column[string_field], 2048)){
                 return false;
             }
+        }
+        //IDはタブ保存の鍵に入るため、鍵に使える文字だけを受け付ける。空はIDの未発行として扱う
+        const uid = column[migration.UID_FIELD];
+        if(uid != null && uid !== "" && !migration.is_valid_uid(uid)){
+            return false;
         }
         if(column.column_save_path && !safe_values.is_safe_x_path(column.column_save_path)){
             return false;
@@ -142,7 +147,28 @@ window.opd_custom_settings_codec = (function(){
             return false;
         }
         return Object.keys(tabs).every(function(key){
-            return /^\d+:[0-9A-Za-z_-]+$/.test(key) && typeof tabs[key] === "string";
+            const parts = /^(\d+):(.*)$/.exec(key);
+            return parts != null && migration.is_valid_uid(parts[2]) && typeof tabs[key] === "string";
+        });
+    }
+
+    //version 2 はIDの再発行(移行)を通らないため、同じプロファイル内でIDが重なると
+    //複数のカラムが1つのタブ保存の鍵を共有する。どれのタブなのか決められないので受け付けない。
+    //version 1 は移行が重複を振り直し、鍵も表示位置から引き直すため対象にしない
+    function has_unique_uids(profile_store){
+        return profile_store.every(function(profile){
+            const used = new Set();
+            return profile.profile.every(function(column){
+                const uid = column[migration.UID_FIELD];
+                if(uid == null || uid === ""){
+                    return true;
+                }
+                if(used.has(uid)){
+                    return false;
+                }
+                used.add(uid);
+                return true;
+            });
         });
     }
 
@@ -205,6 +231,9 @@ window.opd_custom_settings_codec = (function(){
         }
         if(!validate_column_state(normalized.column_state)){
             throw new Error("カラムごとのタブ状態の形式が不正です");
+        }
+        if(migration.is_migrated(normalized.column_state) && !has_unique_uids(normalized.profile_store)){
+            throw new Error("同じプロファイル内でカラムIDが重複しています");
         }
         //version 1 のファイルは読み込み時にID鍵へ移す。移行はデッキ側と同じ変換を通す
         const migrated = migration.migrate(

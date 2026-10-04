@@ -16,9 +16,16 @@ window.opd_custom_column_state_migration = (function(){
     const TAB_COLUMN_TYPE = "home";
     //発行したIDが既存と衝突したときの再試行回数。生成器が壊れていても止まらないようにする
     const ISSUE_ATTEMPTS = 20;
+    //IDはタブ保存の鍵 profile_index:column_uid の右側にそのまま入る。
+    //区切りの ":" などを含むと鍵を分けられないため、使える文字をここで1つに決める
+    const UID_PATTERN = /^[0-9A-Za-z_-]+$/;
 
     function is_plain_object(value){
         return value != null && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function is_valid_uid(value){
+        return typeof value === "string" && UID_PATTERN.test(value);
     }
 
     function uid_of(column){
@@ -47,7 +54,7 @@ window.opd_custom_column_state_migration = (function(){
     function issue_uid(used, create_id){
         for(let attempt = 0; attempt < ISSUE_ATTEMPTS; attempt += 1){
             const candidate = typeof create_id === "function" ? create_id() : null;
-            if(typeof candidate === "string" && candidate !== "" && !used.has(candidate)){
+            if(is_valid_uid(candidate) && !used.has(candidate)){
                 used.add(candidate);
                 return candidate;
             }
@@ -170,6 +177,7 @@ window.opd_custom_column_state_migration = (function(){
         UID_ATTRIBUTE: UID_ATTRIBUTE,
         assign_uids: assign_uids,
         is_migrated: is_migrated,
+        is_valid_uid: is_valid_uid,
         issue_uid: issue_uid,
         migrate: migrate,
         read_tabs: read_tabs,

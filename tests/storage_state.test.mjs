@@ -119,6 +119,99 @@ test("settings codec imports old/new formats and rejects malformed state", () =>
     assert.throws(() => codec.decode([{ name: "bad text", profile: [{ type: "home", column_save_title: "bad\u0000title" }] }]));
 });
 
+test("settings codec rejects column UIDs that cannot be tab keys or are shared in a v2 profile", () => {
+    const context = { window: {}, URL };
+    for (const file of CODEC_SOURCES) {
+        loadScript(file, context);
+    }
+    const codec = context.window.opd_custom_settings_codec;
+    //IDの発行を固定して、実行ごとに結果が変わらないようにする
+    let next_id = 0;
+    context.window.opd_custom_safe_values.create_random_id = () => "fixed" + (next_id++);
+    const reexport = (decoded) => codec.create_export(codec.build_storage_items(decoded, null, "1.1.3.7"));
+    const v2 = (profile, tabs) => ({
+        format: codec.FORMAT,
+        schema_version: 2,
+        opd_profile_store: [{ name: "default", profile }],
+        opd_custom_column_state: { schema_version: 2, tabs },
+    });
+
+    //version 2 で同じプロファイルのタイムライン2本が同じIDだと、鍵 0:same を共有してしまう
+    assert.throws(
+        () => codec.decode(v2(
+            [{ type: "home", opd_custom_uid: "same" }, { type: "home", opd_custom_uid: "same" }],
+            { "0:same": "Following" }
+        )),
+        /重複/
+    );
+    //別のプロファイルなら鍵の左側が違うので同じIDでも混ざらない
+    const across_profiles = codec.decode({
+        format: codec.FORMAT,
+        schema_version: 2,
+        opd_profile_store: [
+            { name: "a", profile: [{ type: "home", opd_custom_uid: "same" }] },
+            { name: "b", profile: [{ type: "home", opd_custom_uid: "same" }] },
+        ],
+        opd_custom_column_state: { schema_version: 2, tabs: { "0:same": "Following", "1:same": "List" } },
+    });
+    assert.equal(reexport(across_profiles).opd_custom_column_state.tabs["1:same"], "List");
+
+    //鍵に使えないIDは、旧形式でも version 2 でも受け付けない
+    assert.throws(
+        () => codec.decode({
+            opd_profile_store: [{ name: "default", profile: [{ type: "home", opd_custom_uid: "bad:id" }] }],
+            opd_custom_column_state: { "0:0": "Following" },
+        }),
+        /カラム設定の形式が不正/
+    );
+    assert.throws(
+        () => codec.decode(v2([{ type: "home", opd_custom_uid: "bad:id" }], {})),
+        /カラム設定の形式が不正/
+    );
+    assert.throws(
+        () => codec.decode(v2([{ type: "home", opd_custom_uid: "ok" }], { "0:bad:id": "Following" })),
+        /タブ状態の形式が不正/
+    );
+
+    //旧形式の重複IDは移行が振り直し、鍵も表示位置から引き直すので受理して再エクスポートできる
+    const legacy = codec.decode({
+        opd_profile_store: [{ name: "default", profile: [
+            { type: "home", opd_custom_uid: "same" },
+            { type: "home", opd_custom_uid: "same" },
+        ] }],
+        opd_custom_column_state: { "0:0": "Following", "0:1": "List" },
+    });
+    const legacy_export = reexport(legacy);
+    const [first_uid, second_uid] = legacy_export.opd_profile_store[0].profile.map((column) => column.opd_custom_uid);
+    assert.equal(first_uid, "same");
+    assert.notEqual(second_uid, "same");
+    assert.deepEqual(JSON.parse(JSON.stringify(legacy_export.opd_custom_column_state)), {
+        schema_version: 2,
+        tabs: { "0:same": "Following", [`0:${second_uid}`]: "List" },
+    });
+
+    //受理した version 2 も保存後に再エクスポートでき、IDと鍵がそのまま残る
+    const accepted_v2 = codec.decode(v2(
+        [{ type: "home", opd_custom_uid: "a-1" }, { type: "home", opd_custom_uid: "b_2" }],
+        { "0:a-1": "Following", "0:b_2": "List" }
+    ));
+    const v2_export = reexport(accepted_v2);
+    assert.deepEqual(
+        Array.from(v2_export.opd_profile_store[0].profile, (column) => column.opd_custom_uid),
+        ["a-1", "b_2"]
+    );
+    assert.deepEqual(JSON.parse(JSON.stringify(v2_export.opd_custom_column_state.tabs)), { "0:a-1": "Following", "0:b_2": "List" });
+});
+
+test("column UID issuing skips generated values that cannot be tab keys", () => {
+    const context = { window: {} };
+    loadScript("extensions/custom/column_state_migration.js", context);
+    const migration = context.window.opd_custom_column_state_migration;
+    const candidates = ["bad:id", "", "ok_1"];
+    assert.equal(migration.issue_uid(new Set(), () => candidates.shift()), "ok_1");
+    assert.equal(migration.issue_uid(new Set(), () => "bad:id"), "uid0");
+});
+
 test("column state serializes concurrent writes and profile remapping", async () => {
     let stored = "{}";
     const context = {
