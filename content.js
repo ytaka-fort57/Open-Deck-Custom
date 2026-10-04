@@ -796,11 +796,20 @@ function run(settings){
             //uid_map は複製元のIDから新しいIDへの対応で、タブ保存の複製に使う
             const copied = column_settings.reissue_uids(profile.column_settings, create_random_id);
             const save_object = {name:"user_profile", profile:copied.profile};
+            //待ち中の自動保存が追加前の一覧で上書きしないよう、メモリへは先に足す
             profile_store.push(save_object);
             const new_profile_index = profile_store.length - 1;
-            deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function (error) {
-                report_profile_save_failure(error);
-                copy_profile_tab_state(last_load_profile, new_profile_index, copied.uid_map);
+            //一覧とタブ選択の複製を1回で書く。失敗したら追加を取り消し、一覧の表示も進めない
+            window.opd_custom_column_state.commit_profile_add(profile_store, last_load_profile, new_profile_index, copied.uid_map, function(error){
+                if(report_profile_save_failure(error)){
+                    const added_index = profile_store.indexOf(save_object);
+                    if(added_index >= 0){
+                        profile_store.splice(added_index, 1);
+                    }
+                    //待ち中の自動保存が追加後の一覧を書いていても、取り消した一覧へ戻す
+                    save_current_profile(last_load_profile);
+                    return;
+                }
                 refresh_profile_list();
             });
         }
@@ -823,20 +832,28 @@ function run(settings){
         }
         if(last_load_profile != delete_num){
             if(confirm(i18n_message("msg_profile_delete_confirm", [delete_num]))){
-                profile_store.splice(delete_num, 1);
+                const deleted_profile = profile_store.splice(delete_num, 1)[0];
                 //一覧を詰めたのと同じ同期区間で現在番号と表示を補正する。保存完了を待つと、
                 //その間の自動保存が詰めた後の配列を補正前の番号で書き換える
+                const before_profile_num = last_load_profile;
                 const after_profile_num = last_load_profile < delete_num ? last_load_profile : Math.max(last_load_profile - 1, 0);
                 last_load_profile = after_profile_num;
                 refresh_profile_list(after_profile_num);
-                //タブ状態の番号の詰め直しを、補正後の番号でのタブ保存より先に書き込みキューへ積む
-                delete_profile_tab_state(delete_num);
-                deck_storage.set_json(deck_storage.KEYS.PROFILE_STORE, profile_store, function (error) {
-                    report_profile_save_failure(error);
-                    deck_storage.update_json(deck_storage.KEYS.SETTINGS, {}, function(settings){
-                        settings.last_load_profile = after_profile_num;
-                        return settings;
-                    }, report_profile_save_failure);
+                //一覧・タブ状態の番号の詰め直し・現在番号を1回で書く。補正後の番号でのタブ保存より
+                //先に書き込みキューへ積む。失敗したら削除を取り消し、番号と表示も元へ戻す
+                window.opd_custom_column_state.commit_profile_delete(profile_store, delete_num, after_profile_num, function(error){
+                    if(!report_profile_save_failure(error)){
+                        return;
+                    }
+                    if(profile_store.indexOf(deleted_profile) < 0){
+                        profile_store.splice(delete_num, 0, deleted_profile);
+                    }
+                    if(last_load_profile === after_profile_num){
+                        last_load_profile = before_profile_num;
+                    }
+                    refresh_profile_list(last_load_profile);
+                    //待ち中の自動保存が詰めた後の一覧を書いていても、取り消した一覧へ戻す
+                    save_current_profile(last_load_profile);
                 });
             }
         }else{
@@ -911,20 +928,6 @@ function run(settings){
             return;
         }
         reorder_api.remap_after_dom_change(before_sections, document);
-    }
-
-    function copy_profile_tab_state(source_profile_index, target_profile_index, uid_map){
-        const state_api = window.opd_custom_column_state;
-        if(state_api != undefined && state_api.copy_profile != undefined){
-            state_api.copy_profile(source_profile_index, target_profile_index, uid_map);
-        }
-    }
-
-    function delete_profile_tab_state(deleted_profile_index){
-        const state_api = window.opd_custom_column_state;
-        if(state_api != undefined && state_api.delete_profile != undefined){
-            state_api.delete_profile(deleted_profile_index);
-        }
     }
 
     //カラム移動

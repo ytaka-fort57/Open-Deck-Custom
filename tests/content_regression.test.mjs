@@ -294,3 +294,17 @@ test("profile saves do not discard storage errors", () => {
     assert.doesNotMatch(content, /deck_storage\.(set_json|update_json)\(deck_storage\.KEYS\.PROFILE_STORE, profile_store, function \(\)/);
     assert.doesNotMatch(content, /deck_storage\.update_json\(deck_storage\.KEYS\.SETTINGS, \{\}, function\(settings\)\{[^}]*?return settings;\s*\}(\)|, function\(\)\{\}\))/);
 });
+
+test("profile add and delete roll memory back when the combined write fails", () => {
+    //BL-081: 一覧・タブ保存・現在番号は1回の書き込みで揃え、失敗したらメモリと表示を成功状態へ進めない。
+    //本家ファイルは実行テストに載せられないため、呼び出しの形で確かめる(書き込み本体は column_state_migration.test.mjs)
+    const save = content.match(/getElementById\("profile_save"\)[\s\S]*?\n    \}\);/)[0];
+    assert.match(save, /profile_store\.push\(save_object\)[\s\S]*?commit_profile_add\(profile_store, last_load_profile, new_profile_index, copied\.uid_map, function\(error\)\{\s*if\(report_profile_save_failure\(error\)\)\{[\s\S]*?profile_store\.splice\(added_index, 1\)[\s\S]*?return;\s*\}\s*refresh_profile_list\(\);/);
+    assert.doesNotMatch(save, /deck_storage\.set_json\(deck_storage\.KEYS\.PROFILE_STORE/);
+
+    const remove = content.match(/getElementById\("profile_delete"\)[\s\S]*?\n    \}\);/)[0];
+    assert.match(remove, /commit_profile_delete\(profile_store, delete_num, after_profile_num, function\(error\)\{\s*if\(!report_profile_save_failure\(error\)\)\{\s*return;\s*\}[\s\S]*?profile_store\.splice\(delete_num, 0, deleted_profile\)[\s\S]*?last_load_profile = before_profile_num;[\s\S]*?refresh_profile_list\(last_load_profile\)/);
+    assert.doesNotMatch(remove, /deck_storage\.(set_json|update_json)\(/);
+    //タブ保存だけを別に書く経路を残さない
+    assert.doesNotMatch(content, /copy_profile_tab_state|delete_profile_tab_state/);
+});

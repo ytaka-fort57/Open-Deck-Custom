@@ -55,14 +55,19 @@ window.opd_custom_column_state = (function(){
         });
     }
 
-    //mutatorは鍵と値だけのマップを受け取る。移行済みかどうかの包みはここで着せ替える
+    //鍵と値だけのマップへmutatorを適用し、移行済みかどうかの包みを元の保存に合わせて着せ替える
+    function apply_tabs(state, mutator){
+        const next_tabs = mutator(migration.read_tabs(state));
+        return migration.is_migrated(state) ? migration.wrap_tabs(next_tabs) : next_tabs;
+    }
+
+    //mutatorは鍵と値だけのマップを受け取る。保存の失敗はcallbackの第1引数で返す
     function update_all(mutator, callback){
         storage.update_json(STATE_KEY, {}, function(state){
-            const next_tabs = mutator(migration.read_tabs(state));
-            return migration.is_migrated(state) ? migration.wrap_tabs(next_tabs) : next_tabs;
-        }, function(){
+            return apply_tabs(state, mutator);
+        }, function(error){
             if(callback != undefined){
-                callback();
+                callback(error);
             }
         });
     }
@@ -110,53 +115,89 @@ window.opd_custom_column_state = (function(){
 
     //新しいプロファイルは現在のカラム構成を複製して作られるため、タブ選択も複製する。
     //複製したカラムのIDは振り直されるので、uid_map(複製元のID -> 新しいID)で鍵を読み替える
-    function copy_profile(source_profile_index, target_profile_index, uid_map, callback){
-        update_all(function(state){
-            const next_state = {};
-            Object.keys(state).forEach(function(key){
-                const parts = split_state_key(key);
-                //対象番号に以前の状態が残っていれば先に捨てる
-                if(parts != null && parts.profile_index === target_profile_index){
-                    return;
-                }
-                next_state[key] = state[key];
-            });
-            Object.keys(state).forEach(function(key){
-                const parts = split_state_key(key);
-                if(parts == null || parts.profile_index !== source_profile_index){
-                    return;
-                }
-                const target_key = is_stable_id_mode()
-                    ? uid_map?.[parts.column_key]
-                    : parts.column_key;
-                if(target_key == undefined){
-                    return;
-                }
-                next_state[state_key(target_profile_index, target_key)] = state[key];
-            });
-            return next_state;
-        }, callback);
+    function copy_profile_tabs(state, source_profile_index, target_profile_index, uid_map){
+        const next_state = {};
+        Object.keys(state).forEach(function(key){
+            const parts = split_state_key(key);
+            //対象番号に以前の状態が残っていれば先に捨てる
+            if(parts != null && parts.profile_index === target_profile_index){
+                return;
+            }
+            next_state[key] = state[key];
+        });
+        Object.keys(state).forEach(function(key){
+            const parts = split_state_key(key);
+            if(parts == null || parts.profile_index !== source_profile_index){
+                return;
+            }
+            const target_key = is_stable_id_mode()
+                ? uid_map?.[parts.column_key]
+                : parts.column_key;
+            if(target_key == undefined){
+                return;
+            }
+            next_state[state_key(target_profile_index, target_key)] = state[key];
+        });
+        return next_state;
     }
 
     //プロファイル削除後は、後続プロファイルの番号を1つ前へ詰める
-    function delete_profile(deleted_profile_index, callback){
-        update_all(function(state){
-            const next_state = {};
-            Object.keys(state).forEach(function(key){
-                const parts = split_state_key(key);
-                if(parts == null){
-                    next_state[key] = state[key];
-                    return;
-                }
-                if(parts.profile_index === deleted_profile_index){
-                    return;
-                }
-                const next_profile_index = parts.profile_index > deleted_profile_index
-                    ? parts.profile_index - 1
-                    : parts.profile_index;
-                next_state[state_key(next_profile_index, parts.column_key)] = state[key];
-            });
-            return next_state;
+    function delete_profile_tabs(state, deleted_profile_index){
+        const next_state = {};
+        Object.keys(state).forEach(function(key){
+            const parts = split_state_key(key);
+            if(parts == null){
+                next_state[key] = state[key];
+                return;
+            }
+            if(parts.profile_index === deleted_profile_index){
+                return;
+            }
+            const next_profile_index = parts.profile_index > deleted_profile_index
+                ? parts.profile_index - 1
+                : parts.profile_index;
+            next_state[state_key(next_profile_index, parts.column_key)] = state[key];
+        });
+        return next_state;
+    }
+
+    //プロファイルの追加・削除は、プロファイル一覧・現在番号・タブ保存の番号が互いを指すため、
+    //1回の書き込みでまとめて保存する。別々に書くと、途中の失敗で番号の対応がずれたまま残る。
+    //next_profile_store は呼び出し時点の内容で確定し、待ち中の自動保存による変更を混ぜない。
+    //next_profile_index を渡したときだけ設定の現在番号も書き換える。
+    function commit_profile_change(next_profile_store, next_profile_index, tabs_mutator, callback){
+        const profile_store_snapshot = JSON.stringify(next_profile_store);
+        const defaults = {};
+        defaults[STATE_KEY] = {};
+        if(next_profile_index != null){
+            defaults[storage.KEYS.SETTINGS] = {};
+        }
+        storage.update_json_many(defaults, function(current){
+            const next = {};
+            next[PROFILE_STORE_KEY] = JSON.parse(profile_store_snapshot);
+            next[STATE_KEY] = apply_tabs(current[STATE_KEY], tabs_mutator);
+            if(next_profile_index != null){
+                next[storage.KEYS.SETTINGS] = Object.assign({}, current[storage.KEYS.SETTINGS], {last_load_profile: next_profile_index});
+            }
+            return next;
+        }, function(error){
+            if(callback != undefined){
+                callback(error);
+            }
+        });
+    }
+
+    //複製して末尾へ足したプロファイルを、タブ選択の複製と同時に保存する
+    function commit_profile_add(next_profile_store, source_profile_index, target_profile_index, uid_map, callback){
+        commit_profile_change(next_profile_store, null, function(state){
+            return copy_profile_tabs(state, source_profile_index, target_profile_index, uid_map);
+        }, callback);
+    }
+
+    //プロファイルを除いた一覧を、タブ保存の詰め直しと補正後の現在番号と同時に保存する
+    function commit_profile_delete(next_profile_store, deleted_profile_index, next_profile_index, callback){
+        commit_profile_change(next_profile_store, next_profile_index, function(state){
+            return delete_profile_tabs(state, deleted_profile_index);
         }, callback);
     }
 
@@ -242,8 +283,8 @@ window.opd_custom_column_state = (function(){
         load_all: load_all,
         save_all: save_all,
         update_all: update_all,
-        copy_profile: copy_profile,
-        delete_profile: delete_profile,
+        commit_profile_add: commit_profile_add,
+        commit_profile_delete: commit_profile_delete,
         column_key: column_key,
         ensure_migrated: ensure_migrated,
         is_stable_id_mode: is_stable_id_mode,

@@ -29,11 +29,14 @@ function sequentialIds() {
     return () => `id${++next}`;
 }
 
-function loadColumnState({ profile_store, column_state, failWrite = false }) {
+function loadColumnState({ profile_store, column_state, settings, failWrite = false }) {
     const stored = {
         opd_profile_store: JSON.stringify(profile_store),
         opd_custom_column_state: JSON.stringify(column_state),
     };
+    if (settings !== undefined) {
+        stored.opd_settings = JSON.stringify(settings);
+    }
     const context = {
         window: {},
         console: { error: () => {} },
@@ -220,19 +223,68 @@ test("profile copy and delete follow the stable id keys", async () => {
     const { state, stored } = loadColumnState({
         profile_store: profileStore([{ type: "home" }]),
         column_state: { schema_version: 2, tabs: { "0:a": "Following", "0:b": "List", "1:z": "Stale" } },
+        settings: { last_load_profile: 1, version: "1.0" },
     });
     await new Promise((resolve) => state.when_ready(resolve));
 
-    //複製先のIDは振り直されるため、uid_map の対応だけを写す
-    await new Promise((resolve) => state.copy_profile(0, 1, { a: "a2" }, resolve));
+    //複製先のIDは振り直されるため、uid_map の対応だけを写す。一覧も同じ書き込みで入る
+    const added = profileStore([{ type: "home" }], [{ type: "home" }]);
+    await new Promise((resolve) => state.commit_profile_add(added, 0, 1, { a: "a2" }, resolve));
     assert.deepEqual(read(stored, "opd_custom_column_state"), {
         schema_version: 2,
         tabs: { "0:a": "Following", "0:b": "List", "1:a2": "Following" },
     });
+    assert.deepEqual(read(stored, "opd_profile_store"), added);
+    //追加は現在番号を変えない
+    assert.equal(read(stored, "opd_settings").last_load_profile, 1);
 
-    await new Promise((resolve) => state.delete_profile(0, resolve));
+    //削除は一覧・タブ保存の詰め直し・現在番号を揃えて書き、設定の他の項目は保つ
+    const remaining = [added[1]];
+    const error = await new Promise((resolve) => state.commit_profile_delete(remaining, 0, 0, resolve));
+    assert.equal(error, null);
     assert.deepEqual(read(stored, "opd_custom_column_state"), {
         schema_version: 2,
         tabs: { "0:a2": "Following" },
     });
+    assert.deepEqual(read(stored, "opd_profile_store"), remaining);
+    assert.deepEqual(read(stored, "opd_settings"), { last_load_profile: 0, version: "1.0" });
+});
+
+test("a failed profile add or delete leaves every related key untouched and reports the error", async () => {
+    //BL-081: 一覧だけ・タブ保存だけ・現在番号だけが書かれた状態を残さない
+    const original = {
+        profile_store: profileStore([{ type: "home", opd_custom_uid: "a" }], [{ type: "home", opd_custom_uid: "c" }]),
+        column_state: { schema_version: 2, tabs: { "0:a": "Following", "1:c": "List" } },
+        settings: { last_load_profile: 1, version: "1.0" },
+    };
+    const { state, stored } = loadColumnState({ ...original, failWrite: true });
+    await new Promise((resolve) => state.when_ready(resolve));
+    const snapshot = { ...stored };
+
+    const add_error = await new Promise((resolve) => state.commit_profile_add(
+        [...original.profile_store, { name: "copy", profile: [{ type: "home", opd_custom_uid: "a2" }] }],
+        0, 2, { a: "a2" }, resolve
+    ));
+    assert.match(String(add_error?.message), /storage is full/);
+    assert.deepEqual(stored, snapshot);
+
+    const delete_error = await new Promise((resolve) => state.commit_profile_delete(
+        [original.profile_store[1]], 0, 0, resolve
+    ));
+    assert.match(String(delete_error?.message), /storage is full/);
+    assert.deepEqual(stored, snapshot);
+    //再読込みで読む値は元のまま
+    assert.deepEqual(read(stored, "opd_profile_store"), original.profile_store);
+    assert.deepEqual(read(stored, "opd_custom_column_state"), original.column_state);
+    assert.equal(read(stored, "opd_settings").last_load_profile, 1);
+});
+
+test("tab state writes pass storage errors to the caller", async () => {
+    const { state } = loadColumnState({
+        profile_store: profileStore([{ type: "home" }]),
+        column_state: { schema_version: 2, tabs: {} },
+        failWrite: true,
+    });
+    const error = await new Promise((resolve) => state.save_tab(0, "a", "List", resolve));
+    assert.match(String(error?.message), /storage is full/);
 });

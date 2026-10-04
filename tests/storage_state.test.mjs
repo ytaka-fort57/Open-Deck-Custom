@@ -238,9 +238,9 @@ test("column state serializes concurrent writes and profile remapping", async ()
     await Promise.all([
         call((done) => state.save_tab(0, 0, "Following", done)),
         call((done) => state.save_tab(0, 1, "List", done)),
-        call((done) => state.copy_profile(0, 1, null, done))
+        call((done) => state.commit_profile_add([{ name: "p0" }, { name: "p1" }], 0, 1, null, done))
     ]);
-    await call((done) => state.delete_profile(0, done));
+    await call((done) => state.commit_profile_delete([{ name: "p1" }], 0, 0, done));
 
     assert.deepEqual(JSON.parse(stored), { "0:0": "Following", "0:1": "List" });
 });
