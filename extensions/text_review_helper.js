@@ -86,6 +86,8 @@
         const detail = JSON.parse(e.detail);
         //貼り付け時のトークンをチェックする
         if(opd_paste_token && opd_paste_token !== detail.token) return;
+        //校正元と同じエディタにフォーカスがあり、本文が校正時のままの場合だけ置き換える
+        if(!isReviewSourceCurrent(target_editor_elem, detail)) return;
 
         //X側のテキストエディタの内部関数を利用してテキストを正しく入力させる
         if(target_editor_elem && target_editor_elem.isContentEditable){
@@ -93,6 +95,8 @@
             text_all_select(target_editor_elem);
             //選択が終わるまで待機
             await new Promise(resolve => setTimeout(resolve, 30));
+            //待機中の入力やフォーカス移動も古い結果での上書きとして拒否する
+            if(!isReviewSourceCurrent(target_editor_elem, detail)) return;
 
             //Firefox では　DataTransfer や ClipboardEvent 使えないので動作を分ける
             if (!detail.is_firefox) {
@@ -140,6 +144,15 @@
             }
         }
     };
+
+    //校正元エディタの印と本文が適用要求と一致するか確かめる(本文は content 側と同じく innerText.trim() で比べる)
+    function isReviewSourceCurrent(editor_elem, detail){
+        return !!editor_elem
+            && editor_elem.isConnected
+            && typeof detail.source_id === "string"
+            && editor_elem.getAttribute("opd_text_review_source") === detail.source_id
+            && editor_elem.innerText.trim() === detail.source_text;
+    }
 
     //組み込みエディタからテキストを取得する
     function getEditorText(editor){

@@ -193,7 +193,7 @@ class OpdExtTextReview {
                             review_panel.textContent = "";
                             review_panel.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div><div class="opd_text_review_loader"></div>${this.UITexts[this.opd_use_lang].textReview_inProgress.message}</div>`);
                             try{
-                                await this.Review(editable_elem.innerText.trim(), review_panel, column_window);
+                                await this.Review(editable_elem.innerText.trim(), review_panel, column_window, editable_elem);
                             }catch(error){
                                 review_panel.textContent = "";
                                 review_panel.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_failed.message}</div>`);
@@ -239,7 +239,17 @@ class OpdExtTextReview {
                 editor_observers.clear();
             });
         }
-        this.Review = async(text, panel_elem, column_window) => {
+        this.Review = async(text, panel_elem, column_window, source_editor) => {
+            //校正元のエディタに印を付け、結果表示時と適用直前に本文と対象が校正時のままか確かめる
+            const source_id = this.CreateRandomID();
+            source_editor.setAttribute("opd_text_review_source", source_id);
+            const is_source_current = () => source_editor.isConnected
+                && source_editor.getAttribute("opd_text_review_source") === source_id
+                && source_editor.innerText.trim() === text;
+            const show_stale = () => {
+                panel_elem.textContent = "";
+                panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_stale.message}</div>`);
+            };
             //校正開始
             const review_request = await this.ReviewRquest(text);
             
@@ -247,6 +257,11 @@ class OpdExtTextReview {
             if(!review_request || !Array.isArray(review_request.indications)){
                 panel_elem.textContent = "";
                 panel_elem.insertAdjacentHTML("beforeend", `<div>${this.UITexts[this.opd_use_lang].textReview_panelTitle.message}</div><div>${this.UITexts[this.opd_use_lang].textReview_failed.message}</div>`);
+                return;
+            }
+            //校正中に本文が変わった、またはエディタが外れた場合は古い結果を出さない
+            if(!is_source_current()){
+                show_stale();
                 return;
             }
             const review_model = window.opd_custom_text_review_model.create_preview_model(
@@ -296,25 +311,33 @@ class OpdExtTextReview {
             });
 
             //指摘適用ボタンの動作を追加
-            panel_elem.querySelector(`#opd_text_review_apply_selected`).addEventListener("click", (ev)=>{
+            //結果表示後に本文が変わっていれば適用せず、再校正を案内する。helper も元本文と対象を再検査する
+            const dispatch_apply = () => {
+                if(!is_source_current()){
+                    show_stale();
+                    return;
+                }
                 column_window.document.dispatchEvent(new CustomEvent('opd_text_review_apply', {
                     bubbles: true,
                     composed: true,
-                    detail: JSON.stringify({ text: indication_fix_str, token: this.opd_text_review_token, is_firefox: this.IsFirefox() })
+                    detail: JSON.stringify({ text: indication_fix_str, source_text: text, source_id: source_id, token: this.opd_text_review_token, is_firefox: this.IsFirefox() })
                 }));
+            };
+            panel_elem.querySelector(`#opd_text_review_apply_selected`).addEventListener("click", (ev)=>{
+                dispatch_apply();
             });
             panel_elem.querySelector(`#opd_text_review_apply_all`).addEventListener("click", (ev)=>{
+                if(!is_source_current()){
+                    show_stale();
+                    return;
+                }
                 indication_items.forEach((item)=>{
                     const target = panel_elem.querySelector(`#opd_text_review_iid_${item.id}`);
                     if(!target.checked){
                         target.click();
                     }
                 });
-                column_window.document.dispatchEvent(new CustomEvent('opd_text_review_apply', {
-                    bubbles: true,
-                    composed: true,
-                    detail: JSON.stringify({ text: indication_fix_str, token: this.opd_text_review_token, is_firefox: this.IsFirefox() })
-                }));
+                dispatch_apply();
             });
         }
         this.NormalizeIndications = (text, result) =>{
@@ -377,6 +400,9 @@ class OpdExtTextReview {
                 textReview_noIssues: {
                     message: "指摘箇所はありません"
                 },
+                textReview_stale: {
+                    message: "校正後に本文または入力欄が変わったため適用できません。もう一度校正してください"
+                },
                 textReview_applySelected: {
                     message: "適用"
                 },
@@ -406,6 +432,9 @@ class OpdExtTextReview {
                 },
                 textReview_noIssues: {
                     message: "No issues found."
+                },
+                textReview_stale: {
+                    message: "The text or editor changed after the review. Please review it again."
                 },
                 textReview_applySelected: {
                     message: "Apply"
