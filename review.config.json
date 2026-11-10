@@ -62,7 +62,7 @@
   },
   "verification": [
     "npm run test:unit",
-    "npm run backlog:validate -- --report"
+    "npm run backlog:validate -- --report --health"
   ],
   "exclude": [
     "playwright-report/**",

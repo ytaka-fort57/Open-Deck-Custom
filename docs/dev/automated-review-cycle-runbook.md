@@ -18,7 +18,7 @@
 2. `npm run review -- run --if-due --dry-run --json`
 3. 決定論レンズはそのまま `run --lens <ID> --json`
 4. LLMレンズはdry-runの `prompt` / `files` 内だけを点検し、構造化JSONを `--findings` で渡す
-5. `npm run backlog:validate -- --report`
+5. `npm run backlog:validate -- --report --health`
 
 期限到来なしは `skipped: true` の正常no-op。1回1レンズ、登録上限は設定値に従う。
 

@@ -64,7 +64,7 @@ description: BL の発見事項(BL-0NN)の対応要否を確かめ、修正・�
 3. `verify --method code --result passed`。notes に追加したテスト名と、統合後のテスト件数(unit / e2e)を書く。
    - `verificationRequired: code` の件: `"status": "verified"` を付ける。
    - `manual` / `both` の件: `in-progress` のまま残す。実 X での確認手順を利用者に渡す(手動検証は人が `verify --method manual` で記録する)。
-4. `K validate --report` を実行する。`validated N finding(s) and report` が出れば完了。
+4. `K validate --report --health` を実行する。`validated N finding(s) and report and health` が出れば完了。`health is stale` なら `review health` で再生成する。
    - Windows で `EPERM: rename … findings.jsonl` が出たら、何も書かれていない。`show` で確かめてから同じ入力を流し直す。
 
 ## 6. 台帳のコミット
