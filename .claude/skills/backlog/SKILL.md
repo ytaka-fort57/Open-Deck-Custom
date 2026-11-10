@@ -55,7 +55,7 @@ CLI はリポジトリのルートで `node node_modules/review-kit/bin/review-k
 
 - `validate --report --health` が `validated <件数> finding(s) and report and health` を出力して終了する。
 - 追加・更新した ID が、CLI の出力どおりの `category` / `priority` / `status` になっている(確かめるなら `list --open` か `show --fields`)。
-- `git status --short` の変更が `docs/backlog/findings.jsonl` と `docs/backlog/report.md`(証跡を残した場合は `docs/backlog/evidence/` の指定ファイル)に限られる。
+- `git status --short` の変更が `docs/backlog/findings.jsonl`、`docs/backlog/report.md`、`docs/backlog/health.md`(証跡を残した場合は `docs/backlog/evidence/` の指定ファイル)に限られる。
 
 ## Do not
 
