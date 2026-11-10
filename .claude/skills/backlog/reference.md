@@ -37,9 +37,10 @@
 
 ## Failure handling
 
-- `similar finding exists: BL-0NN …` — 既存項目と責務・利用者影響が同じなら追加をやめ、その ID を `update` で更新する。別なら `allowSimilar` を付けて追加し、何が違うかを `finding` に書く。タイトルの語が重なった、同じファイルを根拠にしただけの検出もあるため、提示された ID を必ず読んでから判断する。
+- `similar finding exists: BL-0NN …` — 既存項目と責務・利用者影響が同じなら追加をやめ、その ID を `update` で更新する。別なら `allowSimilar` を付けて追加し、何が違うかを `finding` に書く。同じ対象でタイトルが一致するとき、または根拠ファイルを共有しかつタイトルの語が重なるときに止まる。ファイルを共有しただけでは止まらない。提示された ID は読んでから判断する。
 - `invalid status transition: X -> Y` — 途中の状態を飛ばしている。`node_modules/review-kit/docs/schema.md` の状態別の条件を満たしてから 1 段ずつ進める。
 - `cannot be verified before required verification passes` — `verificationRequired` が要求する方法の検証が `passed` で揃っていない。`manual` が必要な項目は、テスト・ビルド・コード確認では代替しない。
 - `needs acceptanceCriteria from triaged onward` / `needs workNotes or relatedCommits` — 状態に必要な項目を同じ `update` で渡す。
-- `report is stale` — `report` で再生成してから、もう一度 `validate --report`。
+- `report is stale` — `report` で再生成してから、もう一度 `validate --report --health`。
+- `health is stale` — `review health` で再生成する。生成日が今日である必要はない。検査は health.md の生成日で台帳を描き直して比べる。
 - ロックエラー — `preflight` で保持プロセスを確認する。別の実行が進行中なら終了を待つ。

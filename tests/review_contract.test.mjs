@@ -25,7 +25,7 @@ test("review config は既存の BL 台帳の契約を保つ", async () => {
   assert.equal(config.paths.report, "docs/backlog/report.md");
   assert.equal(config.skills.scriptPrefix, "backlog");
   assert.deepEqual(config.defaults, { category: "architecture", verificationRequired: "code" });
-  assert.deepEqual(config.verification, ["npm run test:unit", "npm run backlog:validate -- --report"]);
+  assert.deepEqual(config.verification, ["npm run test:unit", "npm run backlog:validate -- --report --health"]);
 });
 
 test("レンズは移植時に合意した最小構成を持つ", async () => {
@@ -43,9 +43,9 @@ test("自動修正は custom 基点の docs-link だけで、方針・エンジ�
   }
 });
 
-test("台帳と report.md が現行エンジンで整合している", async () => {
-  const { stdout } = await reviewKit(["backlog", "validate", "--report"]);
-  assert.match(stdout, /validated \d+ finding\(s\) and report/);
+test("台帳と report.md と health.md が現行エンジンで整合している", async () => {
+  const { stdout } = await reviewKit(["backlog", "validate", "--report", "--health"]);
+  assert.match(stdout, /validated \d+ finding\(s\) and report and health/);
 });
 
 test("生成スキルが雛形・設定とずれていない", async () => {

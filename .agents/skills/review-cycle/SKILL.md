@@ -16,7 +16,7 @@ description: 期限到来したレビュー観点を1件だけ実行し、共通
    - 同じ問題なら、そのfindingを入力から外す。追加の事実は `node node_modules/review-kit/bin/review-kit.mjs backlog update <ID> --work-note "…"` で既存IDへ残す。
    - 別の問題なら、そのfindingに `"allowSimilar": true` を付け、既存IDとの違いを `finding` に書いて流し直す。
    類似判定はタイトルの語や根拠ファイルが重なっただけでも出る。確認して別の問題と分かった発見を、類似判定を理由に捨てない。
-5. `node node_modules/review-kit/bin/review-kit.mjs backlog validate --report` で台帳と生成物を検証する。
+5. `node node_modules/review-kit/bin/review-kit.mjs backlog validate --report --health` で台帳と生成物を検証する。`health is stale` なら `node node_modules/review-kit/bin/review-kit.mjs review health` で再生成する。生成日が今日でなくても、台帳と一致していれば通過する。
 
 1回につき1レンズ、登録上限はCLIの計画に従う。サイクル中にソースコードを修正しない。通常フローで `review cycle start` / `backlog add` / `review cycle finish` を個別に呼ばない(類似候補を登録するときも `allowSimilar` を付けて `review run` で流す)。
 

@@ -18,7 +18,7 @@ npm run backlog:verify -- BL-001 --method code --result passed --notes "node tes
 npm run backlog:verify -- BL-001 --method manual --result passed --screen "x.com デッキ" --viewport 1600x900 --step "拡張を読み込む" --step "カラムを追加する" --observed "iframe head に style が1本だけある"
 npm run backlog:update -- BL-001 --status verified
 npm run backlog:report
-npm run backlog:validate -- --report
+npm run backlog:validate -- --report --health
 ```
 
 `--category` は作業系統、`--source-document docs/code-audit-2026-09-18.md#R-11` は元文書を指定する。
@@ -55,8 +55,9 @@ E2E(Playwright + ローカル `x.com` fixture)は `code` 側の検証として�
 - `findings.jsonl` は CLI 経由で更新する
 - ロックファイル(`findings.jsonl.lock`)が残っている場合は、保持プロセスを確認してから解除する
 - `report.md` が古い場合は `npm run backlog:report` で再生成する
-- `node tests/run.mjs`(`tests/review_contract.test.mjs`)が正本と `report.md` の整合と、生成スキルのずれを検査する。
-  `verify.ps1` / `verify.sh` の前に `npm run backlog:validate -- --report` を通す
+- `health.md` が台帳とずれた場合は `npm run review -- health` で再生成する。検査はファイルに書いてある生成日で比較する
+- `node tests/run.mjs`(`tests/review_contract.test.mjs`)が正本と `report.md` / `health.md` の整合と、生成スキルのずれを検査する。
+  `verify.ps1` / `verify.sh` の前に `npm run backlog:validate -- --report --health` を通す
 - 監査文書の内容を一括で 1 件へ詰め込まず、利用者影響・責務ごとに分ける
 - 運用上の不整合を見つけたら、該当案件の `workNotes` に条件と対応を残し、仕組み側の再発条件は review-kit に回帰テストとして追加する
 - 本家(`kawa-nobu/Open-Deck`)由来のファイルを直す項目は、`app: content` / `helper` を付け、
