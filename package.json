@@ -33,6 +33,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "review-kit": "github:ytaka-fort57/review-kit#4182468a43e2f9535f342a243b672e7c7b875215"
+    "review-kit": "github:ytaka-fort57/review-kit#v0.6.0"
   }
 }
