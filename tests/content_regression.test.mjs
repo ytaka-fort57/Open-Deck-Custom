@@ -36,6 +36,11 @@ test("auto reload controls stay in the handler scope and columns expose a manual
 test("auto reload helper re-resolves the timeline refresh function on every reload", () => {
     assert.match(autoReloadHelper, /function resolve_reload_func\(\)/);
     assert.match(autoReloadHelper, /const refresh = resolve_reload_func\(\) \?\? reload_func/);
+    // 旧クライアントの section 固定パスに加え、x-web のリストと命令ハンドルも探す
+    assert.match(autoReloadHelper, /section\[role="region"\]/);
+    assert.match(autoReloadHelper, /li\[data-index\]/);
+    assert.match(autoReloadHelper, /handle\.fetchTop/);
+    assert.match(autoReloadHelper, /refreshOrGoTop/);
 });
 
 test("auto reload helper keeps X from scrolling the timeline to the top", () => {

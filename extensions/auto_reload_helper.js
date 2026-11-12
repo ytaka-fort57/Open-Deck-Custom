@@ -51,15 +51,76 @@
         return originalFocus.call(this, Object.assign({}, options, { preventScroll: true }));
     };
 
-    //現在描画されているタイムラインから更新関数を取得する
-    //Reactの再描画で以前の関数は無効になるため、更新のたびに取り直す
+    //現在描画されているタイムラインから更新関数を取得する。
+    //Reactの再描画で以前の関数は無効になるため、更新のたびに取り直す。
+    //旧クライアントは section[role="region"] の決まった子に onRefresh がある。
+    //x-web ではその section が無く、投稿リストは li[data-index]。
+    //更新関数は祖先 Fiber の onRefresh、または命令ハンドルの fetchTop / refreshOrGoTop。
+    //fetchTop は先頭の取得で、refreshOrGoTop は先頭にいないとスクロールだけになる。
+    const REFRESH_FIBER_HOP_LIMIT = 40;
+
+    function legacy_region_refresh(section){
+        const props = get_props(section, "Props");
+        const refresh = props?.children?.[1]?.props?.children?.[2]?._owner?.memoizedProps?.onRefresh;
+        return typeof refresh === 'function' ? refresh : null;
+    }
+
+    function refresh_from_handle(handle){
+        if(handle == null || typeof handle !== "object"){
+            return null;
+        }
+        if(typeof handle.fetchTop === "function"){
+            return function(){
+                handle.fetchTop();
+            };
+        }
+        if(typeof handle.refreshOrGoTop === "function"){
+            return handle.refreshOrGoTop;
+        }
+        return null;
+    }
+
+    function refresh_from_fiber(fiber){
+        const from_props = fiber?.memoizedProps?.onRefresh;
+        if(typeof from_props === "function"){
+            return from_props;
+        }
+        return refresh_from_handle(fiber?.ref?.current)
+            ?? refresh_from_handle(fiber?.stateNode);
+    }
+
+    function refresh_by_fiber(start){
+        let fiber = get_props(start, "Fiber");
+        let hop = 0;
+        while(fiber && hop < REFRESH_FIBER_HOP_LIMIT){
+            const refresh = refresh_from_fiber(fiber);
+            if(typeof refresh === "function"){
+                return refresh;
+            }
+            fiber = fiber.return;
+            hop += 1;
+        }
+        return null;
+    }
+
     function resolve_reload_func(){
         try{
-            const section = document.querySelector('section[role="region"]');
-            if(!section) return null;
-            const props = get_props(section, "Props");
-            const refresh = props?.children?.[1]?.props?.children?.[2]?._owner?.memoizedProps?.onRefresh;
-            return typeof refresh === 'function' ? refresh : null;
+            const region = document.querySelector('section[role="region"]');
+            if(region){
+                const legacy = legacy_region_refresh(region);
+                if(legacy){
+                    return legacy;
+                }
+                const from_region = refresh_by_fiber(region);
+                if(from_region){
+                    return from_region;
+                }
+            }
+            const item = document.querySelector('li[data-index]');
+            if(!item){
+                return null;
+            }
+            return refresh_by_fiber(item);
         }catch(err){
             console.warn('resolve_reload_func threw->', err);
             return null;
